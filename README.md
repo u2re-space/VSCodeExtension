@@ -1,2 +1,3 @@
-# VSC_ML_to_TeX
-VS Code extension adapter of MathML to LaTeX converter
+# MathML To LaTeX conversion tool
+
+Just select text fragment with MathML and get LaTeX format instead.
