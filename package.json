@@ -16,11 +16,19 @@
     "commands": [
       {
         "command": "MLtoTeX.convert",
-        "title": "Convert MathML to LaTeX"
+        "title": "Convert to LaTeX"
+      },
+      {
+        "command": "MLtoTeX.paste",
+        "title": "Paste as LaTeX"
       }
     ],
     "menus": {
       "editor/context": [
+        {
+          "command": "MLtoTeX.paste",
+          "group": "ML@1"
+        },
         {
           "command": "MLtoTeX.convert",
           "group": "ML@1"
