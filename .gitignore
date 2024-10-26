@@ -131,3 +131,9 @@ dist
 
 # don't include extensions
 *.vsix
+
+./pack/*
+./pack/
+./pack
+pack/
+pack/*
