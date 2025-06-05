@@ -60,9 +60,25 @@ export function markdown(context: vscode.ExtensionContext) {
         if (md) { replaceSelectionWith(md); }
     });
 
-    const pasteAsMarkdown = vscode.commands.registerCommand('vext.dth.paste', async () => {
+    const pasteAsMarkdown = vscode.commands.registerCommand('vext.htd.paste', async () => {
         const md = await getAsMarkdown();
         if (md) { replaceSelectionWith(md); }
+    });
+
+    const copyAsMarkdown = vscode.commands.registerCommand('vext.htd.copy', () => {
+        let md = convertToMarkdown(getSelection());
+        if (md) {
+            vscode.env.clipboard.writeText(md);
+            vscode.window.showInformationMessage('Copied as Markdown!');
+        }
+    });
+
+    const copyAsHtml = vscode.commands.registerCommand('vext.dth.copy', async () => {
+        let html = await convertToHtml(getSelection());
+        if (html) {
+            vscode.env.clipboard.writeText(html);
+            vscode.window.showInformationMessage('Copied as HTML!');
+        }
     });
 
     const convertAsHtml = vscode.commands.registerCommand('vext.dth.convert', async () => {
@@ -70,12 +86,12 @@ export function markdown(context: vscode.ExtensionContext) {
         if (html) { replaceSelectionWith(html); }
     });
 
-    const pasteAsHtml = vscode.commands.registerCommand('vext.htd.paste', async () => {
+    const pasteAsHtml = vscode.commands.registerCommand('vext.dth.paste', async () => {
         const html = await getAsHtml();
         if (html) { replaceSelectionWith(html); }
     });
 
-    context.subscriptions.push(convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml);
+    context.subscriptions.push(convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml, copyAsMarkdown, copyAsHtml);
 }
 
 // This method is called when your extension is deactivated

@@ -24,8 +24,13 @@ export const tryXML = (unsafe: string): string => {
 };
 
 //
+export const stripMathDelimiters = (input: string): string => {
+    return input?.trim?.()?.replace?.(/^\${1,2}([\s\S]*)\${1,2}$/, '$1')?.trim?.();
+};
+
+//
 export const escapeML = (unsafe: string): string => {
-    if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test(unsafe.trim())) {
+    if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test((unsafe = stripMathDelimiters(unsafe) || unsafe)?.trim?.())) {
         if (unsafe?.trim()?.startsWith?.("&lt;") && unsafe?.trim()?.endsWith?.("&gt;")) {
             return tryXML(unsafe) || dummy(unsafe) || unsafe;
         }

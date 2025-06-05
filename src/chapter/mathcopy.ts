@@ -3,15 +3,15 @@
 
 //
 import { MathMLToLaTeX } from 'mathml-to-latex';
-import { escapeML, replaceSelectionWith, getSelection } from '../lib/utils';
+import { escapeML, replaceSelectionWith, getSelection, stripMathDelimiters } from '../lib/utils';
 import * as vscode from 'vscode';
+import temml from "temml";
 
 //
-const temml = import("../temml/temml.mjs");
 export const convertToMathML = async (mathML: string): Promise<string> =>{
     const original = escapeML(mathML);
     if (!(mathML?.trim()?.startsWith?.("<") && mathML?.trim()?.endsWith?.(">"))) {
-        try { mathML = escapeML((await temml)?.default?.renderToString(mathML, {
+        try { mathML = escapeML(temml?.renderToString?.(stripMathDelimiters(mathML) || mathML, {
             throwOnError: true,
             strict: false,
             xml: true
@@ -48,31 +48,47 @@ export function mathml(context: vscode.ExtensionContext) {
     console.log('Math Utils in testing');
 
     //
-    const convertAsTeX = vscode.commands.registerCommand('MLtoTeX.convert', () => {
+    const convertAsTeX = vscode.commands.registerCommand('vext.mtl.convert', () => {
         let LaTeX = convertToLaTeX(getSelection());
         if (LaTeX) { replaceSelectionWith(`\$${LaTeX}\$`); }
     });
 
     //
-    const pasteAsTeX = vscode.commands.registerCommand('MLtoTeX.paste', async () => {
+    const pasteAsTeX = vscode.commands.registerCommand('vext.mtl.paste', async () => {
         const LaTeX = await getAsLaTeX();
         if (LaTeX) { replaceSelectionWith(`\$${LaTeX}\$`); }
     });
 
     //
-    const convertAsMML = vscode.commands.registerCommand('TeXtoML.convert', async () => {
+    const convertAsMML = vscode.commands.registerCommand('vext.ltm.convert', async () => {
         let mathML = await convertToMathML(getSelection());
         if (mathML) { replaceSelectionWith(`${mathML}`); }
     });
 
     //
-    const pasteAsMML = vscode.commands.registerCommand('TeXtoML.paste', async () => {
+    const pasteAsMML = vscode.commands.registerCommand('vext.ltm.paste', async () => {
         const mathML = await getAsMathML();
         if (mathML) { replaceSelectionWith(`${mathML}`); }
     });
 
+    const copyAsTeX = vscode.commands.registerCommand('vext.mtl.copy', () => {
+        let LaTeX = convertToLaTeX(getSelection());
+        if (LaTeX) {
+            vscode.env.clipboard.writeText(`\$${LaTeX}\$`);
+            vscode.window.showInformationMessage('Copied as LaTeX!');
+        }
+    });
+
+    const copyAsMML = vscode.commands.registerCommand('vext.ltm.copy', async () => {
+        let mathML = await convertToMathML(getSelection());
+        if (mathML) {
+            vscode.env.clipboard.writeText(mathML);
+            vscode.window.showInformationMessage('Copied as MathML!');
+        }
+    });
+
     //
-    context.subscriptions.push(convertAsTeX, pasteAsTeX, convertAsMML, pasteAsMML);
+    context.subscriptions.push(convertAsTeX, pasteAsTeX, convertAsMML, pasteAsMML, copyAsTeX, copyAsMML);
 }
 
 // This method is called when your extension is deactivated

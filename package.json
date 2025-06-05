@@ -18,20 +18,32 @@
     "contributes": {
         "menus": {
             "editor/context": [
-                { "command": "vext.htd.paste"  , "group": "MD@1" },
-                { "command": "vext.htd.convert", "group": "MD@1" },
-                { "command": "vext.dth.paste"  , "group": "MD@1" },
-                { "command": "vext.dth.convert", "group": "MD@1" },
-                { "command": "vext.ltm.paste"  , "group": "ML@1" },
-                { "command": "vext.ltm.convert", "group": "ML@1" },
-                { "command": "vext.mtl.paste"  , "group": "ML@1" },
-                { "command": "vext.mtl.convert", "group": "ML@1" }
+                { "command": "vext.htd.paste",    "group": "Markdown@1" },
+                { "command": "vext.htd.convert",  "group": "Markdown@1" },
+                { "command": "vext.htd.copy",     "group": "Markdown@1" },
+                { "command": "vext.dth.paste",    "group": "HTML@2" },
+                { "command": "vext.dth.convert",  "group": "HTML@2" },
+                { "command": "vext.dth.copy",     "group": "HTML@2" },
+                { "command": "vext.ltm.paste",    "group": "MathML@3" },
+                { "command": "vext.ltm.convert",  "group": "MathML@3" },
+                { "command": "vext.ltm.copy",     "group": "MathML@3" },
+                { "command": "vext.mtl.paste",    "group": "LaTeX@4" },
+                { "command": "vext.mtl.convert",  "group": "LaTeX@4" },
+                { "command": "vext.mtl.copy",     "group": "LaTeX@4" }
             ]
         },
         "viewsContainers": {
             "activitybar": [
-                { "id": "managerView", "title": "Manager View", "icon": "assets/folder.svg" },
-                { "id": "gptView", "title": "GPTunnel View", "icon": "assets/openai.svg" }
+                {
+                    "id": "managerView",
+                    "title": "Manager View",
+                    "icon": "assets/folder.svg"
+                },
+                {
+                    "id": "gptView",
+                    "title": "GPTunnel View",
+                    "icon": "assets/openai.svg"
+                }
             ]
         },
         "views": {
@@ -55,15 +67,18 @@
             ]
         },
         "commands": [
-            { "command": "vext.openWebview", "title": "Open GPTunnel View" },
-            { "command": "vext.ltm.convert", "title": "Convert to LaTeX" },
-            { "command": "vext.ltm.paste",   "title": "Paste as LaTeX" },
-            { "command": "vext.mtl.convert", "title": "Convert to MathML" },
-            { "command": "vext.mtl.paste",   "title": "Paste as MathML" },
+            { "command": "vext.htd.paste", "title": "Paste as Markdown" },
             { "command": "vext.htd.convert", "title": "Convert to Markdown" },
-            { "command": "vext.htd.paste",   "title": "Paste as Markdown" },
+            { "command": "vext.htd.copy", "title": "Copy as Markdown" },
+            { "command": "vext.dth.paste", "title": "Paste as HTML" },
             { "command": "vext.dth.convert", "title": "Convert to HTML" },
-            { "command": "vext.dth.paste",   "title": "Paste as HTML" }
+            { "command": "vext.dth.copy", "title": "Copy as HTML" },
+            { "command": "vext.ltm.paste", "title": "Paste as MathML" },
+            { "command": "vext.ltm.convert", "title": "Convert to MathML" },
+            { "command": "vext.ltm.copy", "title": "Copy as MathML" },
+            { "command": "vext.mtl.paste", "title": "Paste as LaTeX" },
+            { "command": "vext.mtl.convert", "title": "Convert to LaTeX" },
+            { "command": "vext.mtl.copy", "title": "Copy as LaTeX" }
         ]
     },
     "scripts": {
@@ -92,8 +107,9 @@
         "esbuild": "^0.25.5",
         "eslint": "^9.25.1",
         "marked": "^15.0.12",
-        "mathml-to-latex": "^1.4.1",
+        "mathml-to-latex": "^1.5.0",
         "npm-run-all": "^4.1.5",
+        "temml": "^0.11.7",
         "tsx": "^4.19.4",
         "turndown": "^7.2.0",
         "typescript": "^5.8.3"
