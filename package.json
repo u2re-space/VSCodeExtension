@@ -2,6 +2,8 @@
     "name": "vext",
     "displayName": "U2RE utils pack and toolkit",
     "description": "U2RE utils pack and toolkit",
+    "publisher": "u2re-dev",
+    "readme": "./README.md",
     "version": "0.0.1",
     "engines": {
         "vscode": "^1.100.0"
