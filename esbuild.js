@@ -28,12 +28,12 @@ async function main() {
 			'src/extension.mjs'
 		],
 		bundle: true,
-		format: 'cjs',
+		format: 'esm',
 		minify: production,
 		sourcemap: !production,
 		sourcesContent: false,
 		platform: 'node',
-		outfile: 'dist/extension.js',
+		outfile: 'dist/extension.mjs',
 		external: ['vscode'],
 		logLevel: 'silent',
 		plugins: [

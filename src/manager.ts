@@ -3,22 +3,18 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 //
-const editor = vscode?.window?.activeTextEditor;
-const ctxMap = new WeakMap();
-const watcher = vscode.workspace.createFileSystemWatcher('**');
+const editor  = vscode?.window?.activeTextEditor, ctxMap = new WeakMap();
+const watcher = vscode?.workspace?.createFileSystemWatcher?.('./**');
 
 //
 const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
     let path: string = "";
-    if (!workspace.workspaceFolders) {
-        path = workspace.rootPath;
-    } else {
+    if (!workspace.workspaceFolders)
+        { path = workspace.rootPath; } else {
         let root = null;
-        if (workspace.workspaceFolders.length === 1 || !res) {
-            root = workspace.workspaceFolders[0];
-        } else {
-            root = workspace.getWorkspaceFolder(res);
-        }
+        if (workspace.workspaceFolders.length === 1 || !res)
+            { root = workspace.workspaceFolders[0]; } else
+            { root = workspace.getWorkspaceFolder(res); }
         // @ts-ignore
         path = root?.uri?.fsPath || "";
     }
@@ -27,30 +23,22 @@ const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
 
 //
 function getBaseDir(): { baseDir: string, isModules: boolean } {
-    const workspaceFolder = getWorkspaceFolder(vscode.workspace);
-    if (!workspaceFolder) {return { baseDir: "", isModules: false };}
-
-    const wsd = workspaceFolder;
+    const wsd = getWorkspaceFolder(vscode.workspace)||"";
+    if (!wsd) {return { baseDir: "", isModules: false };}
     const modulesDir = path.join(wsd, "modules");
     let isModules = false;
-    try {
-        isModules = fs.statSync(modulesDir).isDirectory();
-    } catch (e) { /* ignore */ }
+    try { isModules = fs.statSync(modulesDir).isDirectory(); }
+    catch (e) { /* ignore */ }
     return { baseDir: isModules ? modulesDir : wsd, isModules };
 }
 
 //
 const getDirs = (context)=>{
     const { baseDir, isModules } = getBaseDir();
-    let modules: string[] = ctxMap.get(context) ?? [];
-    ctxMap.set(context, modules);
-    try {
-        modules = fs.readdirSync(baseDir)
-            .filter(f => fs.statSync(path.join(baseDir, f)).isDirectory())
-            .map(f => (isModules ? `modules/${f}` : f));
-    } catch (e) { /* ignore */ }
-    if (modules?.length < 1) { modules?.push?.("./"); }
-    return modules;
+    if (!context) { return ["./"]; }
+    let modules: string[] = ctxMap.get(context) ?? []; ctxMap.set(context, modules);
+    try { modules = fs.readdirSync(baseDir)?.filter?.(f => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.(f => (isModules ? `modules/${f}` : f)); }
+    catch (e) { /* ignore */ }; if (modules?.length < 1) { modules?.push?.("./"); }; return modules;
 };
 
 //
@@ -59,24 +47,20 @@ export class ManagerViewProvider {
     constructor(extensionUri) { this._extensionUri = extensionUri; }
 
     //
-    updateView(webviewView, context) {
-        webviewView.webview.html = getWebviewContent(getDirs(context)||["./"]);
-    }
-
-    //
+    updateView(webviewView, context) { webviewView.webview.html = getWebviewContent(getDirs(context)||["./"]); }
     resolveWebviewView(webviewView, context, token) {
         const wsd = getWorkspaceFolder(vscode.workspace)||"", modules = getDirs(context);
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
-        webviewView.webview.html    = getWebviewContent(modules||["./"]);
 
         //
-        context.subscriptions.push(watcher.onDidCreate(() => this.updateView(webviewView, context)));
-        context.subscriptions.push(watcher.onDidDelete(() => this.updateView(webviewView, context)));
-        context.subscriptions.push(watcher.onDidChange(() => this.updateView(webviewView, context)));
-
-        //
-        context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => this.updateView(webviewView, context)));
-        context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => this.updateView(webviewView, context)));
+        {
+            try { this.updateView(webviewView, context); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(watcher?.onDidCreate?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(watcher?.onDidDelete?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(watcher?.onDidChange?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(vscode.workspace?.onDidChangeWorkspaceFolders?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(vscode.window?.onDidChangeActiveTextEditor?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+        }
 
         //
         if (modules) { try {
