@@ -1,0 +1,12 @@
+{
+    "include": ["src/*.js", "src/*.mjs"],
+    "exclude": ["src/*.ts", "src/*.d.ts", "node_modules"],
+	"compilerOptions": {
+		"module": "Node16",
+		"target": "ES2022",
+		"checkJs": false,
+		"lib": [
+			"ES2022"
+		]
+	}
+}

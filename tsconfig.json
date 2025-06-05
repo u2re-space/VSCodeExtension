@@ -1,4 +1,7 @@
 {
+    "include": ["src/*.ts"],
+    "exclude": ["src/*.d.ts", "src/*.mjs"],
+    "outDir": "dist/",
 	"compilerOptions": {
 		"module": "NodeNext",
 		"target": "ESNext",
@@ -16,10 +19,6 @@
         "noImplicitThis": false,
 		"sourceMap": true,
 		"rootDir": "./",
-		"strict": true,   /* enable all strict type-checking options */
-		/* Additional Checks */
-		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
-		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
-		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
+		"strict": true
 	}
 }

@@ -5064,7 +5064,7 @@ defineMacro("\\incoh", `{\\mkern5mu\\rule{}{0.7em}\\mathrlap{\\smash{\\raise2mu{
 // chemstyle package
 defineMacro("\\standardstate", "\\text{\\tiny\\char`⦵}");
 
-﻿/* eslint-disable */
+﻿ 
 /* -*- Mode: JavaScript; indent-tabs-mode:nil; js-indent-level: 2 -*- */
 /* vim: set ts=2 et sw=2 tw=80: */
 
@@ -5122,7 +5122,7 @@ defineMacro("\\standardstate", "\\text{\\tiny\\char`⦵}");
 // Add \ce, \pu, and \tripleDash to the Temml macros.
 
 defineMacro("\\ce", function(context) {
-  return chemParse(context.consumeArgs(1)[0], "ce")
+  return chemParse(context.consumeArgs(1)[0], "ce");
 });
 
 defineMacro("\\pu", function(context) {
@@ -5131,12 +5131,12 @@ defineMacro("\\pu", function(context) {
 
 // Math fonts do not include glyphs for the ~ form of bonds. So we'll send path geometry
 // So we'll compose characters built from \rule elements.
-defineMacro("\\uniDash", `{\\rule{0.672em}{0.06em}}`)
-defineMacro("\\triDash", `{\\rule{0.15em}{0.06em}\\kern2mu\\rule{0.15em}{0.06em}\\kern2mu\\rule{0.15em}{0.06em}}`)
-defineMacro("\\tripleDash", `\\kern0.075em\\raise0.25em{\\triDash}\\kern0.075em`)
-defineMacro("\\tripleDashOverLine", `\\kern0.075em\\mathrlap{\\raise0.125em{\\uniDash}}\\raise0.34em{\\triDash}\\kern0.075em`)
-defineMacro("\\tripleDashOverDoubleLine", `\\kern0.075em\\mathrlap{\\mathrlap{\\raise0.48em{\\triDash}}\\raise0.27em{\\uniDash}}{\\raise0.05em{\\uniDash}}\\kern0.075em`)
-defineMacro("\\tripleDashBetweenDoubleLine", `\\kern0.075em\\mathrlap{\\mathrlap{\\raise0.48em{\\uniDash}}\\raise0.27em{\\triDash}}{\\raise0.05em{\\uniDash}}\\kern0.075em`)
+defineMacro("\\uniDash", `{\\rule{0.672em}{0.06em}}`);
+defineMacro("\\triDash", `{\\rule{0.15em}{0.06em}\\kern2mu\\rule{0.15em}{0.06em}\\kern2mu\\rule{0.15em}{0.06em}}`);
+defineMacro("\\tripleDash", `\\kern0.075em\\raise0.25em{\\triDash}\\kern0.075em`);
+defineMacro("\\tripleDashOverLine", `\\kern0.075em\\mathrlap{\\raise0.125em{\\uniDash}}\\raise0.34em{\\triDash}\\kern0.075em`);
+defineMacro("\\tripleDashOverDoubleLine", `\\kern0.075em\\mathrlap{\\mathrlap{\\raise0.48em{\\triDash}}\\raise0.27em{\\uniDash}}{\\raise0.05em{\\uniDash}}\\kern0.075em`);
+defineMacro("\\tripleDashBetweenDoubleLine", `\\kern0.075em\\mathrlap{\\mathrlap{\\raise0.48em{\\uniDash}}\\raise0.27em{\\triDash}}{\\raise0.05em{\\uniDash}}\\kern0.075em`);
 
   //
   //  This is the main function for handing the \ce and \pu commands.
@@ -5146,7 +5146,7 @@ defineMacro("\\tripleDashBetweenDoubleLine", `\\kern0.075em\\mathrlap{\\mathrlap
   var chemParse = function (tokens, stateMachine) {
     // Recreate the argument string from Temml's array of tokens.
     var str = "";
-    var expectedLoc = tokens.length && tokens[tokens.length - 1].loc.start
+    var expectedLoc = tokens.length && tokens[tokens.length - 1].loc.start;
     for (var i = tokens.length - 1; i >= 0; i--) {
       if(tokens[i].loc.start > expectedLoc) {
         // context.consumeArgs has eaten a space.
@@ -7021,7 +7021,7 @@ const arrayGaps = macros => {
   const arraycolsep = match
     ? { number: +(match[1] + match[2]), unit: match[3] }
     : null;
-  return [arraystretch, arraycolsep]
+  return [arraystretch, arraycolsep];
 };
 
 const getTag = (group, style, rowNum) => {
@@ -7035,20 +7035,20 @@ const getTag = (group, style, rowNum) => {
     } else {
       // \notag. Return an empty span.
       tag = new mathMLTree.MathNode("mtext", [], []);
-      return tag
+      return tag;
     }
   } else if (group.envClasses.includes("multline") &&
     ((group.leqno && rowNum !== 0) || (!group.leqno && rowNum !== group.body.length - 1))) {
     // A multiline that does not receive a tag. Return an empty cell.
     tag = new mathMLTree.MathNode("mtext", [], []);
-    return tag
+    return tag;
   } else {
     // AMS automatcally numbered equaton.
     // Insert a class so the element can be populated by a CSS counter.
     // WebKit will display the CSS counter only inside a span.
     tag = new mathMLTree.MathNode("mtext", [new Span(["tml-eqn"])]);
   }
-  return tag
+  return tag;
 };
 
 /**
@@ -7111,7 +7111,7 @@ function parseArray(
           rowTag = cell[i].type === "envTag"
             ? cell.splice(i, 1)[0].body.body[0]
             : { body: null };
-          break
+          break;
         }
       }
     }
@@ -7131,14 +7131,14 @@ function parseArray(
         if (envClasses.includes("array")) {
           if (parser.settings.strict) {
             throw new ParseError("Too few columns " + "specified in the {array} column argument.",
-              parser.nextToken)
+              parser.nextToken);
           }
         } else if (maxNumCols === 2) {
           throw new ParseError("The split environment accepts no more than two columns",
             parser.nextToken);
         } else {
           throw new ParseError("The equation environment accepts only one column",
-            parser.nextToken)
+            parser.nextToken);
         }
       }
       parser.consume();
@@ -7207,7 +7207,7 @@ function parseArray(
 // Decides on a scriptLevel for cells in an array according to whether the given
 // environment name starts with the letter 'd'.
 function dCellStyle(envName) {
-  return envName.slice(0, 1) === "d" ? "display" : "text"
+  return envName.slice(0, 1) === "d" ? "display" : "text";
 }
 
 const alignMap = {
@@ -7222,7 +7222,7 @@ const glue = group => {
   if (group.envClasses.includes("multline")) {
     glueNode.style.width = "7.5%";
   }
-  return glueNode
+  return glueNode;
 };
 
 const mathmlBuilder$7 = function(group, style) {
@@ -7320,14 +7320,14 @@ const mathmlBuilder$7 = function(group, style) {
     const numCols = tbl.length === 0 ? 0 : tbl[0].children.length;
 
     const sidePad = (j, hand) => {
-      if (j === 0 && hand === 0) { return "0" }
-      if (j === numCols - 1 && hand === 1) { return "0" }
-      if (group.envClasses[0] !== "align") { return sidePadding }
-      if (hand === 1) { return "0" }
+      if (j === 0 && hand === 0) { return "0"; }
+      if (j === numCols - 1 && hand === 1) { return "0"; }
+      if (group.envClasses[0] !== "align") { return sidePadding; }
+      if (hand === 1) { return "0"; }
       if (group.addEqnNum) {
-        return (j % 2) ? "1" : "0"
+        return (j % 2) ? "1" : "0";
       } else {
-        return (j % 2) ? "0" : "1"
+        return (j % 2) ? "0" : "1";
       }
     };
 
@@ -7465,7 +7465,7 @@ const mathmlBuilder$7 = function(group, style) {
     table.setAttribute("scriptlevel", "1");
   }
 
-  return table
+  return table;
 };
 
 // Convenience function for align, align*, aligned, alignat, alignat*, alignedat, split.
@@ -7507,7 +7507,7 @@ const alignedHandler = function(context, args) {
       arg0 += textord.text;
     }
     if (isNaN(arg0)) {
-      throw new ParseError("The alignat enviroment requires a numeric first argument.")
+      throw new ParseError("The alignat enviroment requires a numeric first argument.");
     }
     numMaths = Number(arg0);
     numCols = numMaths * 2;
@@ -7541,7 +7541,7 @@ const alignedHandler = function(context, args) {
       align: align
     };
   }
-  if (context.envName === "split") ; else if (isAlignedAt) {
+  if (context.envName === "split") {;} else if (isAlignedAt) {
     res.envClasses.push("alignat"); // Sets justification
   } else {
     res.envClasses[0] = "align"; // Sets column spacing & justification
@@ -7972,17 +7972,17 @@ defineFunction({
 
 const isLongVariableName = (group, font) => {
   if (font !== "mathrm" || group.body.type !== "ordgroup" || group.body.body.length === 1) {
-    return false
+    return false;
   }
-  if (group.body.body[0].type !== "mathord") { return false }
+  if (group.body.body[0].type !== "mathord") { return false; }
   for (let i = 1; i < group.body.body.length; i++) {
     const parseNodeType = group.body.body[i].type;
     if (!(parseNodeType ===  "mathord" ||
     (parseNodeType ===  "textord" && !isNaN(group.body.body[i].text)))) {
-      return false
+      return false;
     }
   }
-  return true
+  return true;
 };
 
 const mathmlBuilder$6 = (group, style) => {
@@ -7990,10 +7990,10 @@ const mathmlBuilder$6 = (group, style) => {
   const newStyle = style.withFont(font);
   const mathGroup = buildGroup$1(group.body, newStyle);
 
-  if (mathGroup.children.length === 0) { return mathGroup } // empty group, e.g., \mathrm{}
+  if (mathGroup.children.length === 0) { return mathGroup; } // empty group, e.g., \mathrm{}
   if (font === "boldsymbol" && ["mo", "mpadded", "mrow"].includes(mathGroup.type)) {
     mathGroup.style.fontWeight = "bold";
-    return mathGroup
+    return mathGroup;
   }
   // Check if it is possible to consolidate elements into a single <mi> element.
   if (isLongVariableName(group, font)) {
@@ -8008,7 +8008,7 @@ const mathmlBuilder$6 = (group, style) => {
     }
     // Wrap in a <mrow> to prevent the same Firefox bug.
     const bogus = new mathMLTree.MathNode("mtext", new mathMLTree.TextNode("\u200b"));
-    return new mathMLTree.MathNode("mrow", [bogus, mi])
+    return new mathMLTree.MathNode("mrow", [bogus, mi]);
   }
   let canConsolidate = mathGroup.children[0].type === "mo";
   for (let i = 1; i < mathGroup.children.length; i++) {
@@ -8020,7 +8020,7 @@ const mathmlBuilder$6 = (group, style) => {
       mathGroup.children[i].attributes.mathvariant || "";
     if (localVariant !== "normal") { canConsolidate = false; }
   }
-  if (!canConsolidate) { return mathGroup }
+  if (!canConsolidate) { return mathGroup; }
   // Consolidate the <mi> elements.
   const mi = mathGroup.children[0];
   for (let i = 1; i < mathGroup.children.length; i++) {
@@ -8033,9 +8033,9 @@ const mathmlBuilder$6 = (group, style) => {
     // We insert a text node that contains a zero-width space and wrap in an mrow.
     // TODO: Get rid of this <mi> workaround when the Firefox bug is fixed.
     const bogus = new mathMLTree.MathNode("mtext", new mathMLTree.TextNode("\u200b"));
-    return new mathMLTree.MathNode("mrow", [bogus, mi])
+    return new mathMLTree.MathNode("mrow", [bogus, mi]);
   }
-  return mi
+  return mi;
 };
 
 const fontAliases = {
@@ -8466,7 +8466,7 @@ defineFunction({
   mathmlBuilder(group, style) {
     const newStyle = style.withLevel(StyleLevel.TEXT);
     const mrow = buildExpressionRow(group.body, newStyle);
-    return consolidateText(mrow)
+    return consolidateText(mrow);
   }
 });
 
@@ -8516,7 +8516,7 @@ defineFunction({
         url: href
       })
     ) {
-      throw new ParseError(`Function "\\href" is not trusted`, token)
+      throw new ParseError(`Function "\\href" is not trusted`, token);
     }
 
     return {
@@ -8553,7 +8553,7 @@ defineFunction({
         url: href
       })
     ) {
-      throw new ParseError(`Function "\\url" is not trusted`, token)
+      throw new ParseError(`Function "\\url" is not trusted`, token);
     }
 
     const chars = [];
@@ -8596,7 +8596,7 @@ defineFunction({
     const body = args[1];
 
     if (parser.settings.strict) {
-      throw new ParseError(`Function "${funcName}" is disabled in strict mode`, token)
+      throw new ParseError(`Function "${funcName}" is disabled in strict mode`, token);
     }
 
     let trustContext;
@@ -8645,7 +8645,7 @@ defineFunction({
     }
 
     if (!parser.settings.isTrusted(trustContext)) {
-      throw new ParseError(`Function "${funcName}" is not trusted`, token)
+      throw new ParseError(`Function "${funcName}" is not trusted`, token);
     }
     return {
       type: "html",
@@ -8677,7 +8677,7 @@ const sizeData = function(str) {
   if (/^[-+]? *(\d+(\.\d*)?|\.\d+)$/.test(str)) {
     // str is a number with no unit specified.
     // default unit is bp, per graphix package.
-    return { number: +str, unit: "bp" }
+    return { number: +str, unit: "bp" };
   } else {
     const match = /([-+]?) *(\d+(?:\.\d*)?|\.\d+) *([a-z]{2})/.exec(str);
     if (!match) {
@@ -8690,7 +8690,7 @@ const sizeData = function(str) {
     if (!validUnit(data)) {
       throw new ParseError("Invalid unit: '" + data.unit + "' in \\includegraphics.");
     }
-    return data
+    return data;
   }
 };
 
@@ -8721,18 +8721,18 @@ defineFunction({
           switch (keyVal[0].trim()) {
             case "alt":
               alt = str;
-              break
+              break;
             case "width":
               width = sizeData(str);
-              break
+              break;
             case "height":
               height = sizeData(str);
-              break
+              break;
             case "totalheight":
               totalheight = sizeData(str);
-              break
+              break;
             default:
-              throw new ParseError("Invalid key: '" + keyVal[0] + "' in \\includegraphics.")
+              throw new ParseError("Invalid key: '" + keyVal[0] + "' in \\includegraphics.");
           }
         }
       }
@@ -8753,7 +8753,7 @@ defineFunction({
         url: src
       })
     ) {
-      throw new ParseError(`Function "\\includegraphics" is not trusted`, token)
+      throw new ParseError(`Function "\\includegraphics" is not trusted`, token);
     }
 
     return {
@@ -8764,7 +8764,7 @@ defineFunction({
       height: height,
       totalheight: totalheight,
       src: src
-    }
+    };
   },
   mathmlBuilder: (group, style) => {
     const height = calculateSize(group.height, style);
@@ -8794,7 +8794,7 @@ defineFunction({
     const node = new Img(group.src, group.alt, graphicStyle);
     node.height = height;
     node.depth = depth;
-    return new mathMLTree.MathNode("mtext", [node])
+    return new mathMLTree.MathNode("mtext", [node]);
   }
 });
 
@@ -8820,15 +8820,15 @@ defineFunction({
       if (mathFunction) {
         if (!muUnit) {
           throw new ParseError(`LaTeX's ${funcName} supports only mu units, ` +
-            `not ${size.value.unit} units`, token)
+            `not ${size.value.unit} units`, token);
         }
         if (parser.mode !== "math") {
-          throw new ParseError(`LaTeX's ${funcName} works only in math mode`, token)
+          throw new ParseError(`LaTeX's ${funcName} works only in math mode`, token);
         }
       } else {
         // !mathFunction
         if (muUnit) {
-          throw new ParseError(`LaTeX's ${funcName} doesn't support mu units`, token)
+          throw new ParseError(`LaTeX's ${funcName} doesn't support mu units`, token);
         }
       }
     }
@@ -8892,7 +8892,7 @@ defineFunction({
     if (group.string.length > 0) {
       node.setAttribute("id", group.string);
     }
-    return node
+    return node;
   }
 });
 
@@ -8911,7 +8911,7 @@ defineFunction({
     if (textModeLap.includes(funcName)) {
       if (parser.settings.strict && parser.mode !== "text") {
         throw new ParseError(`{${funcName}} can be used only in text mode.
- Try \\math${funcName.slice(1)}`, token)
+ Try \\math${funcName.slice(1)}`, token);
       }
       funcName = funcName.slice(1);
     } else {
@@ -8923,7 +8923,7 @@ defineFunction({
       mode: parser.mode,
       alignment: funcName,
       body
-    }
+    };
   },
   mathmlBuilder: (group, style) => {
     // mathllap, mathrlap, mathclap
@@ -8964,7 +8964,7 @@ defineFunction({
       }
     }
     node.setAttribute("width", "0px");
-    return node
+    return node;
   }
 });
 
@@ -9049,7 +9049,7 @@ const textAtomTypes = ["text", "textord", "mathord", "atom"];
 const padding = width => {
   const node = new mathMLTree.MathNode("mspace");
   node.setAttribute("width", width + "em");
-  return node
+  return node;
 };
 
 function mathmlBuilder$3(group, style) {
@@ -9164,7 +9164,7 @@ defineFunction({
         }
       } else {
         mustPromote = false;
-        break
+        break;
       }
     }
     return {
@@ -9247,10 +9247,10 @@ defineFunction({
 
 // Helper function
 const buildGroup = (el, style, noneNode) => {
-  if (!el) { return noneNode }
+  if (!el) { return noneNode; }
   const node = buildGroup$1(el, style);
-  if (node.type === "mrow" && node.children.length === 0) { return noneNode }
-  return node
+  if (node.type === "mrow" && node.children.length === 0) { return noneNode; }
+  return node;
 };
 
 defineFunction({
@@ -9261,17 +9261,17 @@ defineFunction({
   },
   handler({ parser, funcName, token }, args) {
     if (args[2].body.length === 0) {
-      throw new ParseError(funcName + `cannot parse an empty base.`)
+      throw new ParseError(funcName + `cannot parse an empty base.`);
     }
     const base = args[2].body[0];
     if (parser.settings.strict && funcName === "\\sideset" && !base.symbol) {
-      throw new ParseError(`The base of \\sideset must be a big operator. Try \\prescript.`)
+      throw new ParseError(`The base of \\sideset must be a big operator. Try \\prescript.`);
     }
 
     if ((args[0].body.length > 0 && args[0].body[0].type !== "supsub") ||
         (args[1].body.length > 0 && args[1].body[0].type !== "supsub")) {
       throw new ParseError("\\sideset can parse only subscripts and " +
-                            "superscripts in its first two arguments", token)
+                            "superscripts in its first two arguments", token);
     }
 
     // The prescripts and postscripts come wrapped in a supsub.
@@ -9279,7 +9279,7 @@ defineFunction({
     const postscripts = args[1].body.length > 0 ? args[1].body[0] : null;
 
     if (!prescripts && !postscripts) {
-      return base
+      return base;
     } else if (!prescripts) {
       // It's not a multi-script. Get a \textstyle supsub.
       return {
@@ -9293,7 +9293,7 @@ defineFunction({
           sup: postscripts.sup,
           sub: postscripts.sub
         }]
-      }
+      };
     } else {
       return {
         type: "multiscript",
@@ -9302,7 +9302,7 @@ defineFunction({
         prescripts,
         postscripts,
         base
-      }
+      };
     }
   },
   mathmlBuilder(group, style) {
@@ -9367,9 +9367,9 @@ defineFunction({
   mathmlBuilder(group, style) {
     if (group.isCharacterBox) {
       const inner = buildExpression(group.body, style, true);
-      return inner[0]
+      return inner[0];
     } else {
-      return buildExpressionRow(group.body, style)
+      return buildExpressionRow(group.body, style);
     }
   }
 });
@@ -9765,7 +9765,7 @@ const mathmlBuilder$1 = (group, style) => {
               }
             }
           }
-          break
+          break;
         case "mo": {
           const child = node.children[0];
           if (node.children.length === 1 && child instanceof mathMLTree.TextNode) {
@@ -9773,7 +9773,7 @@ const mathmlBuilder$1 = (group, style) => {
           } else {
             isAllString = false;
           }
-          break
+          break;
         }
         default:
           isAllString = false;
@@ -9794,10 +9794,10 @@ const mathmlBuilder$1 = (group, style) => {
   ) {
     expression[0].children[0].type = "mi";
     if (group.parentIsSupSub) {
-      return new mathMLTree.MathNode("mrow", expression)
+      return new mathMLTree.MathNode("mrow", expression);
     } else {
       const operator = new mathMLTree.MathNode("mo", [makeText("\u2061", "text")]);
-      return mathMLTree.newDocumentFragment([expression[0], operator])
+      return mathMLTree.newDocumentFragment([expression[0], operator]);
     }
   }
 
@@ -9828,10 +9828,10 @@ const mathmlBuilder$1 = (group, style) => {
       trail.setAttribute("width", "0.1667em"); // thin space.
       fragment.push(trail);
     }
-    return mathMLTree.newDocumentFragment(fragment)
+    return mathMLTree.newDocumentFragment(fragment);
   }
 
-  return wrapper
+  return wrapper;
 };
 
 // \operatorname
@@ -9957,14 +9957,14 @@ defineFunction({
       type: "pmb",
       mode: parser.mode,
       body: ordargument(args[0])
-    }
+    };
   },
   mathmlBuilder(group, style) {
     const inner = buildExpression(group.body, style);
     // Wrap with an <mstyle> element.
     const node = wrapWithMstyle(inner);
     node.setAttribute("style", "font-weight:bold");
-    return node
+    return node;
   }
 });
 
@@ -9982,7 +9982,7 @@ const mathmlBuilder = (group, style) => {
   } else {
     node.style.padding = "0 0 " + Math.abs(dy.number) + dy.unit + " 0";
   }
-  return node
+  return node;
 };
 
 defineFunction({
@@ -10050,7 +10050,7 @@ defineFunction({
     const classes = group.funcName === "\\ref" ? ["tml-ref"] : ["tml-ref", "tml-eqref"];
     const node = new mathMLTree.MathNode("mtext", [new mathMLTree.TextNode("")], classes);
     node.setAttribute("href", "#" + group.string);
-    return node
+    return node;
   }
 });
 
@@ -10072,7 +10072,7 @@ defineFunction({
   mathmlBuilder(group, style) {
     const node = buildGroup$1(group.body, style);
     node.style.transform = "scaleX(-1)";
-    return node
+    return node;
   }
 });
 
@@ -10125,7 +10125,7 @@ defineFunction({
     }
     rule.setAttribute("width", width.number + width.unit);
     rule.setAttribute("height", height.number + height.unit);
-    if (shift.number === 0) { return rule }
+    if (shift.number === 0) { return rule; }
 
     const wrapper = new mathMLTree.MathNode("mpadded", [rule]);
     if (shift.number >= 0) {
@@ -10486,7 +10486,7 @@ defineFunctionBuilders({
       node = new mathMLTree.MathNode("mrow", [node]);
     }
 
-    return node
+    return node;
   }
 });
 
@@ -10500,9 +10500,9 @@ const arrows = ["\\Rsh", "\\Lsh", "\\restriction"];
 const isArrow = str => {
   if (str.length === 1) {
     const codePoint = str.codePointAt(0);
-    return (0x218f < codePoint && codePoint < 0x2200)
+    return (0x218f < codePoint && codePoint < 0x2200);
   }
-  return str.indexOf("arrow") > -1 || str.indexOf("harpoon") > -1 || arrows.includes(str)
+  return str.indexOf("arrow") > -1 || str.indexOf("harpoon") > -1 || arrows.includes(str);
 };
 
 defineFunctionBuilders({
@@ -10571,62 +10571,62 @@ const getVariant = function(group, style) {
 
   // Deal with the \textit, \textbf, etc., functions.
   if (style.fontFamily === "texttt") {
-    return "monospace"
+    return "monospace";
   } else if (style.fontFamily === "textsc") {
     return "normal"; // handled via character substitution in symbolsOrd.js.
   } else if (style.fontFamily === "textsf") {
     if (style.fontShape === "textit" && style.fontWeight === "textbf") {
-      return "sans-serif-bold-italic"
+      return "sans-serif-bold-italic";
     } else if (style.fontShape === "textit") {
-      return "sans-serif-italic"
+      return "sans-serif-italic";
     } else if (style.fontWeight === "textbf") {
-      return "sans-serif-bold"
+      return "sans-serif-bold";
     } else {
-      return "sans-serif"
+      return "sans-serif";
     }
   } else if (style.fontShape === "textit" && style.fontWeight === "textbf") {
-    return "bold-italic"
+    return "bold-italic";
   } else if (style.fontShape === "textit") {
-    return "italic"
+    return "italic";
   } else if (style.fontWeight === "textbf") {
-    return "bold"
+    return "bold";
   }
 
   // Deal with the \mathit, mathbf, etc, functions.
   const font = style.font;
   if (!font || font === "mathnormal") {
-    return null
+    return null;
   }
 
   const mode = group.mode;
   switch (font) {
     case "mathit":
-      return "italic"
+      return "italic";
     case "mathrm": {
       const codePoint = group.text.codePointAt(0);
       // LaTeX \mathrm returns italic for Greek characters.
-      return  (0x03ab < codePoint && codePoint < 0x03cf) ? "italic" : "normal"
+      return  (0x03ab < codePoint && codePoint < 0x03cf) ? "italic" : "normal";
     }
     case "greekItalic":
-      return "italic"
+      return "italic";
     case "up@greek":
-      return "normal"
+      return "normal";
     case "boldsymbol":
     case "mathboldsymbol":
-      return "bold-italic"
+      return "bold-italic";
     case "mathbf":
-      return "bold"
+      return "bold";
     case "mathbb":
-      return "double-struck"
+      return "double-struck";
     case "mathfrak":
-      return "fraktur"
+      return "fraktur";
     case "mathscr":
     case "mathcal":
-      return "script"
+      return "script";
     case "mathsf":
-      return "sans-serif"
+      return "sans-serif";
     case "mathtt":
-      return "monospace"
+      return "monospace";
   }
 
   let text = group.text;
@@ -10634,7 +10634,7 @@ const getVariant = function(group, style) {
     text = symbols[mode][text].replace;
   }
 
-  return Object.prototype.hasOwnProperty.call(fontMap, font) ? fontMap[font] : null
+  return Object.prototype.hasOwnProperty.call(fontMap, font) ? fontMap[font] : null;
 };
 
 // Chromium does not support the MathML `mathvariant` attribute.
@@ -10714,103 +10714,103 @@ const bisf = Object.freeze({
 // Code point offsets below are derived from https://www.unicode.org/charts/PDF/U1D400.pdf
 const offset = Object.freeze({
   upperCaseLatin: { // A-Z
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return 0x1D3BF },
-    "italic": ch =>                 { return 0x1D3F3 },
-    "bold-italic": ch =>            { return 0x1D427 },
-    "script": ch =>                 { return script[ch] || 0x1D45B },
-    "script-bold": ch =>            { return 0x1D48F },
-    "fraktur": ch =>                { return frak[ch] || 0x1D4C3 },
-    "fraktur-bold": ch =>           { return 0x1D52B },
-    "double-struck": ch =>          { return bbb[ch] || 0x1D4F7 },
-    "sans-serif": ch =>             { return 0x1D55F },
-    "sans-serif-bold": ch =>        { return 0x1D593 },
-    "sans-serif-italic": ch =>      { return 0x1D5C7 },
-    "sans-serif-bold-italic": ch => { return 0x1D63C },
-    "monospace": ch =>              { return 0x1D62F }
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return 0x1D3BF; },
+    "italic": ch =>                 { return 0x1D3F3; },
+    "bold-italic": ch =>            { return 0x1D427; },
+    "script": ch =>                 { return script[ch] || 0x1D45B; },
+    "script-bold": ch =>            { return 0x1D48F; },
+    "fraktur": ch =>                { return frak[ch] || 0x1D4C3; },
+    "fraktur-bold": ch =>           { return 0x1D52B; },
+    "double-struck": ch =>          { return bbb[ch] || 0x1D4F7; },
+    "sans-serif": ch =>             { return 0x1D55F; },
+    "sans-serif-bold": ch =>        { return 0x1D593; },
+    "sans-serif-italic": ch =>      { return 0x1D5C7; },
+    "sans-serif-bold-italic": ch => { return 0x1D63C; },
+    "monospace": ch =>              { return 0x1D62F; }
   },
   lowerCaseLatin: { // a-z
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return 0x1D3B9 },
-    "italic": ch =>                 { return ch === "h" ? 0x20A6 : 0x1D3ED },
-    "bold-italic": ch =>            { return 0x1D421 },
-    "script": ch =>                 { return script[ch] || 0x1D455 },
-    "script-bold": ch =>            { return 0x1D489 },
-    "fraktur": ch =>                { return 0x1D4BD },
-    "fraktur-bold": ch =>           { return 0x1D525 },
-    "double-struck": ch =>          { return 0x1D4F1 },
-    "sans-serif": ch =>             { return 0x1D559 },
-    "sans-serif-bold": ch =>        { return 0x1D58D },
-    "sans-serif-italic": ch =>      { return 0x1D5C1 },
-    "sans-serif-bold-italic": ch => { return 0x1D5F5 },
-    "monospace": ch =>              { return 0x1D629 }
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return 0x1D3B9; },
+    "italic": ch =>                 { return ch === "h" ? 0x20A6 : 0x1D3ED; },
+    "bold-italic": ch =>            { return 0x1D421; },
+    "script": ch =>                 { return script[ch] || 0x1D455; },
+    "script-bold": ch =>            { return 0x1D489; },
+    "fraktur": ch =>                { return 0x1D4BD; },
+    "fraktur-bold": ch =>           { return 0x1D525; },
+    "double-struck": ch =>          { return 0x1D4F1; },
+    "sans-serif": ch =>             { return 0x1D559; },
+    "sans-serif-bold": ch =>        { return 0x1D58D; },
+    "sans-serif-italic": ch =>      { return 0x1D5C1; },
+    "sans-serif-bold-italic": ch => { return 0x1D5F5; },
+    "monospace": ch =>              { return 0x1D629; }
   },
   upperCaseGreek: { // A-Ω
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return 0x1D317 },
-    "italic": ch =>                 { return 0x1D351 },
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return 0x1D317; },
+    "italic": ch =>                 { return 0x1D351; },
     // \boldsymbol actually returns upright bold for upperCaseGreek
-    "bold-italic": ch =>            { return 0x1D317 },
-    "script": ch =>                 { return 0 },
-    "script-bold": ch =>            { return 0 },
-    "fraktur": ch =>                { return 0 },
-    "fraktur-bold": ch =>           { return 0 },
-    "double-struck": ch =>          { return 0 },
+    "bold-italic": ch =>            { return 0x1D317; },
+    "script": ch =>                 { return 0; },
+    "script-bold": ch =>            { return 0; },
+    "fraktur": ch =>                { return 0; },
+    "fraktur-bold": ch =>           { return 0; },
+    "double-struck": ch =>          { return 0; },
     // Unicode has no code points for regular-weight san-serif Greek. Use bold.
-    "sans-serif": ch =>             { return 0x1D3C5 },
-    "sans-serif-bold": ch =>        { return 0x1D3C5 },
-    "sans-serif-italic": ch =>      { return 0 },
-    "sans-serif-bold-italic": ch => { return 0x1D3FF },
-    "monospace": ch =>              { return 0 }
+    "sans-serif": ch =>             { return 0x1D3C5; },
+    "sans-serif-bold": ch =>        { return 0x1D3C5; },
+    "sans-serif-italic": ch =>      { return 0; },
+    "sans-serif-bold-italic": ch => { return 0x1D3FF; },
+    "monospace": ch =>              { return 0; }
   },
   lowerCaseGreek: { // α-ω
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return 0x1D311 },
-    "italic": ch =>                 { return 0x1D34B },
-    "bold-italic": ch =>            { return ch === "\u03d5" ? 0x1D37E : 0x1D385 },
-    "script": ch =>                 { return 0 },
-    "script-bold": ch =>            { return 0 },
-    "fraktur": ch =>                { return 0 },
-    "fraktur-bold": ch =>           { return 0 },
-    "double-struck": ch =>          { return 0 },
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return 0x1D311; },
+    "italic": ch =>                 { return 0x1D34B; },
+    "bold-italic": ch =>            { return ch === "\u03d5" ? 0x1D37E : 0x1D385; },
+    "script": ch =>                 { return 0; },
+    "script-bold": ch =>            { return 0; },
+    "fraktur": ch =>                { return 0; },
+    "fraktur-bold": ch =>           { return 0; },
+    "double-struck": ch =>          { return 0; },
     // Unicode has no code points for regular-weight san-serif Greek. Use bold.
-    "sans-serif": ch =>             { return 0x1D3BF },
-    "sans-serif-bold": ch =>        { return 0x1D3BF },
-    "sans-serif-italic": ch =>      { return 0 },
-    "sans-serif-bold-italic": ch => { return 0x1D3F9 },
-    "monospace": ch =>              { return 0 }
+    "sans-serif": ch =>             { return 0x1D3BF; },
+    "sans-serif-bold": ch =>        { return 0x1D3BF; },
+    "sans-serif-italic": ch =>      { return 0; },
+    "sans-serif-bold-italic": ch => { return 0x1D3F9; },
+    "monospace": ch =>              { return 0; }
   },
   varGreek: { // \varGamma, etc
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return  bold[ch] || -51 },
-    "italic": ch =>                 { return 0 },
-    "bold-italic": ch =>            { return boldItalic[ch] || 0x3A },
-    "script": ch =>                 { return 0 },
-    "script-bold": ch =>            { return 0 },
-    "fraktur": ch =>                { return 0 },
-    "fraktur-bold": ch =>           { return 0 },
-    "double-struck": ch =>          { return 0 },
-    "sans-serif": ch =>             { return boldsf[ch] || 0x74 },
-    "sans-serif-bold": ch =>        { return boldsf[ch] || 0x74 },
-    "sans-serif-italic": ch =>      { return 0 },
-    "sans-serif-bold-italic": ch => { return bisf[ch] || 0xAE },
-    "monospace": ch =>              { return 0 }
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return  bold[ch] || -51; },
+    "italic": ch =>                 { return 0; },
+    "bold-italic": ch =>            { return boldItalic[ch] || 0x3A; },
+    "script": ch =>                 { return 0; },
+    "script-bold": ch =>            { return 0; },
+    "fraktur": ch =>                { return 0; },
+    "fraktur-bold": ch =>           { return 0; },
+    "double-struck": ch =>          { return 0; },
+    "sans-serif": ch =>             { return boldsf[ch] || 0x74; },
+    "sans-serif-bold": ch =>        { return boldsf[ch] || 0x74; },
+    "sans-serif-italic": ch =>      { return 0; },
+    "sans-serif-bold-italic": ch => { return bisf[ch] || 0xAE; },
+    "monospace": ch =>              { return 0; }
   },
   numeral: { // 0-9
-    "normal": ch =>                 { return 0 },
-    "bold": ch =>                   { return 0x1D79E },
-    "italic": ch =>                 { return 0 },
-    "bold-italic": ch =>            { return 0 },
-    "script": ch =>                 { return 0 },
-    "script-bold": ch =>            { return 0 },
-    "fraktur": ch =>                { return 0 },
-    "fraktur-bold": ch =>           { return 0 },
-    "double-struck": ch =>          { return 0x1D7A8 },
-    "sans-serif": ch =>             { return 0x1D7B2 },
-    "sans-serif-bold": ch =>        { return 0x1D7BC },
-    "sans-serif-italic": ch =>      { return 0 },
-    "sans-serif-bold-italic": ch => { return 0 },
-    "monospace": ch =>              { return 0x1D7C6 }
+    "normal": ch =>                 { return 0; },
+    "bold": ch =>                   { return 0x1D79E; },
+    "italic": ch =>                 { return 0; },
+    "bold-italic": ch =>            { return 0; },
+    "script": ch =>                 { return 0; },
+    "script-bold": ch =>            { return 0; },
+    "fraktur": ch =>                { return 0; },
+    "fraktur-bold": ch =>           { return 0; },
+    "double-struck": ch =>          { return 0x1D7A8; },
+    "sans-serif": ch =>             { return 0x1D7B2; },
+    "sans-serif-bold": ch =>        { return 0x1D7BC; },
+    "sans-serif-italic": ch =>      { return 0; },
+    "sans-serif-bold-italic": ch => { return 0; },
+    "monospace": ch =>              { return 0x1D7C6; }
   }
 });
 
@@ -10831,7 +10831,7 @@ const variantChar = (ch, variant) => {
     : "other";
   return block === "other"
     ? ch
-    : String.fromCodePoint(codePoint + offset[block][variant](ch))
+    : String.fromCodePoint(codePoint + offset[block][variant](ch));
 };
 
 const smallCaps = Object.freeze({
@@ -10877,7 +10877,7 @@ const italicNumber = (text, variant, tag) => {
   wrapper.style["font-style"] = "italic";
   wrapper.style["font-family"] = "Cambria, 'Times New Roman', serif";
   if (variant === "bold-italic") { wrapper.style["font-weight"] = "bold"; }
-  return wrapper
+  return wrapper;
 };
 
 defineFunctionBuilders({
@@ -10890,7 +10890,7 @@ defineFunctionBuilders({
     const variant = getVariant(group, style) || defaultVariant;
     if (variant === "script") {
       text.text = variantChar(text.text, variant);
-      return new mathMLTree.MathNode("mi", [text], [style.font])
+      return new mathMLTree.MathNode("mi", [text], [style.font]);
     } else if (variant !== "italic") {
       text.text = variantChar(text.text, variant);
     }
@@ -10903,7 +10903,7 @@ defineFunctionBuilders({
         node = new mathMLTree.MathNode("mrow", [node]);
       }
     }
-    return node
+    return node;
   }
 });
 
@@ -10925,7 +10925,7 @@ defineFunctionBuilders({
     if (numberRegEx.test(group.text)) {
       const tag = group.mode === "text" ? "mtext" : "mn";
       if (variant === "italic" || variant === "bold-italic") {
-        return italicNumber(text, variant, tag)
+        return italicNumber(text, variant, tag);
       } else {
         if (variant !== "normal") {
           text.text = text.text.split("").map(c => variantChar(c, variant)).join("");
@@ -10951,7 +10951,7 @@ defineFunctionBuilders({
         node.setAttribute("mathvariant", "italic");
       }
     }
-    return node
+    return node;
   }
 });
 
@@ -10998,10 +10998,10 @@ defineFunctionBuilders({
         node.setAttribute("linebreak", "nobreak");
       }
     } else {
-      throw new ParseError(`Unknown type of space "${group.text}"`)
+      throw new ParseError(`Unknown type of space "${group.text}"`);
     }
 
-    return node
+    return node;
   }
 });
 
@@ -11044,9 +11044,9 @@ const styleWithFont = (group, style) => {
   } else if (font === "\\emph") {
     return style.fontShape === "textit"
       ? style.withTextFontShape("textup")
-      : style.withTextFontShape("textit")
+      : style.withTextFontShape("textit");
   }
-  return style.withTextFontShape(textFontShapes[font])
+  return style.withTextFontShape(textFontShapes[font]);
 };
 
 defineFunction({
@@ -11085,7 +11085,7 @@ defineFunction({
   mathmlBuilder(group, style) {
     const newStyle = styleWithFont(group, style);
     const mrow = buildExpressionRow(group.body, newStyle);
-    return consolidateText(mrow)
+    return consolidateText(mrow);
   }
 });
 
@@ -11293,7 +11293,7 @@ class Lexer {
         this.tokenRegex.lastIndex = input.length; // EOF
         if (this.settings.strict) {
           throw new ParseError("% comment has no terminating newline; LaTeX would " +
-              "fail because of commenting the end of math mode")
+              "fail because of commenting the end of math mode");
         }
       } else {
         this.tokenRegex.lastIndex = nlIndex + 1;
@@ -11475,7 +11475,7 @@ class MacroExpander {
     if (this.stack.length === 0) {
       this.pushToken(this.lexer.lex());
     }
-    return this.stack[this.stack.length - 1]
+    return this.stack[this.stack.length - 1];
   }
 
   /**
@@ -11719,7 +11719,7 @@ class MacroExpander {
         if (token.treatAsRelax) {
           token.text = "\\relax";
         }
-        return token
+        return token;
       }
     }
 
@@ -11787,7 +11787,7 @@ class MacroExpander {
     if (name.length === 1) {
       const catcode = this.lexer.catcodes[name];
       if (catcode != null && catcode !== 13) {
-        return
+        return;
       }
     }
     const expansion = typeof definition === "function" ? definition(this) : definition;
@@ -12436,7 +12436,7 @@ class Parser {
         macros[key] = value;
       });
       this.gullet.endGroup();
-      return macros
+      return macros;
     }
 
     // The only local macro that we want to save is from \tag.
@@ -12507,7 +12507,7 @@ class Parser {
         break;
       }
       if (breakOnMiddle && lex.text === "\\middle") {
-        break
+        break;
       }
       if (breakOnInfix && functions[lex.text] && functions[lex.text].infix) {
         break;
@@ -12711,8 +12711,8 @@ class Parser {
         // Continue fetching tokens to fill out the group.
         while (true) {
           const token = this.fetch().text;
-          if (!(uSubsAndSups[token])) { break }
-          if (unicodeSubRegEx.test(token) !== isSub) { break }
+          if (!(uSubsAndSups[token])) { break; }
+          if (unicodeSubRegEx.test(token) !== isSub) { break; }
           subsupTokens.unshift(new Token(uSubsAndSups[token]));
           this.consume();
         }
@@ -12734,7 +12734,7 @@ class Parser {
         // base is the result of a \prescript function.
         // Write the sub- & superscripts into the multiscript element.
         base.postscripts = { sup: superscript, sub: subscript };
-        return base
+        return base;
       } else {
         // We got either a superscript or subscript, create a supsub
         const isFollowedByDelimiter = (!base || base.type !== "op" && base.type !== "operatorname")
@@ -12747,7 +12747,7 @@ class Parser {
           sup: superscript,
           sub: subscript,
           isFollowedByDelimiter
-        }
+        };
       }
     } else {
       // Otherwise return the original body
@@ -12910,7 +12910,7 @@ class Parser {
       if (ch === " " || ch === "\u00a0" || ch === "\ufe0e") {
         this.consume();
       } else {
-        break
+        break;
       }
     }
   }
@@ -13245,7 +13245,7 @@ class Parser {
             mode: "math",
             font,
             body: { type: "mathord", mode: "math", loc, text: asciiFromScript[text] }
-          }
+          };
         }
         // Default ord character. No disambiguation necessary.
         s = {
@@ -13259,7 +13259,7 @@ class Parser {
     } else if (text.charCodeAt(0) >= 0x80 || combiningDiacriticalMarksEndRegex.exec(text)) {
       // no symbol for e.g. ^
       if (this.settings.strict && this.mode === "math") {
-        throw new ParseError(`Unicode text character "${text[0]}" used in math mode`, nucleus)
+        throw new ParseError(`Unicode text character "${text[0]}" used in math mode`, nucleus);
       }
       // All nonmathematical Unicode characters are rendered as if they
       // are in text mode (wrapped in \text) because that's what it
@@ -13305,7 +13305,7 @@ class Parser {
  */
 const parseTree = function(toParse, settings) {
   if (!(typeof toParse === "string" || toParse instanceof String)) {
-    throw new TypeError("Temml can only parse string typed expression")
+    throw new TypeError("Temml can only parse string typed expression");
   }
   const parser = new Parser(toParse, settings);
   // Blank out any \df@tag to avoid spurious "Duplicate \tag" errors
@@ -13319,7 +13319,7 @@ const parseTree = function(toParse, settings) {
     // In this case, we separately parse the tag and wrap the tree.
     if (parser.gullet.macros.get("\\df@tag")) {
       if (!settings.displayMode) {
-        throw new ParseError("\\tag works only in display mode")
+        throw new ParseError("\\tag works only in display mode");
       }
       parser.gullet.feed("\\df@tag");
       tree = [
@@ -13333,7 +13333,7 @@ const parseTree = function(toParse, settings) {
     }
   }
 
-  return tree
+  return tree;
 };
 
 /**
@@ -13410,7 +13410,7 @@ class Style {
   inSubOrSup() {
     return this.extend({
       level: subOrSupLevel[this.level]
-    })
+    });
   }
 
   /**
@@ -13509,7 +13509,7 @@ function postProcess(block) {
     }
     // If there is a \label, add it to labelMap
     const labels = parent.getElementsByClassName("tml-label");
-    if (labels.length === 0) { continue }
+    if (labels.length === 0) { continue; }
     if (eqns.length > 0) {
       labelMap[labels[0].id] = String(i);
     } else {
@@ -13612,13 +13612,13 @@ const definePreamble = function(expression, options) {
   const settings = new Settings(options);
   settings.macros = {};
   if (!(typeof expression === "string" || expression instanceof String)) {
-    throw new TypeError("Temml can only parse string typed expression")
+    throw new TypeError("Temml can only parse string typed expression");
   }
   const parser = new Parser(expression, settings, true);
   // Blank out any \df@tag to avoid spurious "Duplicate \tag" errors
   delete parser.gullet.macros.current["\\df@tag"];
   const macros = parser.parse();
-  return macros
+  return macros;
 };
 
 /**

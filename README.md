@@ -1,3 +1,3 @@
-# MathML To LaTeX conversion tool
+# GPTunnel View
 
-Just select text fragment with MathML and get LaTeX format instead.
+WebView Panel: <https://gptunnel.ru/model/gpt-4.1>

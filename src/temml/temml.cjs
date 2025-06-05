@@ -5066,7 +5066,7 @@ defineMacro("\\incoh", `{\\mkern5mu\\rule{}{0.7em}\\mathrlap{\\smash{\\raise2mu{
 // chemstyle package
 defineMacro("\\standardstate", "\\text{\\tiny\\char`⦵}");
 
-﻿/* eslint-disable */
+﻿ 
 /* -*- Mode: JavaScript; indent-tabs-mode:nil; js-indent-level: 2 -*- */
 /* vim: set ts=2 et sw=2 tw=80: */
 
