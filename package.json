@@ -3,7 +3,9 @@
     "displayName": "U2RE utils pack and toolkit",
     "description": "U2RE utils pack and toolkit",
     "version": "0.0.1",
-    "engines": { "vscode": "^1.100.0" },
+    "engines": {
+        "vscode": "^1.100.0"
+    },
     "icon": "./assets/service.png",
     "categories": [
         "Education",
@@ -16,36 +18,20 @@
     "contributes": {
         "menus": {
             "editor/context": [
-                {
-                    "command": "vext.ltm.paste",
-                    "group": "ML@1"
-                },
-                {
-                    "command": "vext.ltm.convert",
-                    "group": "ML@1"
-                },
-                {
-                    "command": "vext.mtl.paste",
-                    "group": "ML@1"
-                },
-                {
-                    "command": "vext.mtl.convert",
-                    "group": "ML@1"
-                }
+                { "command": "vext.htd.paste"  , "group": "MD@1" },
+                { "command": "vext.htd.convert", "group": "MD@1" },
+                { "command": "vext.dth.paste"  , "group": "MD@1" },
+                { "command": "vext.dth.convert", "group": "MD@1" },
+                { "command": "vext.ltm.paste"  , "group": "ML@1" },
+                { "command": "vext.ltm.convert", "group": "ML@1" },
+                { "command": "vext.mtl.paste"  , "group": "ML@1" },
+                { "command": "vext.mtl.convert", "group": "ML@1" }
             ]
         },
         "viewsContainers": {
             "activitybar": [
-                {
-                    "id": "managerView",
-                    "title": "Manager View",
-                    "icon": "assets/folder.svg"
-                },
-                {
-                    "id": "gptView",
-                    "title": "GPTunnel View",
-                    "icon": "assets/openai.svg"
-                }
+                { "id": "managerView", "title": "Manager View", "icon": "assets/folder.svg" },
+                { "id": "gptView", "title": "GPTunnel View", "icon": "assets/openai.svg" }
             ]
         },
         "views": {
@@ -69,26 +55,15 @@
             ]
         },
         "commands": [
-            {
-                "command": "vext.openWebview",
-                "title": "Open GPTunnel View"
-            },
-            {
-                "command": "vext.ltm.convert",
-                "title": "Convert to LaTeX"
-            },
-            {
-                "command": "vext.ltm.paste",
-                "title": "Paste as LaTeX"
-            },
-            {
-                "command": "vext.mtl.convert",
-                "title": "Convert to MathML"
-            },
-            {
-                "command": "vext.mtl.paste",
-                "title": "Paste as MathML"
-            }
+            { "command": "vext.openWebview", "title": "Open GPTunnel View" },
+            { "command": "vext.ltm.convert", "title": "Convert to LaTeX" },
+            { "command": "vext.ltm.paste",   "title": "Paste as LaTeX" },
+            { "command": "vext.mtl.convert", "title": "Convert to MathML" },
+            { "command": "vext.mtl.paste",   "title": "Paste as MathML" },
+            { "command": "vext.htd.convert", "title": "Convert to Markdown" },
+            { "command": "vext.htd.paste",   "title": "Paste as Markdown" },
+            { "command": "vext.dth.convert", "title": "Convert to HTML" },
+            { "command": "vext.dth.paste",   "title": "Paste as HTML" }
         ]
     },
     "scripts": {
@@ -116,9 +91,11 @@
         "@vscode/test-electron": "^2.5.2",
         "esbuild": "^0.25.5",
         "eslint": "^9.25.1",
+        "marked": "^15.0.12",
         "mathml-to-latex": "^1.4.1",
         "npm-run-all": "^4.1.5",
         "tsx": "^4.19.4",
+        "turndown": "^7.2.0",
         "typescript": "^5.8.3"
     }
 }

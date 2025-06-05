@@ -1,5 +1,5 @@
 {
-    "include": ["src/*.js", "src/*.mjs"],
+    "include": ["src/*.js", "src/*.mjs", "src/chapter/webview.mjs", "src/legacy/hello.mjs"],
     "exclude": ["src/*.ts", "src/*.d.ts", "node_modules"],
 	"compilerOptions": {
 		"module": "Node16",

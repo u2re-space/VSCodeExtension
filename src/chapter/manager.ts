@@ -97,8 +97,13 @@ function runInTerminal(cmd: string, cwd: string) {
 
 //
 const defaultCSS = `
+* {
+    box-sizing: border-box;
+}
+
 :root {
     /* VS Code dark theme colors */
+    --highlight: color(srgb 1 1 1 / 0.01);
     --background: #1e1e1e;
     --foreground: #d4d4d4;
     --border: #333;
@@ -107,7 +112,15 @@ const defaultCSS = `
     --button-active: #007acc;
     --button-fg: #d4d4d4;
     --button-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    --row-hover: #232323;
+    --row-hover: color(srgb 1 1 1 / 0.02);
+    --scrollbar-bg: #23272e;
+    --scrollbar-thumb: color(srgb 1 1 1 / 0.5);
+    --scrollbar-thumb-hover: color(srgb 1 1 1 / 0.6);
+}
+
+html {
+    padding: 0px;
+    margin: 0px;
 }
 
 body {
@@ -116,42 +129,92 @@ body {
     font-family: "Segoe UI", "Fira Code", "Consolas", monospace;
     margin: 0;
     padding: 0.5em 1em;
+    min-block-size: 100dvh;
+    block-size: 100dvh;
+    overflow: hidden;
+    box-sizing: border-box;
+    container-type: size;
+    contain: strict;
 }
 
 table {
-    width: 100%;
+    inline-size: 100%;
+    border-radius: 0.5rem;
     border-collapse: collapse;
-    margin-top: 0.5em;
+    clip-path: inset(0 round 0.5rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    background: var(--highlight);
+    min-block-size: max(100%, 100cqh);
+    block-size: max(100%, 100cqh);
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;/*var(--scrollbar-bg)*/;
+    scrollbar-gutter: auto;
 }
 
 tr {
-    border-bottom: 1px solid var(--border);
     transition: background 0.2s;
+    max-block-size: max-content;
+    block-size: max-content;
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+    flex-grow: 1;
+    flex-shrink: 0;
+    flex-basis: stretch;
+    inline-size: 100%;
+    place-content: center;
+    place-items: center;
+    padding-inline: 0.5rem;
+    box-sizing: border-box;
 }
 
-tr:hover {
-    background: var(--row-hover);
-}
+tr:hover { background: var(--row-hover); }
 
 td {
-    padding: 0.5em 0.5em;
+    padding: 0px;
+    padding-block: 0.5rem;
     vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    flex-direction: row;
+    flex-shrink: 0;
+    flex-grow: 1;
+    flex-basis: stretch;
+    text-align: start;
+    max-block-size: max-content;
+    block-size: max-content;
+    box-sizing: border-box;
 }
 
 button {
+    overflow: hidden;
     background: var(--button-bg);
     color: var(--button-fg);
     border: none;
     border-radius: 6px;
     margin: 0 0.15em;
-    padding: 0.35em 0.7em;
+    padding: 0.5rem;
     font-size: 1em;
     font-family: inherit;
     cursor: pointer;
-    box-shadow: var(--button-shadow);
+    /*box-shadow: var(--button-shadow);*/
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
     position: relative;
+    aspect-ratio: 1 / 1;
+    inline-size: 2rem;
+    block-size: 2rem;
+    display: inline flex;
+    place-content: center;
+    place-items: center;
 }
 
 button:hover {
@@ -165,11 +228,12 @@ button:active {
 }
 
 button:focus {
-    box-shadow: 0 0 0 2px #007acc55;
+    /*box-shadow: 0 0 0 2px #007acc55;*/
 }
 
 @media (prefers-color-scheme: light) {
     :root {
+        --highlight: color(srgb 0 0 0 / 0.01);
         --background: #f3f3f3;
         --foreground: #222;
         --border: #e1e1e1;
@@ -178,25 +242,28 @@ button:focus {
         --button-active: #007acc;
         --button-fg: #222;
         --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        --row-hover: #eaeaea;
+        --row-hover: color(srgb 0 0 0 / 0.02);
+        --scrollbar-bg: #f0f0f0;
+        --scrollbar-thumb: color(srgb 0 0 0 / 0.5);
+        --scrollbar-thumb-hover: color(srgb 0 0 0 / 0.6);
     }
 }
 `;
 
 //
 function getWebviewContent(modules: string[]): string {
-    return `<html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons/dist/codicon.css"></head><body style="padding: 0px; margin: 0px; border: none 0px transparent;">
+    return `<html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons/dist/codicon.css"></head><body style="margin: 0px; border: none 0px transparent; min-block-size: 100dvh;">
     <style>${defaultCSS}</style>
     <table>
         ${modules?.map?.(m => `<tr>
-                <td style="inline-size: stretch; inline-size: -webkit-fill-available;">${m}</td>
-                <td style="inline-size: max-content; text-align: end;">
+                <td style="flex-basis: max-content; inline-size: -webkit-fill-available; padding-inline-start: 0.5rem; justify-content: start;">${m}</td>
+                <td style="flex-basis: max-content; inline-size: max-content; flex-shrink: 0; flex-grow: 0; justify-content: end;">
                     <button onclick="send('watch', '${m}')"><i class="codicon codicon-eye"></i></button>
                     <button onclick="send('debug', '${m}')"><i class="codicon codicon-debug"></i></button>
                     <button onclick="send('build', '${m}')"><i class="codicon codicon-package"></i></button>
-                    <button onclick="send('test', '${m}')"><i class="codicon codicon-beaker"></i></button>
+                    <button onclick="send('test' , '${m}')"><i class="codicon codicon-beaker"></i></button>
                     <button onclick="send('terminal', '${m}')"><i class="codicon codicon-terminal"></i></button>
-                    <button onclick="send('push', '${m}')"><i class="codicon codicon-cloud-upload"></i></button>
+                    <button onclick="send('push' , '${m}')"><i class="codicon codicon-cloud-upload"></i></button>
                 </td>
             </tr>`)?.join?.('')}
     </table>

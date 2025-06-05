@@ -1,0 +1,61 @@
+import * as vscode from 'vscode';
+
+//
+export const dummy = (unsafe: string)=>{
+    return unsafe?.trim()?.replace?.(/&amp;/g, '&')
+    ?.replace?.(/&lt;/g, '<')
+    ?.replace?.(/&gt;/g, '>')
+    ?.replace?.(/&quot;/g, '"')
+    ?.replace?.(/&nbsp;/g, " ")
+    ?.replace?.(/&#39;/g, "'") || unsafe;
+};
+
+//
+export const weak_dummy = (unsafe: string)=>{
+    return unsafe?.trim()?.replace?.(/&amp;/g, '&')
+    ?.replace?.(/&nbsp;/g, " ")
+    ?.replace?.(/&quot;/g, '"')
+    ?.replace?.(/&#39;/g, "'") || unsafe;
+};
+
+//
+export const tryXML = (unsafe: string): string => {
+    return dummy(unsafe) || unsafe;
+};
+
+//
+export const escapeML = (unsafe: string): string => {
+    if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test(unsafe.trim())) {
+        if (unsafe?.trim()?.startsWith?.("&lt;") && unsafe?.trim()?.endsWith?.("&gt;")) {
+            return tryXML(unsafe) || dummy(unsafe) || unsafe;
+        }
+        if (!(unsafe?.trim()?.startsWith?.("<") && unsafe?.trim()?.endsWith?.(">"))) {
+            return dummy(unsafe) || unsafe;
+        }
+    }
+    return weak_dummy(unsafe) || unsafe;
+};
+
+//
+export const getSelection = (): string =>{
+    const editor: any = vscode.window.activeTextEditor;
+    const selection = editor.selection;
+    if (selection && !selection.isEmpty) {
+        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+        const highlighted = editor.document.getText(selectionRange);
+        return highlighted;
+    }
+    return "";
+};
+
+//
+export const replaceSelectionWith = (text: string) => {
+    const editor: any = vscode.window.activeTextEditor;
+    const selection = editor.selection;
+    if (selection) {
+        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+        editor.edit((builder: any)=>{
+            builder.replace(selectionRange, text);
+        });
+    }
+};

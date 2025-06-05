@@ -3,70 +3,11 @@
 
 //
 import { MathMLToLaTeX } from 'mathml-to-latex';
+import { escapeML, replaceSelectionWith, getSelection } from '../lib/utils';
 import * as vscode from 'vscode';
 
 //
-const dummy = (unsafe: string)=>{
-    return unsafe?.trim()?.replace?.(/&amp;/g, '&')
-    ?.replace?.(/&lt;/g, '<')
-    ?.replace?.(/&gt;/g, '>')
-    ?.replace?.(/&quot;/g, '"')
-    ?.replace?.(/&nbsp;/g, " ")
-    ?.replace?.(/&#39;/g, "'") || unsafe;
-};
-
-//
-const weak_dummy = (unsafe: string)=>{
-    return unsafe?.trim()?.replace?.(/&amp;/g, '&')
-    ?.replace?.(/&nbsp;/g, " ")
-    ?.replace?.(/&quot;/g, '"')
-    ?.replace?.(/&#39;/g, "'") || unsafe;
-};
-
-//
-const tryXML = (unsafe: string): string => {
-    return dummy(unsafe) || unsafe;
-};
-
-//
-const escapeML = (unsafe: string): string => {
-    if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test(unsafe.trim())) {
-        if (unsafe?.trim()?.startsWith?.("&lt;") && unsafe?.trim()?.endsWith?.("&gt;")) {
-            return tryXML(unsafe) || dummy(unsafe) || unsafe;
-        }
-        if (!(unsafe?.trim()?.startsWith?.("<") && unsafe?.trim()?.endsWith?.(">"))) {
-            return dummy(unsafe) || unsafe;
-        }
-    }
-    return weak_dummy(unsafe) || unsafe;
-};
-
-//
-export const getSelection = (): string =>{
-    const editor: any = vscode.window.activeTextEditor;
-    const selection = editor.selection;
-    if (selection && !selection.isEmpty) {
-        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-        const highlighted = editor.document.getText(selectionRange);
-        return highlighted;
-    }
-    return "";
-};
-
-//
-export const replaceSelectionWith = (text: string) => {
-    const editor: any = vscode.window.activeTextEditor;
-    const selection = editor.selection;
-    if (selection) {
-        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-        editor.edit((builder: any)=>{
-            builder.replace(selectionRange, text);
-        });
-    }
-};
-
-//
-const temml = import("./temml/temml.mjs");
+const temml = import("../temml/temml.mjs");
 export const convertToMathML = async (mathML: string): Promise<string> =>{
     const original = escapeML(mathML);
     if (!(mathML?.trim()?.startsWith?.("<") && mathML?.trim()?.endsWith?.(">"))) {
@@ -131,12 +72,7 @@ export function mathml(context: vscode.ExtensionContext) {
     });
 
     //
-    context.subscriptions.push(convertAsTeX);
-    context.subscriptions.push(pasteAsTeX);
-
-    //
-    context.subscriptions.push(convertAsMML);
-    context.subscriptions.push(pasteAsMML);
+    context.subscriptions.push(convertAsTeX, pasteAsTeX, convertAsMML, pasteAsMML);
 }
 
 // This method is called when your extension is deactivated
