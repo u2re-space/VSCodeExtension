@@ -5,6 +5,7 @@ import * as fs from 'fs';
 //
 const editor  = vscode?.window?.activeTextEditor, ctxMap = new WeakMap();
 const watcher = vscode?.workspace?.createFileSystemWatcher?.('./**');
+const MOD_DIR = "modules";
 
 //
 const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
@@ -25,7 +26,7 @@ const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
 function getBaseDir(): { baseDir: string, isModules: boolean } {
     const wsd = getWorkspaceFolder(vscode.workspace)||"";
     if (!wsd) {return { baseDir: "", isModules: false };}
-    const modulesDir = path.join(wsd, "modules");
+    const modulesDir = path.join(wsd, MOD_DIR);
     let isModules = false;
     try { isModules = fs.statSync(modulesDir).isDirectory(); }
     catch (e) { /* ignore */ }
@@ -35,9 +36,9 @@ function getBaseDir(): { baseDir: string, isModules: boolean } {
 //
 const getDirs = (context)=>{
     const { baseDir, isModules } = getBaseDir();
-    if (!context) { return ["./"]; }
+    if (!context || !isModules) { return ["./"]; }
     let modules: string[] = ctxMap.get(context) ?? []; ctxMap.set(context, modules);
-    try { modules = fs.readdirSync(baseDir)?.filter?.(f => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.(f => (isModules ? `modules/${f}` : f)); }
+    try { modules = fs.readdirSync(baseDir)?.filter?.(f => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.(f => (isModules ? `${MOD_DIR}/${f}` : f)); }
     catch (e) { /* ignore */ }; if (modules?.length < 1) { modules?.push?.("./"); }; return modules;
 };
 
