@@ -23,10 +23,10 @@ const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
 };
 
 //
-function getBaseDir(): { baseDir: string, isModules: boolean } {
+function getBaseDir(dir: string = MOD_DIR): { baseDir: string, isModules: boolean } {
     const wsd = getWorkspaceFolder(vscode.workspace)||"";
     if (!wsd) {return { baseDir: "", isModules: false };}
-    const modulesDir = path.join(wsd, MOD_DIR);
+    const modulesDir = path.join(wsd, dir);
     let isModules = false;
     try { isModules = fs.statSync(modulesDir).isDirectory(); }
     catch (e) { /* ignore */ }
@@ -34,11 +34,11 @@ function getBaseDir(): { baseDir: string, isModules: boolean } {
 }
 
 //
-const getDirs = (context)=>{
-    const { baseDir, isModules } = getBaseDir();
+const getDirs = (context, dir = MOD_DIR)=>{
+    const { baseDir, isModules } = getBaseDir(dir);
     if (!context || !isModules) { return ["./"]; }
     let modules: string[] = ctxMap.get(context) ?? []; ctxMap.set(context, modules);
-    try { modules = fs.readdirSync(baseDir)?.filter?.(f => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.(f => (isModules ? `${MOD_DIR}/${f}` : f)); }
+    try { modules = fs.readdirSync(baseDir)?.filter?.(f => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.(f => (isModules ? `${dir}/${f}` : f)); }
     catch (e) { /* ignore */ }; if (modules?.length < 1) { modules?.push?.("./"); }; return modules;
 };
 
@@ -50,7 +50,7 @@ export class ManagerViewProvider {
     //
     updateView(webviewView, context) { webviewView.webview.html = getWebviewContent(getDirs(context)||["./"]); }
     resolveWebviewView(webviewView, context, token) {
-        const wsd = getWorkspaceFolder(vscode.workspace)||"", modules = getDirs(context);
+        const wsd = getWorkspaceFolder(vscode.workspace)||"", modules = getDirs(context)||["./"];
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
 
         //
@@ -68,13 +68,17 @@ export class ManagerViewProvider {
             webviewView?.webview?.onDidReceiveMessage?.(async message => {
                 const modulePath = path.join(wsd, message.module);
                 switch (message.command) {
-                    case 'terminal': runInTerminal('', modulePath); break;
-                    case 'build': runInTerminal('npm run build', modulePath); break;
-                    case 'watch': runInTerminal('npm run watch', modulePath); break;
-                    case 'test' : runInTerminal('npm run test' , modulePath); break;
+                    case 'terminal': runInTerminal([''], modulePath); break;
+                    case 'build': runInTerminal(['npm run build'], modulePath); break;
+                    case 'watch': runInTerminal(['npm run watch'], modulePath); break;
+                    case 'test' : runInTerminal(['npm run test'] , modulePath); break;
                     case 'push':
-                        const commitMsg = await vscode.window.showInputBox({ prompt: 'Почему?', value: '' }) || 'update';
-                        runInTerminal(`git add * && git add . && git commit -m "${commitMsg}" && git push --all`, modulePath);
+                        const commitMsg = await vscode.window.showInputBox({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
+                        runInTerminal([
+                            'git add .',
+                            `git commit -m "${commitMsg}"`,
+                            'git push --all'
+                        ], modulePath);
                         break;
                 }
             });
@@ -91,9 +95,10 @@ export function manager(context: vscode.ExtensionContext) {
 }
 
 //
-function runInTerminal(cmd: string, cwd: string) {
+function runInTerminal(cmds: string[], cwd: string) {
     const term = vscode.window.createTerminal({ cwd });
-    if (cmd) {term.sendText(cmd);} term.show();
+    term.show();
+    cmds.forEach(cmd => term.sendText(cmd));
 }
 
 //
