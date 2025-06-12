@@ -132,6 +132,12 @@ function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
 }
 
 //
+vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
+    for (const [cwd, obj] of terminalMap.entries()) 
+        { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
+});
+
+//
 const defaultCSS = `
 * {
     box-sizing: border-box;
