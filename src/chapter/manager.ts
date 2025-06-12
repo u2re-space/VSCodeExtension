@@ -68,7 +68,6 @@ export class ManagerViewProvider {
             webviewView?.webview?.onDidReceiveMessage?.(async message => {
                 const modulePath = path.join(wsd, message.module); modules = getDirs(context)||["./"];
                 switch (message.command) {
-                    case 'bulk_build': for (const m of modules) { runInTerminal(['npm run build'], path.join(wsd, m)); }; break;
                     case 'bulk_push': {
                         const commitMsg = await vscode.window.showInputBox({ prompt: 'Commit Message for all?', value: '' }) || 'Bulk Update';
                         for (const m of modules) {
@@ -79,10 +78,14 @@ export class ManagerViewProvider {
                             ], path.join(wsd, m));
                         }
                     }; break;
+                    case 'bulk_build': for (const m of modules) { runInTerminal(['npm run build'], path.join(wsd, m)); }; break;
+
+                    //
                     case 'terminal': runInTerminal([''], modulePath); break;
                     case 'build': runInTerminal(['npm run build'], modulePath); break;
-                    case 'watch': runInTerminal(['npm run watch'], modulePath); break;
-                    case 'test' : runInTerminal(['npm run test'] , modulePath); break;
+                    case 'watch': runInTerminal(['npm run watch'], modulePath, true); break;
+                    case 'test' : runInTerminal(['npm run test'] , modulePath, true); break;
+                    case 'diff': runInTerminal(['git diff'], modulePath, true); break;
                     case 'push': {
                         const commitMsg = await vscode.window.showInputBox({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
                         runInTerminal([
@@ -106,11 +109,27 @@ export function manager(context: vscode.ExtensionContext) {
 }
 
 //
-function runInTerminal(cmds: string[], cwd: string) {
-    const term = vscode.window.createTerminal({ cwd });
-    term.show();
-    cmds.forEach(cmd => term.sendText(cmd));
+type TerminalStatus = 'free' | 'busy';
+const terminalMap = new Map<string, { terminal: vscode.Terminal, status: TerminalStatus }>();
+function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
+    // longRunning = true для watch/dev/test, false для diff/build/push
+    let entry = Array.from(terminalMap.entries()).find(([dir, obj]) =>
+        dir === cwd && obj.status === 'free'
+    );
+    let termObj = entry?.[1];
+
+    if (!termObj) {
+        const terminal = vscode.window.createTerminal({ cwd });
+        termObj = { terminal, status: longRunning ? 'busy' : 'free' };
+        terminalMap.set(cwd, termObj);
+    } else if (longRunning) {
+        termObj.status = 'busy';
+    }
+
+    termObj.terminal.show();
+    cmds.forEach(cmd => termObj.terminal.sendText(cmd));
 }
+
 
 //
 const defaultCSS = `
@@ -313,6 +332,7 @@ function getWebviewContent(modules: string[]): string {
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
                 <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
                 <button onclick="send('test' , '${m}')" title="Test"><i class="codicon codicon-beaker"></i></button>
+                <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
                 <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
                 <button onclick="send('push' , '${m}')" title="Git push"><i class="codicon codicon-cloud-upload"></i></button>
             </td>
