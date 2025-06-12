@@ -61,6 +61,10 @@ export class ManagerViewProvider {
             try { context.subscriptions.push(watcher?.onDidChange?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
             try { context.subscriptions.push(vscode.workspace?.onDidChangeWorkspaceFolders?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
             try { context.subscriptions.push(vscode.window?.onDidChangeActiveTextEditor?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
+            try { context.subscriptions.push(vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
+                for (const [cwd, obj] of terminalMap.entries()) 
+                    { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
+            })); } catch(e) { console.warn(e); };
         }
 
         //
@@ -126,7 +130,6 @@ function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
     termObj.terminal.show();
     cmds.forEach(cmd => termObj.terminal.sendText(cmd));
 }
-
 
 //
 const defaultCSS = `
