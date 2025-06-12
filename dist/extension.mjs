@@ -106,12 +106,14 @@ body {
     font-family: "Segoe UI", "Fira Code", "Consolas", monospace;
     margin: 0;
     padding: 0.5em 1em;
-    min-block-size: 100dvh;
-    block-size: 100dvh;
+    block-size: min(100svh, 100cqh);
+    min-block-size: min(100svh, 100cqh);
+    max-block-size: min(100svh, 100cqh);
     overflow: hidden;
     box-sizing: border-box;
     container-type: size;
-    contain: strict;
+    position: fixed;
+    inline-size: 100%;
 }
 
 table {
@@ -120,12 +122,14 @@ table {
     border-collapse: collapse;
     clip-path: inset(0 round 0.5rem);
     margin-block-start: 3rem;
+    margin-block-end: 0rem;
     overflow-y: auto;
     overflow-x: hidden;
 
     background: var(--highlight);
     block-size: max-content;
-    max-block-size: min(100%, 100cqh);
+    max-block-size: stretch;
+    max-block-size: -webkit-fill-available;
 
     display: flex;
     flex-direction: column;
@@ -233,7 +237,7 @@ button:focus {
     padding: 0.25rem 1rem 0.25rem 1rem;
     display: flex; gap: 0.125rem;
     padding-inline-end: 0.5rem;
-    background: var(--highlight);
+    background: var(--background);
     border-radius: 0.5rem;
     inset-inline-start: 0px;
     inset-block-start: 0px;
@@ -256,14 +260,16 @@ button:focus {
     block-size: max-content;
 }
 
-.selected { outline: 2px solid var(--button-active); }
+:where(.toolbar, tr):has(button:focus) {
+    border-bottom: 2px solid var(--button-active);
+}
 
 button:focus {
     outline: 2px solid var(--button-active);
     outline-offset: 1px;
 }
 `;function Xp(e){return`<html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons/dist/codicon.css"></head>
-    <body style="margin: 0px; border: none 0px transparent; min-block-size: 100dvh;">
+    <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <style>${Wp}</style>
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
