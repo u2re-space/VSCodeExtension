@@ -6,6 +6,19 @@ import * as fs from 'fs';
 const editor  = vscode?.window?.activeTextEditor, ctxMap = new WeakMap();
 const watcher = vscode?.workspace?.createFileSystemWatcher?.('./**');
 const MOD_DIR = "modules";
+const inWatch = new Set<any>([]);
+
+//
+watcher?.onDidCreate?.(() => inWatch.forEach((cb: any)=>cb?.()));
+watcher?.onDidDelete?.(() => inWatch.forEach((cb: any)=>cb?.()));
+watcher?.onDidChange?.(() => inWatch.forEach((cb: any)=>cb?.()));
+vscode.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
+vscode.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
+vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
+    for (const [cwd, obj] of terminalMap.entries()) 
+        { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
+});
+
 
 //
 const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
@@ -50,22 +63,11 @@ export class ManagerViewProvider {
     //
     updateView(webviewView, context) { webviewView.webview.html = getWebviewContent(getDirs(context)||["./"]); }
     resolveWebviewView(webviewView, context, token) {
+        const weak = new WeakRef(this), view = new WeakRef(webviewView), ctx  = new WeakRef(context);
         let wsd = getWorkspaceFolder(vscode.workspace)||"", modules = getDirs(context)||["./"];
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
-
-        //
-        {
-            try { this.updateView(webviewView, context); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(watcher?.onDidCreate?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(watcher?.onDidDelete?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(watcher?.onDidChange?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(vscode.workspace?.onDidChangeWorkspaceFolders?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(vscode.window?.onDidChangeActiveTextEditor?.(() => this.updateView(webviewView, context))); } catch(e) { console.warn(e); };
-            try { context.subscriptions.push(vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
-                for (const [cwd, obj] of terminalMap.entries()) 
-                    { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
-            })); } catch(e) { console.warn(e); };
-        }
+        try { this.updateView(webviewView, context); } catch(e) { console.warn(e); };
+        inWatch?.add?.(()=>weak?.deref?.()?.updateView?.(view?.deref?.(), ctx?.deref?.()));
 
         //
         if (modules = getDirs(context)||["./"]) { try {
