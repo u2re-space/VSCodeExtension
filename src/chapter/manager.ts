@@ -113,15 +113,12 @@ type TerminalStatus = 'free' | 'busy';
 const terminalMap = new Map<string, { terminal: vscode.Terminal, status: TerminalStatus }>();
 function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
     // longRunning = true для watch/dev/test, false для diff/build/push
-    let entry = Array.from(terminalMap.entries()).find(([dir, obj]) =>
-        dir === cwd && obj.status === 'free'
-    );
-    let termObj = entry?.[1];
+    let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => (dir === cwd && obj.status === 'free')) : null, termObj = entry?.[1];
 
     if (!termObj) {
         const terminal = vscode.window.createTerminal({ cwd });
         termObj = { terminal, status: longRunning ? 'busy' : 'free' };
-        terminalMap.set(cwd, termObj);
+        if (!longRunning) { terminalMap.set(cwd, termObj); }
     } else if (longRunning) {
         termObj.status = 'busy';
     }
