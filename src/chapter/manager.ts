@@ -184,12 +184,14 @@ table {
     border-radius: 0.5rem;
     border-collapse: collapse;
     clip-path: inset(0 round 0.5rem);
+    margin-block-start: 3rem;
     overflow-y: auto;
     overflow-x: hidden;
 
     background: var(--highlight);
-    min-block-size: max(100%, 100cqh);
-    block-size: max(100%, 100cqh);
+    block-size: max-content;
+    max-block-size: min(100%, 100cqh);
+
     display: flex;
     flex-direction: column;
     box-sizing: border-box;
@@ -298,13 +300,19 @@ button:focus {
     padding-inline-end: 0.5rem;
     background: var(--highlight);
     border-radius: 0.5rem;
-    inset-block-start: 0;
-    position: sticky;
+    inset-inline-start: 0px;
+    inset-block-start: 0px;
+    position: fixed;
     z-index: 2;
     flex-directon: row;
     text-align: start;
     justify-content: start;
+    margin-block-start: 0.5rem;
     margin-block-end: 0.5rem;
+    margin-inline: 0.75rem;
+    block-size: max-content;
+    min-block-size: 2rem;
+    inline-size: calc(100% - 1.5rem);
 }
 
 .toolbar-label {
