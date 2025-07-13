@@ -9,9 +9,23 @@ import TurndownService from 'turndown';
 import { marked } from 'marked';
 import { replaceSelectionWith, getSelection } from '../imports/utils.ts';
 import { escapeML } from "../imports/str.ts";
+import markedKatex from "marked-katex-extension";
+
+//! unused
+//import mk from "@vscode/markdown-it-katex";
 
 //
 const turndownService = new TurndownService();
+
+//
+try {
+    marked?.use?.(markedKatex?.({
+        throwOnError: false,
+        nonStandard: true
+    }));
+} catch(e) {
+    console.warn(e);
+}
 
 //
 export const convertToHtml = async (input: string): Promise<string> => {
