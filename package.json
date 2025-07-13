@@ -6,7 +6,7 @@
     "readme": "./README.md",
     "version": "0.0.1",
     "engines": {
-        "vscode": "^1.100.0"
+        "vscode": "^1.99.0"
     },
     "icon": "./assets/service.png",
     "categories": [
