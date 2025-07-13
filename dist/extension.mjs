@@ -7116,32 +7116,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path2) {
-          if (!path2) return path2;
+        function remove_dot_segments(path) {
+          if (!path) return path;
           var output = "";
-          while (path2.length > 0) {
-            if (path2 === "." || path2 === "..") {
-              path2 = "";
+          while (path.length > 0) {
+            if (path === "." || path === "..") {
+              path = "";
               break;
             }
-            var twochars = path2.substring(0, 2);
-            var threechars = path2.substring(0, 3);
-            var fourchars = path2.substring(0, 4);
+            var twochars = path.substring(0, 2);
+            var threechars = path.substring(0, 3);
+            var fourchars = path.substring(0, 4);
             if (threechars === "../") {
-              path2 = path2.substring(3);
+              path = path.substring(3);
             } else if (twochars === "./") {
-              path2 = path2.substring(2);
+              path = path.substring(2);
             } else if (threechars === "/./") {
-              path2 = "/" + path2.substring(3);
-            } else if (twochars === "/." && path2.length === 2) {
-              path2 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path2.length === 3) {
-              path2 = "/" + path2.substring(4);
+              path = "/" + path.substring(3);
+            } else if (twochars === "/." && path.length === 2) {
+              path = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path.length === 3) {
+              path = "/" + path.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path2.match(/(\/?([^\/]*))/)[0];
+              var segment = path.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path2 = path2.substring(segment.length);
+              path = path.substring(segment.length);
             }
           }
           return output;
@@ -19419,14 +19419,14 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join2(output, replacement);
+        return join(output, replacement);
       }, "");
     }
     function postProcess2(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join2(output, rule.append(self.options));
+          output = join(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
@@ -19438,7 +19438,7 @@ var require_turndown_cjs = __commonJS({
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join2(output, replacement) {
+    function join(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -19513,10 +19513,6 @@ async function webview(context) {
     panel.webview.html = html;
   }));
 }
-
-// src/views/manager.ts
-import * as path from "path";
-import * as fs from "fs";
 
 // src/views/default-css.ts
 var defaultCSS = `
@@ -19865,33 +19861,29 @@ var getWorkspaceFolder = async (workspace, res = "") => {
   const vscodeAPI2 = await initVscodeAPI();
   const editor = vscodeAPI2?.window?.activeTextEditor;
   res = res || editor?.document?.uri || "";
-  let path2 = "";
+  let folder;
   if (!workspace.workspaceFolders) {
-    path2 = workspace.rootPath;
+  } else if (workspace.workspaceFolders.length === 1 || !res) {
+    folder = workspace.workspaceFolders[0];
   } else {
-    let root = null;
-    if (workspace.workspaceFolders.length === 1 || !res) {
-      root = workspace.workspaceFolders[0];
-    } else {
-      root = workspace.getWorkspaceFolder(res);
-    }
-    path2 = root?.uri?.fsPath || "";
+    folder = workspace.getWorkspaceFolder(res);
   }
-  return path2 || "";
+  return folder?.uri || void 0;
 };
 async function getBaseDir(dir = MOD_DIR) {
   const vscodeAPI2 = await initVscodeAPI();
-  const wsd = await getWorkspaceFolder(vscodeAPI2?.workspace) || "";
-  if (!wsd) {
-    return { baseDir: "", isModules: false };
+  const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
+  if (!wsdUri) {
+    return { baseDir: vscodeAPI2.Uri.file(""), isModules: false };
   }
-  const modulesDir = path.join(wsd, dir);
+  const modulesDirUri = vscodeAPI2.Uri.joinPath(wsdUri, dir);
   let isModules = false;
   try {
-    isModules = fs.statSync(modulesDir).isDirectory();
+    const stat = await vscodeAPI2.workspace.fs.stat(modulesDirUri);
+    isModules = stat.type === vscodeAPI2.FileType.Directory;
   } catch (e) {
   }
-  return { baseDir: isModules ? modulesDir : wsd, isModules };
+  return { baseDir: isModules ? modulesDirUri : wsdUri, isModules };
 }
 var getDirs = async (context, dir = MOD_DIR) => {
   const { baseDir, isModules } = await getBaseDir(dir);
@@ -19901,14 +19893,13 @@ var getDirs = async (context, dir = MOD_DIR) => {
   let modules = ctxMap.get(context) ?? [];
   ctxMap.set(context, modules);
   try {
-    modules = fs.readdirSync(baseDir)?.filter?.((f) => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.((f) => isModules ? `${dir}/${f}` : f);
+    const entries = await vscodeAPI?.workspace?.fs?.readDirectory?.(baseDir);
+    modules = entries.filter(([name, type]) => type === vscodeAPI?.FileType?.Directory).map(([name]) => isModules ? `${dir}/${name}` : name);
   } catch (e) {
   }
-  ;
   if (modules?.length < 1) {
     modules?.push?.("./");
   }
-  ;
   return modules;
 };
 var ManagerViewProvider = class {
@@ -19918,63 +19909,64 @@ var ManagerViewProvider = class {
     this._extensionUri = extensionUri;
   }
   //
-  async updateView(webviewView, context) {
-    const modules = await getDirs(context) || ["./"];
+  async updateView(webviewView, context, modules) {
+    modules ??= await getDirs(context) || ["./"];
     webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri, modules);
   }
+  //
   async resolveWebviewView(webviewView, context, token) {
-    const weak = new WeakRef(this), view2 = new WeakRef(webviewView), ctx = new WeakRef(context);
     const vscodeAPI2 = await initVscodeAPI();
-    let wsd = await getWorkspaceFolder(vscodeAPI2?.workspace) || "", modules = await getDirs(context) || ["./"];
+    const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
+    let modules = await getDirs(context) || ["./"];
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
     try {
-      await this.updateView(webviewView, context);
+      await this.updateView(webviewView, context, modules);
     } catch (e) {
       console.warn(e);
     }
     ;
-    inWatch?.add?.(() => weak?.deref?.()?.updateView?.(view2?.deref?.(), ctx?.deref?.()));
+    inWatch?.add?.(() => this.updateView(webviewView, context));
     if (modules = await getDirs(context) || ["./"]) {
       try {
         webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
-          const modulePath = path.join(wsd, message.module);
+          const moduleUri = vscodeAPI2.Uri.joinPath(wsdUri, message.module);
           const modules2 = await getDirs(context) || ["./"];
           switch (message.command) {
             case "bulk_push":
               {
                 const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "" }) || "Bulk Update";
                 for (const m of modules2) {
+                  const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
                   runInTerminal([
                     "git add .",
                     "git add *",
                     `git commit -m "${commitMsg}"`,
                     "git push --all"
-                  ], path.join(wsd, m));
+                  ], mUri.fsPath);
                 }
               }
               ;
               break;
             case "bulk_build":
               for (const m of modules2) {
-                runInTerminal(["npm run build"], path.join(wsd, m));
+                const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
+                runInTerminal(["npm run build"], mUri.fsPath);
               }
-              ;
               break;
-            //
             case "terminal":
-              runInTerminal([""], modulePath);
+              runInTerminal([""], moduleUri.fsPath);
               break;
             case "build":
-              runInTerminal(["npm run build"], modulePath);
+              runInTerminal(["npm run build"], moduleUri.fsPath);
               break;
             case "watch":
-              runInTerminal(["npm run watch"], modulePath, true);
+              runInTerminal(["npm run watch"], moduleUri.fsPath, true);
               break;
             case "test":
-              runInTerminal(["npm run test"], modulePath, true);
+              runInTerminal(["npm run test"], moduleUri.fsPath, true);
               break;
             case "diff":
-              runInTerminal(["git diff"], modulePath, true);
+              runInTerminal(["git diff"], moduleUri.fsPath, true);
               break;
             case "push":
               {
@@ -19984,7 +19976,7 @@ var ManagerViewProvider = class {
                   "git add *",
                   `git commit -m "${commitMsg}"`,
                   "git push --all"
-                ], modulePath);
+                ], moduleUri.fsPath);
               }
               ;
               break;
