@@ -121,27 +121,27 @@ export class ManagerViewProvider {
                                 'git add .', 'git add *',
                                 `git commit -m "${commitMsg}"`,
                                 'git push --all'
-                            ], mUri.fsPath);
+                            ], mUri?.path || mUri?.fsPath);
                         }
                     }; break;
                     case 'bulk_build':
                         for (const m of modules) {
                             const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
-                            runInTerminal(['npm run build'], mUri.fsPath);
+                            runInTerminal(['npm run build'], mUri?.path || mUri?.fsPath);
                         }
                         break;
-                    case 'terminal': runInTerminal([''], moduleUri.fsPath); break;
-                    case 'build': runInTerminal(['npm run build'], moduleUri.fsPath); break;
-                    case 'watch': runInTerminal(['npm run watch'], moduleUri.fsPath, true); break;
-                    case 'test' : runInTerminal(['npm run test'] , moduleUri.fsPath, true); break;
-                    case 'diff': runInTerminal(['git diff'], moduleUri.fsPath, true); break;
+                    case 'terminal': runInTerminal([''], moduleUri?.path || moduleUri?.fsPath); break;
+                    case 'build': runInTerminal(['npm run build'], moduleUri?.path || moduleUri?.fsPath); break;
+                    case 'watch': runInTerminal(['npm run watch'], moduleUri?.path || moduleUri?.fsPath, true); break;
+                    case 'test' : runInTerminal(['npm run test'] , moduleUri?.path || moduleUri?.fsPath, true); break;
+                    case 'diff': runInTerminal(['git diff'], moduleUri?.path || moduleUri?.fsPath, true); break;
                     case 'push': {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
                         runInTerminal([
                             'git add .', 'git add *',
                             `git commit -m "${commitMsg}"`,
                             'git push --all'
-                        ], moduleUri.fsPath);
+                        ], moduleUri?.path || moduleUri?.fsPath);
                     }; break;
                 }
             });

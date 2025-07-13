@@ -19942,7 +19942,7 @@ var ManagerViewProvider = class {
                     "git add *",
                     `git commit -m "${commitMsg}"`,
                     "git push --all"
-                  ], mUri.fsPath);
+                  ], mUri?.path || mUri?.fsPath);
                 }
               }
               ;
@@ -19950,23 +19950,23 @@ var ManagerViewProvider = class {
             case "bulk_build":
               for (const m of modules2) {
                 const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
-                runInTerminal(["npm run build"], mUri.fsPath);
+                runInTerminal(["npm run build"], mUri?.path || mUri?.fsPath);
               }
               break;
             case "terminal":
-              runInTerminal([""], moduleUri.fsPath);
+              runInTerminal([""], moduleUri?.path || moduleUri?.fsPath);
               break;
             case "build":
-              runInTerminal(["npm run build"], moduleUri.fsPath);
+              runInTerminal(["npm run build"], moduleUri?.path || moduleUri?.fsPath);
               break;
             case "watch":
-              runInTerminal(["npm run watch"], moduleUri.fsPath, true);
+              runInTerminal(["npm run watch"], moduleUri?.path || moduleUri?.fsPath, true);
               break;
             case "test":
-              runInTerminal(["npm run test"], moduleUri.fsPath, true);
+              runInTerminal(["npm run test"], moduleUri?.path || moduleUri?.fsPath, true);
               break;
             case "diff":
-              runInTerminal(["git diff"], moduleUri.fsPath, true);
+              runInTerminal(["git diff"], moduleUri?.path || moduleUri?.fsPath, true);
               break;
             case "push":
               {
@@ -19976,7 +19976,7 @@ var ManagerViewProvider = class {
                   "git add *",
                   `git commit -m "${commitMsg}"`,
                   "git push --all"
-                ], moduleUri.fsPath);
+                ], moduleUri?.path || moduleUri?.fsPath);
               }
               ;
               break;
