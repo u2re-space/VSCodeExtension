@@ -19454,220 +19454,71 @@ var require_turndown_cjs = __commonJS({
 
 // src/imports/api.ts
 import { createRequire } from "module";
-var require2 = createRequire(import.meta.url);
-var vscode2 = require2?.("vscode") ?? (typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis);
-var api_default = vscode2;
+var vscode = null;
+var VSCODE_MOD_NAME = "vscode";
+var tryLegacyMethod = () => {
+  let require2 = null;
+  try {
+    require2 = createRequire(import.meta.url);
+  } catch (error) {
+    console.warn(error);
+  }
+  try {
+    return require2?.("" + VSCODE_MOD_NAME) ?? (typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis);
+  } catch (error) {
+    console.warn(error);
+    return typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis;
+  }
+};
+try {
+  vscode = import("" + VSCODE_MOD_NAME)?.catch?.((e) => {
+    console.warn(e);
+    return tryLegacyMethod();
+  });
+} catch (e) {
+  console.warn(e);
+  vscode = tryLegacyMethod();
+}
+var api_default = vscode;
 
-// src/chapter/webview.mjs
+// src/web/webview.mjs
 var view = `<iframe style="padding:0px;margin:0px;border:none 0px transparent;box-sizing:border-box;inline-size:100dvw;block-size:100dvh;" src="https://gptunnel.ru/model/gpt-4.1/"></iframe>`;
 var html = `<html><body style="inline-size:100dvw;block-size:100dvh;overflow:hidden;padding:0px;margin:0px;border:none 0px transparent;">${view}</body></html>`;
 var CustomSidebarViewProvider = class {
   static viewType = "vext.gptView";
   constructor(extensionUri) {
   }
+  //
   resolveWebviewView(webviewView, context, token) {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
     webviewView.webview.html = this.getHtmlContent(webviewView.webview);
   }
+  //
   getHtmlContent(webview2) {
     return html;
   }
 };
-function webview(context) {
+async function webview(context) {
+  const vscode2 = await api_default;
   const provider = new CustomSidebarViewProvider(context.extensionUri);
-  context.subscriptions.push(api_default.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, provider));
-  context.subscriptions.push(api_default.commands.registerCommand("vext.openWebview", function() {
-    const panel = api_default.window.createWebviewPanel(
+  context.subscriptions.push(vscode2.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, provider));
+  context.subscriptions.push(vscode2.commands.registerCommand("vext.openWebview", function() {
+    const panel = vscode2.window.createWebviewPanel(
       "vext.gptView",
       "GPTUnnel Web View",
-      api_default.ViewColumn.One,
+      vscode2.ViewColumn.One,
       { enableScripts: true }
     );
     panel.webview.html = html;
   }));
 }
 
-// src/chapter/manager.ts
+// src/views/manager.ts
 import * as path from "path";
 import * as fs from "fs";
-var editor = api_default?.window?.activeTextEditor;
-var ctxMap = /* @__PURE__ */ new WeakMap();
-var watcher = api_default?.workspace?.createFileSystemWatcher?.("./**");
-var MOD_DIR = "modules";
-var inWatch = /* @__PURE__ */ new Set([]);
-watcher?.onDidCreate?.(() => inWatch.forEach((cb) => cb?.()));
-watcher?.onDidDelete?.(() => inWatch.forEach((cb) => cb?.()));
-watcher?.onDidChange?.(() => inWatch.forEach((cb) => cb?.()));
-api_default?.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb) => cb?.()));
-api_default?.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb) => cb?.()));
-api_default?.window?.onDidCloseTerminal?.((closedTerminal) => {
-  for (const [cwd, obj] of terminalMap.entries()) {
-    if (obj.terminal === closedTerminal) {
-      terminalMap.delete(cwd);
-      break;
-    }
-  }
-});
-var getWorkspaceFolder = (workspace, res = editor?.document?.uri || "") => {
-  let path2 = "";
-  if (!workspace.workspaceFolders) {
-    path2 = workspace.rootPath;
-  } else {
-    let root = null;
-    if (workspace.workspaceFolders.length === 1 || !res) {
-      root = workspace.workspaceFolders[0];
-    } else {
-      root = workspace.getWorkspaceFolder(res);
-    }
-    path2 = root?.uri?.fsPath || "";
-  }
-  return path2 || "";
-};
-function getBaseDir(dir = MOD_DIR) {
-  const wsd = getWorkspaceFolder(api_default?.workspace) || "";
-  if (!wsd) {
-    return { baseDir: "", isModules: false };
-  }
-  const modulesDir = path.join(wsd, dir);
-  let isModules = false;
-  try {
-    isModules = fs.statSync(modulesDir).isDirectory();
-  } catch (e) {
-  }
-  return { baseDir: isModules ? modulesDir : wsd, isModules };
-}
-var getDirs = (context, dir = MOD_DIR) => {
-  const { baseDir, isModules } = getBaseDir(dir);
-  if (!context || !isModules) {
-    return ["./"];
-  }
-  let modules = ctxMap.get(context) ?? [];
-  ctxMap.set(context, modules);
-  try {
-    modules = fs.readdirSync(baseDir)?.filter?.((f) => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.((f) => isModules ? `${dir}/${f}` : f);
-  } catch (e) {
-  }
-  ;
-  if (modules?.length < 1) {
-    modules?.push?.("./");
-  }
-  ;
-  return modules;
-};
-var ManagerViewProvider = class {
-  _extensionUri;
-  static viewType = "vext.managerView";
-  constructor(extensionUri) {
-    this._extensionUri = extensionUri;
-  }
-  //
-  updateView(webviewView, context) {
-    webviewView.webview.html = getWebviewContent(webviewView.webview, this._extensionUri, getDirs(context) || ["./"]);
-  }
-  resolveWebviewView(webviewView, context, token) {
-    const weak = new WeakRef(this), view2 = new WeakRef(webviewView), ctx = new WeakRef(context);
-    let wsd = getWorkspaceFolder(api_default?.workspace) || "", modules = getDirs(context) || ["./"];
-    webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
-    try {
-      this.updateView(webviewView, context);
-    } catch (e) {
-      console.warn(e);
-    }
-    ;
-    inWatch?.add?.(() => weak?.deref?.()?.updateView?.(view2?.deref?.(), ctx?.deref?.()));
-    if (modules = getDirs(context) || ["./"]) {
-      try {
-        webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
-          const modulePath = path.join(wsd, message.module);
-          modules = getDirs(context) || ["./"];
-          switch (message.command) {
-            case "bulk_push":
-              {
-                const commitMsg = await api_default?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "" }) || "Bulk Update";
-                for (const m of modules) {
-                  runInTerminal([
-                    "git add .",
-                    "git add *",
-                    `git commit -m "${commitMsg}"`,
-                    "git push --all"
-                  ], path.join(wsd, m));
-                }
-              }
-              ;
-              break;
-            case "bulk_build":
-              for (const m of modules) {
-                runInTerminal(["npm run build"], path.join(wsd, m));
-              }
-              ;
-              break;
-            //
-            case "terminal":
-              runInTerminal([""], modulePath);
-              break;
-            case "build":
-              runInTerminal(["npm run build"], modulePath);
-              break;
-            case "watch":
-              runInTerminal(["npm run watch"], modulePath, true);
-              break;
-            case "test":
-              runInTerminal(["npm run test"], modulePath, true);
-              break;
-            case "diff":
-              runInTerminal(["git diff"], modulePath, true);
-              break;
-            case "push":
-              {
-                const commitMsg = await api_default?.window?.showInputBox?.({ prompt: "Commit Message?", value: "" }) || "Regular Update";
-                runInTerminal([
-                  "git add .",
-                  "git add *",
-                  `git commit -m "${commitMsg}"`,
-                  "git push --all"
-                ], modulePath);
-              }
-              ;
-              break;
-          }
-        });
-      } catch (e) {
-        console.warn(e);
-      }
-    }
-  }
-};
-function manager(context) {
-  const provider = new ManagerViewProvider(context?.extensionUri);
-  const prov = api_default?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, provider);
-  if (prov) {
-    context?.subscriptions?.push?.(prov);
-  }
-}
-var terminalMap = /* @__PURE__ */ new Map();
-function runInTerminal(cmds, cwd, longRunning = false) {
-  let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => dir === cwd && obj.status === "free") : null, termObj = entry?.[1];
-  if (!termObj) {
-    const terminal = api_default?.window.createTerminal({ cwd });
-    termObj = { terminal, status: longRunning ? "busy" : "free" };
-    if (!longRunning) {
-      terminalMap.set(cwd, termObj);
-    }
-  } else if (longRunning) {
-    termObj.status = "busy";
-  }
-  termObj?.terminal?.show();
-  cmds.forEach((cmd) => termObj?.terminal?.sendText?.(cmd));
-}
-api_default?.window?.onDidCloseTerminal?.((closedTerminal) => {
-  for (const [cwd, obj] of terminalMap.entries()) {
-    if (obj.terminal === closedTerminal) {
-      terminalMap.delete(cwd);
-      break;
-    }
-  }
-});
+
+// src/views/default-css.ts
 var defaultCSS = `
 * {
     box-sizing: border-box;
@@ -19864,8 +19715,11 @@ button:focus {
     outline-offset: 1px;
 }
 `;
-function getWebviewContent(webview2, extensionUri, modules) {
-  return `<html><head><link rel="stylesheet" href="${webview2?.asWebviewUri(api_default?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css") || "") || ""}"></head>
+
+// src/views/webview.ts
+async function getWebviewContent(webview2, extensionUri, modules) {
+  const vscodeAPI2 = await api_default;
+  return `<html><head><link rel="stylesheet" href="${webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css") || "") || ""}"></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <style>${defaultCSS}</style>
         <div class="toolbar" tabindex="0">
@@ -19982,53 +19836,224 @@ function getWebviewContent(webview2, extensionUri, modules) {
 </html>`;
 }
 
-// src/lib/utils.ts
-var dummy = (unsafe) => {
-  return unsafe?.trim()?.replace?.(/&amp;/g, "&")?.replace?.(/&lt;/g, "<")?.replace?.(/&gt;/g, ">")?.replace?.(/&quot;/g, '"')?.replace?.(/&nbsp;/g, " ")?.replace?.(/&#39;/g, "'") || unsafe;
-};
-var weak_dummy = (unsafe) => {
-  return unsafe?.trim()?.replace?.(/&amp;/g, "&")?.replace?.(/&nbsp;/g, " ")?.replace?.(/&quot;/g, '"')?.replace?.(/&#39;/g, "'") || unsafe;
-};
-var tryXML = (unsafe) => {
-  return dummy(unsafe) || unsafe;
-};
-var stripMathDelimiters = (input) => {
-  return input?.trim?.()?.replace?.(/^\${1,2}([\s\S]*)\${1,2}$/, "$1")?.trim?.();
-};
-var escapeML = (unsafe) => {
-  if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test((unsafe = stripMathDelimiters(unsafe) || unsafe)?.trim?.())) {
-    if (unsafe?.trim()?.startsWith?.("&lt;") && unsafe?.trim()?.endsWith?.("&gt;")) {
-      return tryXML(unsafe) || dummy(unsafe) || unsafe;
+// src/views/manager.ts
+var MOD_DIR = "modules";
+var inWatch = /* @__PURE__ */ new Set([]);
+var vscodeAPI = null;
+var ctxMap = /* @__PURE__ */ new WeakMap();
+async function initVscodeAPI() {
+  if (!vscodeAPI) {
+    vscodeAPI = await api_default;
+    const watcher = vscodeAPI?.workspace?.createFileSystemWatcher?.("./**");
+    watcher?.onDidCreate?.(() => inWatch.forEach((cb) => cb?.()));
+    watcher?.onDidDelete?.(() => inWatch.forEach((cb) => cb?.()));
+    watcher?.onDidChange?.(() => inWatch.forEach((cb) => cb?.()));
+    vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb) => cb?.()));
+    vscodeAPI?.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb) => cb?.()));
+    vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
+      for (const [cwd, obj] of terminalMap.entries()) {
+        if (obj.terminal === closedTerminal) {
+          terminalMap.delete(cwd);
+          break;
+        }
+      }
+    });
+  }
+  return vscodeAPI;
+}
+var getWorkspaceFolder = async (workspace, res = "") => {
+  const vscodeAPI2 = await initVscodeAPI();
+  const editor = vscodeAPI2?.window?.activeTextEditor;
+  res = res || editor?.document?.uri || "";
+  let path2 = "";
+  if (!workspace.workspaceFolders) {
+    path2 = workspace.rootPath;
+  } else {
+    let root = null;
+    if (workspace.workspaceFolders.length === 1 || !res) {
+      root = workspace.workspaceFolders[0];
+    } else {
+      root = workspace.getWorkspaceFolder(res);
     }
-    if (!(unsafe?.trim()?.startsWith?.("<") && unsafe?.trim()?.endsWith?.(">"))) {
-      return dummy(unsafe) || unsafe;
+    path2 = root?.uri?.fsPath || "";
+  }
+  return path2 || "";
+};
+async function getBaseDir(dir = MOD_DIR) {
+  const vscodeAPI2 = await initVscodeAPI();
+  const wsd = await getWorkspaceFolder(vscodeAPI2?.workspace) || "";
+  if (!wsd) {
+    return { baseDir: "", isModules: false };
+  }
+  const modulesDir = path.join(wsd, dir);
+  let isModules = false;
+  try {
+    isModules = fs.statSync(modulesDir).isDirectory();
+  } catch (e) {
+  }
+  return { baseDir: isModules ? modulesDir : wsd, isModules };
+}
+var getDirs = async (context, dir = MOD_DIR) => {
+  const { baseDir, isModules } = await getBaseDir(dir);
+  if (!context || !isModules) {
+    return ["./"];
+  }
+  let modules = ctxMap.get(context) ?? [];
+  ctxMap.set(context, modules);
+  try {
+    modules = fs.readdirSync(baseDir)?.filter?.((f) => fs.statSync(path.join(baseDir, f)).isDirectory())?.map?.((f) => isModules ? `${dir}/${f}` : f);
+  } catch (e) {
+  }
+  ;
+  if (modules?.length < 1) {
+    modules?.push?.("./");
+  }
+  ;
+  return modules;
+};
+var ManagerViewProvider = class {
+  _extensionUri;
+  static viewType = "vext.managerView";
+  constructor(extensionUri) {
+    this._extensionUri = extensionUri;
+  }
+  //
+  async updateView(webviewView, context) {
+    const modules = await getDirs(context) || ["./"];
+    webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri, modules);
+  }
+  async resolveWebviewView(webviewView, context, token) {
+    const weak = new WeakRef(this), view2 = new WeakRef(webviewView), ctx = new WeakRef(context);
+    const vscodeAPI2 = await initVscodeAPI();
+    let wsd = await getWorkspaceFolder(vscodeAPI2?.workspace) || "", modules = await getDirs(context) || ["./"];
+    webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
+    try {
+      await this.updateView(webviewView, context);
+    } catch (e) {
+      console.warn(e);
+    }
+    ;
+    inWatch?.add?.(() => weak?.deref?.()?.updateView?.(view2?.deref?.(), ctx?.deref?.()));
+    if (modules = await getDirs(context) || ["./"]) {
+      try {
+        webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
+          const modulePath = path.join(wsd, message.module);
+          const modules2 = await getDirs(context) || ["./"];
+          switch (message.command) {
+            case "bulk_push":
+              {
+                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "" }) || "Bulk Update";
+                for (const m of modules2) {
+                  runInTerminal([
+                    "git add .",
+                    "git add *",
+                    `git commit -m "${commitMsg}"`,
+                    "git push --all"
+                  ], path.join(wsd, m));
+                }
+              }
+              ;
+              break;
+            case "bulk_build":
+              for (const m of modules2) {
+                runInTerminal(["npm run build"], path.join(wsd, m));
+              }
+              ;
+              break;
+            //
+            case "terminal":
+              runInTerminal([""], modulePath);
+              break;
+            case "build":
+              runInTerminal(["npm run build"], modulePath);
+              break;
+            case "watch":
+              runInTerminal(["npm run watch"], modulePath, true);
+              break;
+            case "test":
+              runInTerminal(["npm run test"], modulePath, true);
+              break;
+            case "diff":
+              runInTerminal(["git diff"], modulePath, true);
+              break;
+            case "push":
+              {
+                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "" }) || "Regular Update";
+                runInTerminal([
+                  "git add .",
+                  "git add *",
+                  `git commit -m "${commitMsg}"`,
+                  "git push --all"
+                ], modulePath);
+              }
+              ;
+              break;
+          }
+        });
+      } catch (e) {
+        console.warn(e);
+      }
     }
   }
-  return weak_dummy(unsafe) || unsafe;
 };
-var getSelection = () => {
-  const editor2 = api_default?.window?.activeTextEditor;
-  const selection = editor2?.selection;
+async function manager(context) {
+  const vscodeAPI2 = await initVscodeAPI();
+  const provider = new ManagerViewProvider(context?.extensionUri);
+  const prov = vscodeAPI2?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, provider);
+  if (prov) {
+    context?.subscriptions?.push?.(prov);
+  }
+}
+var terminalMap = /* @__PURE__ */ new Map();
+async function runInTerminal(cmds, cwd, longRunning = false) {
+  const vscodeAPI2 = await initVscodeAPI();
+  let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => dir === cwd && obj.status === "free") : null, termObj = entry?.[1];
+  if (!termObj) {
+    const terminal = vscodeAPI2?.window.createTerminal({ cwd });
+    termObj = { terminal, status: longRunning ? "busy" : "free" };
+    if (!longRunning) {
+      terminalMap.set(cwd, termObj);
+    }
+  } else if (longRunning) {
+    termObj.status = "busy";
+  }
+  termObj?.terminal?.show();
+  cmds.forEach((cmd) => termObj?.terminal?.sendText?.(cmd));
+}
+initVscodeAPI().then((vscodeAPI2) => {
+  vscodeAPI2?.window?.onDidCloseTerminal?.((closedTerminal) => {
+    for (const [cwd, obj] of terminalMap.entries()) {
+      if (obj.terminal === closedTerminal) {
+        terminalMap.delete(cwd);
+        break;
+      }
+    }
+  });
+});
+
+// src/imports/utils.ts
+var getSelection = async () => {
+  const vscodeAPI2 = await api_default;
+  const editor = vscodeAPI2?.window?.activeTextEditor;
+  const selection = editor?.selection;
   if (selection && !selection.isEmpty) {
-    const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-    const highlighted = editor2?.document?.getText(selectionRange);
+    const selectionRange = new vscodeAPI2.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+    const highlighted = editor?.document?.getText(selectionRange);
     return highlighted;
   }
   return "";
 };
-var replaceSelectionWith = (text2) => {
-  const editor2 = api_default?.window?.activeTextEditor;
-  const selection = editor2?.selection;
+var replaceSelectionWith = async (text2) => {
+  const vscodeAPI2 = await api_default;
+  const editor = vscodeAPI2?.window?.activeTextEditor;
+  const selection = editor?.selection;
   if (selection) {
-    const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-    editor2?.edit((builder) => {
+    const selectionRange = new vscodeAPI2.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
+    editor?.edit((builder) => {
       builder.replace(selectionRange, text2);
     });
   }
 };
-
-// src/chapter/mathcopy.ts
-var import_mathml_to_latex = __toESM(require_bundle_min(), 1);
 
 // node_modules/temml/dist/temml.mjs
 var ParseError = class _ParseError {
@@ -32472,7 +32497,35 @@ var temml$1 = {
   __defineMacro: defineMacro
 };
 
-// src/chapter/mathcopy.ts
+// src/editor/mathcopy.ts
+var import_mathml_to_latex = __toESM(require_bundle_min(), 1);
+
+// src/imports/str.ts
+var dummy = (unsafe) => {
+  return unsafe?.trim()?.replace?.(/&amp;/g, "&")?.replace?.(/&lt;/g, "<")?.replace?.(/&gt;/g, ">")?.replace?.(/&quot;/g, '"')?.replace?.(/&nbsp;/g, " ")?.replace?.(/&#39;/g, "'") || unsafe;
+};
+var weak_dummy = (unsafe) => {
+  return unsafe?.trim()?.replace?.(/&amp;/g, "&")?.replace?.(/&nbsp;/g, " ")?.replace?.(/&quot;/g, '"')?.replace?.(/&#39;/g, "'") || unsafe;
+};
+var tryXML = (unsafe) => {
+  return dummy(unsafe) || unsafe;
+};
+var stripMathDelimiters = (input) => {
+  return input?.trim?.()?.replace?.(/^\${1,2}([\s\S]*)\${1,2}$/, "$1")?.trim?.();
+};
+var escapeML = (unsafe) => {
+  if (/&amp;|&quot;|&#39;|&lt;|&gt;|&nbsp;/.test((unsafe = stripMathDelimiters(unsafe) || unsafe)?.trim?.())) {
+    if (unsafe?.trim()?.startsWith?.("&lt;") && unsafe?.trim()?.endsWith?.("&gt;")) {
+      return tryXML(unsafe) || dummy(unsafe) || unsafe;
+    }
+    if (!(unsafe?.trim()?.startsWith?.("<") && unsafe?.trim()?.endsWith?.(">"))) {
+      return dummy(unsafe) || unsafe;
+    }
+  }
+  return weak_dummy(unsafe) || unsafe;
+};
+
+// src/editor/mathcopy.ts
 var convertToMathML = async (mathML) => {
   const original = escapeML(mathML);
   if (!(mathML?.trim()?.startsWith?.("<") && mathML?.trim()?.endsWith?.(">"))) {
@@ -32491,7 +32544,8 @@ var convertToMathML = async (mathML) => {
   return mathML?.normalize?.()?.trim?.() || mathML?.trim?.() || mathML;
 };
 var getAsMathML = async () => {
-  return convertToMathML(await api_default?.env?.clipboard?.readText?.() || "") || "";
+  const vscodeAPI2 = await api_default;
+  return convertToMathML(await vscodeAPI2?.env?.clipboard?.readText?.() || "") || "";
 };
 var convertToLaTeX = (LaTeX) => {
   const original = escapeML(LaTeX);
@@ -32505,50 +32559,55 @@ var convertToLaTeX = (LaTeX) => {
   return LaTeX?.normalize?.()?.trim?.() || LaTeX?.trim?.() || LaTeX;
 };
 var getAsLaTeX = async () => {
-  return convertToLaTeX(await api_default?.env?.clipboard?.readText?.() || "") || "";
+  const vscodeAPI2 = await api_default;
+  return convertToLaTeX(await vscodeAPI2?.env?.clipboard?.readText?.() || "") || "";
 };
-function mathml(context) {
+async function mathml(context) {
+  const vscodeAPI2 = await api_default;
   console.log("Math Utils in testing");
-  const convertAsTeX = api_default?.commands?.registerCommand?.("vext.mtl.convert", () => {
-    let LaTeX = convertToLaTeX(getSelection());
+  const convertAsTeX = vscodeAPI2?.commands?.registerCommand?.("vext.mtl.convert", async () => {
+    let LaTeX = convertToLaTeX(await getSelection());
     if (LaTeX) {
-      replaceSelectionWith(`$${LaTeX}$`);
+      await replaceSelectionWith(`$${LaTeX}$`);
     }
   });
-  const pasteAsTeX = api_default?.commands?.registerCommand?.("vext.mtl.paste", async () => {
+  const pasteAsTeX = vscodeAPI2?.commands?.registerCommand?.("vext.mtl.paste", async () => {
     const LaTeX = await getAsLaTeX();
     if (LaTeX) {
-      replaceSelectionWith(`$${LaTeX}$`);
+      await replaceSelectionWith(`$${LaTeX}$`);
     }
   });
-  const convertAsMML = api_default?.commands?.registerCommand?.("vext.ltm.convert", async () => {
-    let mathML = await convertToMathML(getSelection());
+  const convertAsMML = vscodeAPI2?.commands?.registerCommand?.("vext.ltm.convert", async () => {
+    let mathML = await convertToMathML(await getSelection());
     if (mathML) {
-      replaceSelectionWith(`${mathML}`);
+      await replaceSelectionWith(`${mathML}`);
     }
   });
-  const pasteAsMML = api_default?.commands?.registerCommand?.("vext.ltm.paste", async () => {
+  const pasteAsMML = vscodeAPI2?.commands?.registerCommand?.("vext.ltm.paste", async () => {
     const mathML = await getAsMathML();
     if (mathML) {
-      replaceSelectionWith(`${mathML}`);
+      await replaceSelectionWith(`${mathML}`);
     }
   });
-  const copyAsTeX = api_default?.commands?.registerCommand?.("vext.mtl.copy", () => {
-    let LaTeX = convertToLaTeX(getSelection());
+  const copyAsTeX = vscodeAPI2?.commands?.registerCommand?.("vext.mtl.copy", async () => {
+    let LaTeX = convertToLaTeX(await getSelection());
     if (LaTeX) {
-      api_default?.env?.clipboard?.writeText?.(`$${LaTeX}$`);
-      api_default?.window?.showInformationMessage?.("Copied as LaTeX!");
+      vscodeAPI2?.env?.clipboard?.writeText?.(`$${LaTeX}$`);
+      vscodeAPI2?.window?.showInformationMessage?.("Copied as LaTeX!");
     }
   });
-  const copyAsMML = api_default?.commands?.registerCommand?.("vext.ltm.copy", async () => {
-    let mathML = await convertToMathML(getSelection());
+  const copyAsMML = vscodeAPI2?.commands?.registerCommand?.("vext.ltm.copy", async () => {
+    let mathML = await convertToMathML(await getSelection());
     if (mathML) {
-      api_default?.env?.clipboard?.writeText?.(mathML);
-      api_default?.window?.showInformationMessage?.("Copied as MathML!");
+      vscodeAPI2?.env?.clipboard?.writeText?.(mathML);
+      vscodeAPI2?.window?.showInformationMessage?.("Copied as MathML!");
     }
   });
   context.subscriptions.push(...[convertAsTeX, pasteAsTeX, convertAsMML, pasteAsMML, copyAsTeX, copyAsMML]?.filter?.((v) => v));
 }
+
+// src/editor/markdown.ts
+var import_turndown = __toESM(require_turndown_cjs(), 1);
 
 // node_modules/marked/lib/marked.esm.js
 function _getDefaults() {
@@ -34686,8 +34745,7 @@ var parseInline = marked.parseInline;
 var parser = _Parser.parse;
 var lexer = _Lexer.lex;
 
-// src/chapter/markdown.ts
-var import_turndown = __toESM(require_turndown_cjs(), 1);
+// src/editor/markdown.ts
 var turndownService = new import_turndown.default();
 var convertToHtml = async (input) => {
   const original = escapeML(input);
@@ -34704,7 +34762,8 @@ var convertToHtml = async (input) => {
   return input?.normalize?.()?.trim?.() || input?.trim?.() || input;
 };
 var getAsHtml = async () => {
-  return convertToHtml(await api_default?.env?.clipboard?.readText?.() || "") || "";
+  const vscodeAPI2 = await api_default;
+  return convertToHtml(await vscodeAPI2?.env?.clipboard?.readText?.() || "") || "";
 };
 var convertToMarkdown = (input) => {
   const original = escapeML(input);
@@ -34718,46 +34777,48 @@ var convertToMarkdown = (input) => {
   return input?.normalize?.()?.trim?.() || input?.trim?.() || input;
 };
 var getAsMarkdown = async () => {
-  return convertToMarkdown(await api_default?.env?.clipboard?.readText?.() || "") || "";
+  const vscodeAPI2 = await api_default;
+  return convertToMarkdown(await vscodeAPI2?.env?.clipboard?.readText?.() || "") || "";
 };
-function markdown(context) {
+async function markdown(context) {
+  const vscodeAPI2 = await api_default;
   console.log("HTML/Markdown Utils in testing");
-  const convertAsMarkdown = api_default?.commands?.registerCommand?.("vext.htd.convert", () => {
-    let md = convertToMarkdown(getSelection());
+  const convertAsMarkdown = vscodeAPI2?.commands?.registerCommand?.("vext.htd.convert", async () => {
+    let md = convertToMarkdown(await getSelection());
     if (md) {
-      replaceSelectionWith(md);
+      await replaceSelectionWith(md);
     }
   });
-  const pasteAsMarkdown = api_default?.commands?.registerCommand?.("vext.htd.paste", async () => {
+  const pasteAsMarkdown = vscodeAPI2?.commands?.registerCommand?.("vext.htd.paste", async () => {
     const md = await getAsMarkdown();
     if (md) {
-      replaceSelectionWith(md);
+      await replaceSelectionWith(md);
     }
   });
-  const copyAsMarkdown = api_default?.commands?.registerCommand?.("vext.htd.copy", () => {
-    let md = convertToMarkdown(getSelection());
+  const copyAsMarkdown = vscodeAPI2?.commands?.registerCommand?.("vext.htd.copy", async () => {
+    let md = convertToMarkdown(await getSelection());
     if (md) {
-      api_default?.env?.clipboard?.writeText?.(md);
-      api_default?.window?.showInformationMessage?.("Copied as Markdown!");
+      vscodeAPI2?.env?.clipboard?.writeText?.(md);
+      vscodeAPI2?.window?.showInformationMessage?.("Copied as Markdown!");
     }
   });
-  const copyAsHtml = api_default?.commands?.registerCommand?.("vext.dth.copy", async () => {
-    let html3 = await convertToHtml(getSelection());
+  const copyAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.copy", async () => {
+    let html3 = await convertToHtml(await getSelection());
     if (html3) {
-      api_default?.env?.clipboard?.writeText?.(html3);
-      api_default?.window?.showInformationMessage?.("Copied as HTML!");
+      vscodeAPI2?.env?.clipboard?.writeText?.(html3);
+      vscodeAPI2?.window?.showInformationMessage?.("Copied as HTML!");
     }
   });
-  const convertAsHtml = api_default?.commands?.registerCommand?.("vext.dth.convert", async () => {
-    let html3 = await convertToHtml(getSelection());
+  const convertAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.convert", async () => {
+    let html3 = await convertToHtml(await getSelection());
     if (html3) {
-      replaceSelectionWith(html3);
+      await replaceSelectionWith(html3);
     }
   });
-  const pasteAsHtml = api_default?.commands?.registerCommand?.("vext.dth.paste", async () => {
+  const pasteAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.paste", async () => {
     const html3 = await getAsHtml();
     if (html3) {
-      replaceSelectionWith(html3);
+      await replaceSelectionWith(html3);
     }
   });
   context.subscriptions.push(...[convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml, copyAsMarkdown, copyAsHtml]?.filter?.((v) => v));

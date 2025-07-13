@@ -1,5 +1,3 @@
-import vscodeAPI from '../imports/api.ts';
-
 //
 export const dummy = (unsafe: string)=>{
     return unsafe?.trim()?.replace?.(/&amp;/g, '&')
@@ -39,28 +37,4 @@ export const escapeML = (unsafe: string): string => {
         }
     }
     return weak_dummy(unsafe) || unsafe;
-};
-
-//
-export const getSelection = (): string =>{
-    const editor: any = vscodeAPI?.window?.activeTextEditor;
-    const selection = editor?.selection;
-    if (selection && !selection.isEmpty) { // @ts-ignore
-        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-        const highlighted = editor?.document?.getText(selectionRange);
-        return highlighted;
-    }
-    return "";
-};
-
-//
-export const replaceSelectionWith = (text: string) => {
-    const editor: any = vscodeAPI?.window?.activeTextEditor;
-    const selection = editor?.selection;
-    if (selection) { // @ts-ignore
-        const selectionRange = new vscode.Range(selection.start.line, selection.start.character, selection.end.line, selection.end.character);
-        editor?.edit((builder: any)=>{
-            builder.replace(selectionRange, text);
-        });
-    }
 };

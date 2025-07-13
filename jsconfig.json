@@ -1,12 +1,10 @@
 {
-    "include": ["src/*.js", "src/*.mjs", "src/chapter/webview.mjs", "src/legacy/hello.mjs"],
+    "include": ["src/*.js", "src/*.mjs", "src/web/*.mjs"],
     "exclude": ["src/*.ts", "src/*.d.ts", "node_modules"],
 	"compilerOptions": {
-		"module": "Node16",
-		"target": "ES2022",
+		"module": "nodenext",
+		"target": "esnext",
 		"checkJs": false,
-		"lib": [
-			"ES2022"
-		]
+		"lib": ["ESNext", "DOM"],
 	}
 }

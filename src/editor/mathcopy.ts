@@ -1,16 +1,14 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-
 //! use only TS types
 import * as vscode from "vscode";
 
 //
-import { escapeML, replaceSelectionWith, getSelection, stripMathDelimiters } from '../lib/utils.ts';
-import vscodeAPI from '../imports/api.ts';
+import { replaceSelectionWith, getSelection } from '../imports/utils.ts';
+import vscodePromise from '../imports/api.ts';
 
 //
-import { MathMLToLaTeX } from 'mathml-to-latex';
 import temml from "temml";
+import { MathMLToLaTeX } from 'mathml-to-latex';
+import { escapeML, stripMathDelimiters } from "../imports/str.ts";
 
 //
 export const convertToMathML = async (mathML: string): Promise<string> =>{
@@ -28,6 +26,7 @@ export const convertToMathML = async (mathML: string): Promise<string> =>{
 
 //
 export const getAsMathML = async (): Promise<string> =>{
+    const vscodeAPI = await vscodePromise;
     return convertToMathML(await vscodeAPI?.env?.clipboard?.readText?.() || "") || "";
 };
 
@@ -41,44 +40,46 @@ export const convertToLaTeX = (LaTeX: string): string =>{
 
 //
 export const getAsLaTeX = async (): Promise<string> =>{
+    const vscodeAPI = await vscodePromise;
     return convertToLaTeX(await vscodeAPI?.env?.clipboard?.readText?.() || "") || "";
 };
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
-export function mathml(context: vscode.ExtensionContext) {
+export async function mathml(context: vscode.ExtensionContext) {
+    const vscodeAPI = await vscodePromise;
 
     // Use the console to output diagnostic information (console.log) and errors (console.error)
     // This line of code will only be executed once when your extension is activated
     console.log('Math Utils in testing');
 
     //
-    const convertAsTeX = vscodeAPI?.commands?.registerCommand?.('vext.mtl.convert', () => {
-        let LaTeX = convertToLaTeX(getSelection());
-        if (LaTeX) { replaceSelectionWith(`\$${LaTeX}\$`); }
+    const convertAsTeX = vscodeAPI?.commands?.registerCommand?.('vext.mtl.convert', async () => {
+        let LaTeX = convertToLaTeX(await getSelection());
+        if (LaTeX) { await replaceSelectionWith(`\$${LaTeX}\$`); }
     });
 
     //
     const pasteAsTeX = vscodeAPI?.commands?.registerCommand?.('vext.mtl.paste', async () => {
         const LaTeX = await getAsLaTeX();
-        if (LaTeX) { replaceSelectionWith(`\$${LaTeX}\$`); }
+        if (LaTeX) { await replaceSelectionWith(`\$${LaTeX}\$`); }
     });
 
     //
     const convertAsMML = vscodeAPI?.commands?.registerCommand?.('vext.ltm.convert', async () => {
-        let mathML = await convertToMathML(getSelection());
-        if (mathML) { replaceSelectionWith(`${mathML}`); }
+        let mathML = await convertToMathML(await getSelection());
+        if (mathML) { await replaceSelectionWith(`${mathML}`); }
     });
 
     //
     const pasteAsMML = vscodeAPI?.commands?.registerCommand?.('vext.ltm.paste', async () => {
         const mathML = await getAsMathML();
-        if (mathML) { replaceSelectionWith(`${mathML}`); }
+        if (mathML) { await replaceSelectionWith(`${mathML}`); }
     });
 
     //
-    const copyAsTeX = vscodeAPI?.commands?.registerCommand?.('vext.mtl.copy', () => {
-        let LaTeX = convertToLaTeX(getSelection());
+    const copyAsTeX = vscodeAPI?.commands?.registerCommand?.('vext.mtl.copy', async () => {
+        let LaTeX = convertToLaTeX(await getSelection());
         if (LaTeX) {
             vscodeAPI?.env?.clipboard?.writeText?.(`\$${LaTeX}\$`);
             vscodeAPI?.window?.showInformationMessage?.('Copied as LaTeX!');
@@ -87,7 +88,7 @@ export function mathml(context: vscode.ExtensionContext) {
 
     //
     const copyAsMML = vscodeAPI?.commands?.registerCommand?.('vext.ltm.copy', async () => {
-        let mathML = await convertToMathML(getSelection());
+        let mathML = await convertToMathML(await getSelection());
         if (mathML) {
             vscodeAPI?.env?.clipboard?.writeText?.(mathML);
             vscodeAPI?.window?.showInformationMessage?.('Copied as MathML!');

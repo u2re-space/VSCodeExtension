@@ -1,9 +1,12 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-import {webview}  from './chapter/webview.mjs';
-import {manager}  from './chapter/manager.ts';
-import {mathml}   from './chapter/mathcopy.ts';
-import {markdown} from "./chapter/markdown.ts";
+// web-view instruments
+import {webview}  from './web/webview.mjs';
+
+// project management
+import {manager}  from './views/manager.ts';
+
+// editor tools
+import {mathml}   from './editor/mathcopy.ts';
+import {markdown} from "./editor/markdown.ts";
 
 //
 if (Promise.try === undefined || Promise.try === null || !("try" in Promise)) {

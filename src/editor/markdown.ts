@@ -1,14 +1,14 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
-
 //! use only TS types
 import * as vscode from "vscode";
 
 //
-import vscodeAPI from '../imports/api.ts';
-import { marked } from 'marked';
+import vscodePromise from '../imports/api.ts';
+
+//
 import TurndownService from 'turndown';
-import { escapeML, replaceSelectionWith, getSelection } from '../lib/utils.ts';
+import { marked } from 'marked';
+import { replaceSelectionWith, getSelection } from '../imports/utils.ts';
+import { escapeML } from "../imports/str.ts";
 
 //
 const turndownService = new TurndownService();
@@ -33,6 +33,7 @@ export const convertToHtml = async (input: string): Promise<string> => {
 
 //
 export const getAsHtml = async (): Promise<string> => {
+    const vscodeAPI = await vscodePromise;
     return convertToHtml(await vscodeAPI?.env?.clipboard?.readText?.() || "") || "";
 };
 
@@ -51,25 +52,27 @@ export const convertToMarkdown = (input: string): string => {
 
 //
 export const getAsMarkdown = async (): Promise<string> => {
+    const vscodeAPI = await vscodePromise;
     return convertToMarkdown(await vscodeAPI?.env?.clipboard?.readText?.() || "") || "";
 };
 
 //
-export function markdown(context: vscode.ExtensionContext) {
+export async function markdown(context: vscode.ExtensionContext) {
+    const vscodeAPI = await vscodePromise;
     console.log('HTML/Markdown Utils in testing');
 
-    const convertAsMarkdown = vscodeAPI?.commands?.registerCommand?.('vext.htd.convert', () => {
-        let md = convertToMarkdown(getSelection());
-        if (md) { replaceSelectionWith(md); }
+    const convertAsMarkdown = vscodeAPI?.commands?.registerCommand?.('vext.htd.convert', async () => {
+        let md = convertToMarkdown(await getSelection());
+        if (md) { await replaceSelectionWith(md); }
     });
 
     const pasteAsMarkdown = vscodeAPI?.commands?.registerCommand?.('vext.htd.paste', async () => {
         const md = await getAsMarkdown();
-        if (md) { replaceSelectionWith(md); }
+        if (md) { await replaceSelectionWith(md); }
     });
 
-    const copyAsMarkdown = vscodeAPI?.commands?.registerCommand?.('vext.htd.copy', () => {
-        let md = convertToMarkdown(getSelection());
+    const copyAsMarkdown = vscodeAPI?.commands?.registerCommand?.('vext.htd.copy', async () => {
+        let md = convertToMarkdown(await getSelection());
         if (md) {
             vscodeAPI?.env?.clipboard?.writeText?.(md);
             vscodeAPI?.window?.showInformationMessage?.('Copied as Markdown!');
@@ -77,7 +80,7 @@ export function markdown(context: vscode.ExtensionContext) {
     });
 
     const copyAsHtml = vscodeAPI?.commands?.registerCommand?.('vext.dth.copy', async () => {
-        let html = await convertToHtml(getSelection());
+        let html = await convertToHtml(await getSelection());
         if (html) {
             vscodeAPI?.env?.clipboard?.writeText?.(html);
             vscodeAPI?.window?.showInformationMessage?.('Copied as HTML!');
@@ -85,13 +88,13 @@ export function markdown(context: vscode.ExtensionContext) {
     });
 
     const convertAsHtml = vscodeAPI?.commands?.registerCommand?.('vext.dth.convert', async () => {
-        let html = await convertToHtml(getSelection());
-        if (html) { replaceSelectionWith(html); }
+        let html = await convertToHtml(await getSelection());
+        if (html) { await replaceSelectionWith(html); }
     });
 
     const pasteAsHtml = vscodeAPI?.commands?.registerCommand?.('vext.dth.paste', async () => {
         const html = await getAsHtml();
-        if (html) { replaceSelectionWith(html); }
+        if (html) { await replaceSelectionWith(html); }
     });
 
     context.subscriptions.push(...[convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml, copyAsMarkdown, copyAsHtml]?.filter?.((v: any)=>v) as any);

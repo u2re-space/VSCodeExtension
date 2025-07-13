@@ -17,6 +17,7 @@
     ],
     "type": "module",
     "activationEvents": [],
+    "extensionKind": ["ui", "workspace"],
     "main": "./dist/extension.mjs",
     "contributes": {
         "menus": {
