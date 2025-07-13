@@ -6,7 +6,7 @@
     "readme": "./README.md",
     "version": "0.0.1",
     "engines": {
-        "vscode": "^1.99.0"
+        "vscode": "^1.99.3"
     },
     "icon": "./assets/service.png",
     "categories": [
@@ -20,18 +20,54 @@
     "contributes": {
         "menus": {
             "editor/context": [
-                { "command": "vext.htd.paste",    "group": "Markdown@1" },
-                { "command": "vext.htd.convert",  "group": "Markdown@1" },
-                { "command": "vext.htd.copy",     "group": "Markdown@1" },
-                { "command": "vext.dth.paste",    "group": "HTML@2" },
-                { "command": "vext.dth.convert",  "group": "HTML@2" },
-                { "command": "vext.dth.copy",     "group": "HTML@2" },
-                { "command": "vext.ltm.paste",    "group": "MathML@3" },
-                { "command": "vext.ltm.convert",  "group": "MathML@3" },
-                { "command": "vext.ltm.copy",     "group": "MathML@3" },
-                { "command": "vext.mtl.paste",    "group": "LaTeX@4" },
-                { "command": "vext.mtl.convert",  "group": "LaTeX@4" },
-                { "command": "vext.mtl.copy",     "group": "LaTeX@4" }
+                {
+                    "command": "vext.htd.paste",
+                    "group": "Markdown@1"
+                },
+                {
+                    "command": "vext.htd.convert",
+                    "group": "Markdown@1"
+                },
+                {
+                    "command": "vext.htd.copy",
+                    "group": "Markdown@1"
+                },
+                {
+                    "command": "vext.dth.paste",
+                    "group": "HTML@2"
+                },
+                {
+                    "command": "vext.dth.convert",
+                    "group": "HTML@2"
+                },
+                {
+                    "command": "vext.dth.copy",
+                    "group": "HTML@2"
+                },
+                {
+                    "command": "vext.ltm.paste",
+                    "group": "MathML@3"
+                },
+                {
+                    "command": "vext.ltm.convert",
+                    "group": "MathML@3"
+                },
+                {
+                    "command": "vext.ltm.copy",
+                    "group": "MathML@3"
+                },
+                {
+                    "command": "vext.mtl.paste",
+                    "group": "LaTeX@4"
+                },
+                {
+                    "command": "vext.mtl.convert",
+                    "group": "LaTeX@4"
+                },
+                {
+                    "command": "vext.mtl.copy",
+                    "group": "LaTeX@4"
+                }
             ]
         },
         "viewsContainers": {
@@ -69,18 +105,54 @@
             ]
         },
         "commands": [
-            { "command": "vext.htd.paste", "title": "Paste as Markdown" },
-            { "command": "vext.htd.convert", "title": "Convert to Markdown" },
-            { "command": "vext.htd.copy", "title": "Copy as Markdown" },
-            { "command": "vext.dth.paste", "title": "Paste as HTML" },
-            { "command": "vext.dth.convert", "title": "Convert to HTML" },
-            { "command": "vext.dth.copy", "title": "Copy as HTML" },
-            { "command": "vext.ltm.paste", "title": "Paste as MathML" },
-            { "command": "vext.ltm.convert", "title": "Convert to MathML" },
-            { "command": "vext.ltm.copy", "title": "Copy as MathML" },
-            { "command": "vext.mtl.paste", "title": "Paste as LaTeX" },
-            { "command": "vext.mtl.convert", "title": "Convert to LaTeX" },
-            { "command": "vext.mtl.copy", "title": "Copy as LaTeX" }
+            {
+                "command": "vext.htd.paste",
+                "title": "Paste as Markdown"
+            },
+            {
+                "command": "vext.htd.convert",
+                "title": "Convert to Markdown"
+            },
+            {
+                "command": "vext.htd.copy",
+                "title": "Copy as Markdown"
+            },
+            {
+                "command": "vext.dth.paste",
+                "title": "Paste as HTML"
+            },
+            {
+                "command": "vext.dth.convert",
+                "title": "Convert to HTML"
+            },
+            {
+                "command": "vext.dth.copy",
+                "title": "Copy as HTML"
+            },
+            {
+                "command": "vext.ltm.paste",
+                "title": "Paste as MathML"
+            },
+            {
+                "command": "vext.ltm.convert",
+                "title": "Convert to MathML"
+            },
+            {
+                "command": "vext.ltm.copy",
+                "title": "Copy as MathML"
+            },
+            {
+                "command": "vext.mtl.paste",
+                "title": "Paste as LaTeX"
+            },
+            {
+                "command": "vext.mtl.convert",
+                "title": "Convert to LaTeX"
+            },
+            {
+                "command": "vext.mtl.copy",
+                "title": "Copy as LaTeX"
+            }
         ]
     },
     "scripts": {
@@ -101,7 +173,7 @@
     "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "^20.17.57",
-        "@types/vscode": "^1.100.0",
+        "@types/vscode": "^1.99.3",
         "@typescript-eslint/eslint-plugin": "^8.10.0",
         "@typescript-eslint/parser": "^8.7.0",
         "@vscode/test-cli": "^0.0.10",
