@@ -34764,6 +34764,17 @@ function markdown(context) {
 }
 
 // src/extension.mjs
+if (Promise.try === void 0 || Promise.try === null || !("try" in Promise)) {
+  Promise.try = (fn, ...args) => {
+    return new Promise((resolve, reject) => {
+      try {
+        resolve(fn(...args));
+      } catch (error) {
+        reject(error);
+      }
+    });
+  };
+}
 function activate(context) {
   Promise.try(mathml, context)?.catch?.((e) => console.error(e));
   Promise.try(markdown, context)?.catch?.((e) => console.error(e));
