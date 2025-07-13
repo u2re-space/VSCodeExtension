@@ -1,6 +1,4 @@
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const vscode  = require("vscode");
+import vscode from '../imports/api';
 
 //
 const view = `<iframe style="padding:0px;margin:0px;border:none 0px transparent;box-sizing:border-box;inline-size:100dvw;block-size:100dvh;" src="https://gptunnel.ru/model/gpt-4.1/"></iframe>`;

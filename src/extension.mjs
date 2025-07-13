@@ -7,7 +7,12 @@ import {markdown} from "./chapter/markdown.ts";
 
 // This method is called when your extension is activated
 // Your extension is activated the very first time the command is executed
-export function activate(context) { webview(context); mathml(context); manager(context); markdown(context); }
+export function activate(context) {
+    Promise.try(mathml, context)?.catch?.(e=>console.error(e));
+    Promise.try(markdown, context)?.catch?.(e=>console.error(e));
+    Promise.try(manager, context)?.catch?.(e=>console.error(e));
+    Promise.try(webview, context)?.catch?.(e=>console.error(e));
+}
 
 // This method is called when your extension is deactivated
 export function deactivate() {}

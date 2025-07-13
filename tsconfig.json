@@ -1,13 +1,16 @@
 {
-    "include": ["src/*.ts", "src/chapter/manager.ts", "src/chapter/markdown.ts", "src/chapter/mathcopy.ts", "src/lib/utils.ts"],
-    "exclude": ["src/*.d.ts", "src/*.mjs"],
+    "include": ["src/**/*.ts", "src/**/*.d.ts"],
+    "exclude": ["src/*.mjs", "dist/**/*"],
     "outDir": "dist/",
 	"compilerOptions": {
 		"module": "NodeNext",
-		"target": "ESNext",
+		"target": "esnext",
+        "moduleResolution": "nodenext",
 		"lib": ["ESNext", "DOM"],
 		"esModuleInterop": true,
         "forceConsistentCasingInFileNames": true,
+        "allowImportingTsExtensions": true,
+        "noEmit": true,
         "allowJs": true,
         "allowArbitraryExtensions": true,
         "allowSyntheticDefaultImports": true,
@@ -19,6 +22,7 @@
         "noImplicitThis": false,
 		"sourceMap": true,
 		"rootDir": "./",
-		"strict": true
+		"strict": true,
+		"types": ["node", "vscode"]
 	}
 }

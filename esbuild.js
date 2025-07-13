@@ -1,5 +1,6 @@
-const esbuild = require("esbuild");
-const production = process.argv.includes('--production');
+import esbuild from "esbuild";
+
+//
 const watch = process.argv.includes('--watch');
 
 /**
@@ -22,6 +23,7 @@ const esbuildProblemMatcherPlugin = {
 	},
 };
 
+//
 async function main() {
 	const ctx = await esbuild.context({
 		entryPoints: [
@@ -29,9 +31,9 @@ async function main() {
 		],
 		bundle: true,
 		format: 'esm',
-		minify: production,
-		sourcemap: !production,
-		sourcesContent: false,
+		minify: false,
+		sourcemap: true,
+		sourcesContent: true,
 		platform: 'node',
 		outfile: 'dist/extension.mjs',
 		external: ['vscode'],

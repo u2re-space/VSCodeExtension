@@ -1,10 +1,16 @@
-import * as vscode from 'vscode';
+//! use only TS types
+import * as vscode from "vscode";
+
+//
+import vscodeAPI from '../imports/api.ts';
+
+// @types/vscode
 import * as path from 'path';
 import * as fs from 'fs';
 
 //
-const editor  = vscode?.window?.activeTextEditor, ctxMap = new WeakMap();
-const watcher = vscode?.workspace?.createFileSystemWatcher?.('./**');
+const editor  = vscodeAPI?.window?.activeTextEditor, ctxMap = new WeakMap();
+const watcher = vscodeAPI?.workspace?.createFileSystemWatcher?.('./**');
 const MOD_DIR = "modules";
 const inWatch = new Set<any>([]);
 
@@ -12,10 +18,10 @@ const inWatch = new Set<any>([]);
 watcher?.onDidCreate?.(() => inWatch.forEach((cb: any)=>cb?.()));
 watcher?.onDidDelete?.(() => inWatch.forEach((cb: any)=>cb?.()));
 watcher?.onDidChange?.(() => inWatch.forEach((cb: any)=>cb?.()));
-vscode.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
-vscode.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
-vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
-    for (const [cwd, obj] of terminalMap.entries()) 
+vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
+vscodeAPI?.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb: any)=>cb?.()));
+vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
+    for (const [cwd, obj] of terminalMap.entries())
         { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
 });
 
@@ -37,7 +43,7 @@ const getWorkspaceFolder = (workspace, res = editor?.document?.uri||"")=>{
 
 //
 function getBaseDir(dir: string = MOD_DIR): { baseDir: string, isModules: boolean } {
-    const wsd = getWorkspaceFolder(vscode.workspace)||"";
+    const wsd = getWorkspaceFolder(vscodeAPI?.workspace)||"";
     if (!wsd) {return { baseDir: "", isModules: false };}
     const modulesDir = path.join(wsd, dir);
     let isModules = false;
@@ -61,10 +67,10 @@ export class ManagerViewProvider {
     constructor(extensionUri) { this._extensionUri = extensionUri; }
 
     //
-    updateView(webviewView, context) { webviewView.webview.html = getWebviewContent(getDirs(context)||["./"]); }
+    updateView(webviewView, context) { webviewView.webview.html = getWebviewContent(webviewView.webview, this._extensionUri, getDirs(context)||["./"]); }
     resolveWebviewView(webviewView, context, token) {
         const weak = new WeakRef(this), view = new WeakRef(webviewView), ctx  = new WeakRef(context);
-        let wsd = getWorkspaceFolder(vscode.workspace)||"", modules = getDirs(context)||["./"];
+        let wsd = getWorkspaceFolder(vscodeAPI?.workspace)||"", modules = getDirs(context)||["./"];
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
         try { this.updateView(webviewView, context); } catch(e) { console.warn(e); };
         inWatch?.add?.(()=>weak?.deref?.()?.updateView?.(view?.deref?.(), ctx?.deref?.()));
@@ -75,7 +81,7 @@ export class ManagerViewProvider {
                 const modulePath = path.join(wsd, message.module); modules = getDirs(context)||["./"];
                 switch (message.command) {
                     case 'bulk_push': {
-                        const commitMsg = await vscode.window.showInputBox({ prompt: 'Commit Message for all?', value: '' }) || 'Bulk Update';
+                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message for all?', value: '' }) || 'Bulk Update';
                         for (const m of modules) {
                             runInTerminal([
                                 'git add .', 'git add *',
@@ -93,7 +99,7 @@ export class ManagerViewProvider {
                     case 'test' : runInTerminal(['npm run test'] , modulePath, true); break;
                     case 'diff': runInTerminal(['git diff'], modulePath, true); break;
                     case 'push': {
-                        const commitMsg = await vscode.window.showInputBox({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
+                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
                         runInTerminal([
                             'git add .', 'git add *',
                             `git commit -m "${commitMsg}"`,
@@ -106,12 +112,11 @@ export class ManagerViewProvider {
     }
 }
 
-
-
 //
 export function manager(context: vscode.ExtensionContext) {
-    const provider = new ManagerViewProvider(context.extensionUri);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider(ManagerViewProvider.viewType, provider));
+    const provider = new ManagerViewProvider(context?.extensionUri);
+    const prov = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, provider);
+    if (prov) { context?.subscriptions?.push?.(prov); }
 }
 
 //
@@ -122,20 +127,19 @@ function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
     let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => (dir === cwd && obj.status === 'free')) : null, termObj = entry?.[1];
 
     if (!termObj) {
-        const terminal = vscode.window.createTerminal({ cwd });
-        termObj = { terminal, status: longRunning ? 'busy' : 'free' };
-        if (!longRunning) { terminalMap.set(cwd, termObj); }
+        const terminal = vscodeAPI?.window.createTerminal({ cwd }); // @ts-ignore
+        termObj = { terminal, status: longRunning ? 'busy' : 'free' }; if (!longRunning) { terminalMap.set(cwd, termObj); }
     } else if (longRunning) {
         termObj.status = 'busy';
     }
 
-    termObj.terminal.show();
-    cmds.forEach(cmd => termObj.terminal.sendText(cmd));
+    termObj?.terminal?.show();
+    cmds.forEach(cmd => termObj?.terminal?.sendText?.(cmd));
 }
 
 //
-vscode.window?.onDidCloseTerminal?.((closedTerminal) => {
-    for (const [cwd, obj] of terminalMap.entries()) 
+vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
+    for (const [cwd, obj] of terminalMap.entries())
         { if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; } }
 });
 
@@ -338,8 +342,9 @@ button:focus {
 `;
 
 //
-function getWebviewContent(modules: string[]): string {
-    return `<html><head><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@vscode/codicons/dist/codicon.css"></head>
+function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, modules: string[]): string {
+    // @ts-ignore
+    return `<html><head><link rel="stylesheet" href="${webview?.asWebviewUri(vscodeAPI?.Uri?.joinPath?.(extensionUri, 'icons', 'codicon.css')||'')||''}"></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <style>${defaultCSS}</style>
         <div class="toolbar" tabindex="0">
@@ -360,9 +365,9 @@ function getWebviewContent(modules: string[]): string {
             </td>
         </tr>`)?.join?.('')}</table>
         <script>
-            const vscode = acquireVsCodeApi();
+            const vscode = typeof acquireVsCodeApi != "undefined" ? acquireVsCodeApi?.() : null;
             function send(command, module = "") {
-                vscode.postMessage({ command, module });
+                vscode?.postMessage?.({ command, module });
             }
 
             // --- Keyboard navigation ---
@@ -380,23 +385,22 @@ function getWebviewContent(modules: string[]): string {
                 rows.forEach(r => r.classList.remove('selected'));
             }
 
-            function focusRow(idx) {
+            function focusRow(idx, e) {
                 inToolbar = false;
                 if (rows[current]) rows[current].classList.remove('selected');
                 current = (idx + rows.length) % rows.length;
                 rows[current]?.classList?.add?.('selected');
                 rows[current]?.focus?.();
 
-                //
                 let btns = rows[current]?.querySelectorAll?.('button'), active = document.activeElement;
                 let btx = Array.from(btns).indexOf(active); if (btx < 0) { btx = 0; }
                 if (btx >= 0) btns[btx]?.focus?.(); else if (btns?.length) btns[btns.length - 1]?.focus?.();
-                e.preventDefault();
+                if (e) e.preventDefault();
             }
 
             document.body.addEventListener('keydown', e => {
                 if (inToolbar) {
-                    if (e.key === 'ArrowDown') { focusRow(0); e.preventDefault(); }
+                    if (e.key === 'ArrowDown') { focusRow(current + 1, e); }
                     if (e.key === 'ArrowRight') {
                         toolbarBtnIdx = (toolbarBtnIdx + 1) % toolbarButtons.length;
                         toolbarButtons[toolbarBtnIdx]?.focus?.();

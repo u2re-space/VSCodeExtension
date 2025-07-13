@@ -15,6 +15,7 @@
         "AI",
         "Chat"
     ],
+    "type": "module",
     "activationEvents": [],
     "main": "./dist/extension.mjs",
     "contributes": {
@@ -173,7 +174,7 @@
     "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "^20.17.57",
-        "@types/vscode": "^1.99.3",
+        "@types/vscode": "^1.99",
         "@typescript-eslint/eslint-plugin": "^8.10.0",
         "@typescript-eslint/parser": "^8.7.0",
         "@vscode/test-cli": "^0.0.10",
