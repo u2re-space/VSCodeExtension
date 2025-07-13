@@ -118,9 +118,6 @@ export async function getWebviewContent(webview: vscode.Webview, extensionUri: v
                     }
                 }
             });
-
-            // Initial focus
-            setTimeout(() => focusRow(0), 100);
         </script>
     </body>
 </html>`;

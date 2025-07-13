@@ -19824,9 +19824,6 @@ async function getWebviewContent(webview2, extensionUri, modules) {
                     }
                 }
             });
-
-            // Initial focus
-            setTimeout(() => focusRow(0), 100);
         </script>
     </body>
 </html>`;
