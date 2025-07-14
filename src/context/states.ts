@@ -41,27 +41,21 @@ let debounceTimer: NodeJS.Timeout | undefined;
 //
 async function proxyUndo() {
     const vscode = await vscodePromise;
-    await vscode?.commands?.executeCommand?.('undo')?.then?.(
-        () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canRedo', !!vscode?.window?.activeTextEditor);
-        },
-        () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canUndo', false);
-        }
-    );
+    await vscode?.commands?.executeCommand?.('undo')?.then?.(() => {
+        vscode?.commands?.executeCommand?.('setContext', 'canRedo', !!vscode?.window?.activeTextEditor);
+    })?.catch?.(()=>{
+        vscode?.commands?.executeCommand?.('setContext', 'canUndo', false);
+    });
 }
 
 //
 async function proxyRedo() {
     const vscode = await vscodePromise;
-    await vscode?.commands?.executeCommand?.('redo')?.then?.(
-        () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canUndo', !!vscode?.window?.activeTextEditor);
-        },
-        () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canRedo', false);
-        }
-    );
+    await vscode?.commands?.executeCommand?.('redo')?.then?.(() => {
+        vscode?.commands?.executeCommand?.('setContext', 'canUndo', !!vscode?.window?.activeTextEditor);
+    })?.catch?.(() => {
+        vscode?.commands?.executeCommand?.('setContext', 'canRedo', false);
+    });
 }
 
 //
