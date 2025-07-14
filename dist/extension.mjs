@@ -49416,6 +49416,24 @@ async function markdown(context) {
 }
 
 // src/context/states.ts
+var makeDebouncer = (delay = 1e3) => {
+  let timer;
+  return (fn) => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = void 0;
+    }
+    timer = setTimeout(fn, delay);
+  };
+};
+var cmdDBN = makeDebouncer();
+var ctxDBN = makeDebouncer();
+var redDBN = makeDebouncer(100);
+var undDBN = makeDebouncer(100);
+var changeFlags = {
+  redo: false,
+  undo: false
+};
 async function updateLineContext() {
   const vscode2 = await api_default;
   const editor = vscode2.window.activeTextEditor;
@@ -49427,58 +49445,64 @@ async function updateLineContext() {
     return;
   }
   const pos = editor.selection.active;
-  const line = editor.document.lineAt(pos.line);
-  const isEmpty = line.text.length === 0;
-  const atStart = pos.character === 0;
-  const atEnd = pos.character === line.text.length;
+  const line = editor.document.lineAt(pos?.line);
+  const isEmpty = line?.text?.length === 0;
+  const atStart = pos?.character === 0;
+  const atEnd = pos?.character === line?.text?.length;
   const atStartAndEnd = atStart && atEnd;
   vscode2?.commands?.executeCommand?.("setContext", "lineIsEmpty", isEmpty);
   vscode2?.commands?.executeCommand?.("setContext", "cursorAtLineStart", atStart);
   vscode2?.commands?.executeCommand?.("setContext", "cursorAtLineEnd", atEnd);
   vscode2?.commands?.executeCommand?.("setContext", "cursorAtLineStartAndEnd", atStartAndEnd);
 }
-var debounceTimer;
 async function proxyUndo() {
   const vscode2 = await api_default;
-  await vscode2?.commands?.executeCommand?.("undo")?.then?.(() => {
-    vscode2?.commands?.executeCommand?.("setContext", "canRedo", !!vscode2?.window?.activeTextEditor);
-  })?.catch?.(() => {
-    vscode2?.commands?.executeCommand?.("setContext", "canUndo", false);
-  });
+  const unflag = () => {
+    changeFlags.undo = false;
+    clearTimeout(timer);
+  };
+  await vscode2?.commands?.executeCommand?.("undo")?.catch?.(unflag);
+  const timer = setTimeout(() => {
+    if (!changeFlags.undo) {
+      unflag?.();
+    }
+    changeFlags.undo = false;
+  }, 10);
 }
 async function proxyRedo() {
   const vscode2 = await api_default;
-  await vscode2?.commands?.executeCommand?.("redo")?.then?.(() => {
-    vscode2?.commands?.executeCommand?.("setContext", "canUndo", !!vscode2?.window?.activeTextEditor);
-  })?.catch?.(() => {
-    vscode2?.commands?.executeCommand?.("setContext", "canRedo", false);
-  });
-}
-function checkUndoRedo(vscode2) {
-  const editor = vscode2.window.activeTextEditor;
-  if (!editor) {
-    vscode2?.commands.executeCommand?.("setContext", "canUndo", false);
-    vscode2?.commands.executeCommand?.("setContext", "canRedo", false);
-    return;
-  }
-  vscode2?.commands?.executeCommand("setContext", "canUndo", true);
-}
-async function updateUndoRedoContext() {
-  const vscode2 = await api_default;
-  if (debounceTimer) {
-    clearTimeout(debounceTimer);
-    debounceTimer = void 0;
-  }
-  debounceTimer = setTimeout(() => checkUndoRedo(vscode2), 1e3);
+  const unflag = () => {
+    changeFlags.redo = false;
+    clearTimeout(timer);
+    return vscode2?.commands?.executeCommand?.("editor.action.acceptCursorTabSuggestion");
+  };
+  await vscode2?.commands?.executeCommand?.("redo")?.catch?.(unflag);
+  const timer = setTimeout(() => {
+    if (!changeFlags.redo) {
+      unflag?.();
+    }
+    changeFlags.redo = false;
+  }, 10);
 }
 async function contexts(context) {
   const vscode2 = await api_default;
-  vscode2?.commands?.executeCommand?.("setContext", "canUndo", !!vscode2.window.activeTextEditor);
   vscode2?.commands?.executeCommand?.("setContext", "canRedo", false);
+  vscode2?.commands?.executeCommand?.("setContext", "canUndo", false);
+  changeFlags.redo = false;
+  changeFlags.undo = false;
   context?.subscriptions?.push?.(
-    vscode2?.window?.onDidChangeTextEditorSelection?.(updateUndoRedoContext),
-    vscode2?.window?.onDidChangeActiveTextEditor?.(updateUndoRedoContext),
-    vscode2?.workspace?.onDidChangeTextDocument?.(updateUndoRedoContext)
+    vscode2?.workspace?.onDidChangeTextDocument?.((ev) => {
+      if (ev?.reason == 2) {
+        changeFlags.redo = true;
+        redDBN(() => changeFlags.redo = false);
+      }
+      ;
+      if (ev?.reason == 1) {
+        changeFlags.undo = true;
+        undDBN(() => changeFlags.undo = false);
+      }
+      ;
+    })
   );
   context?.subscriptions?.push?.(
     vscode2?.window?.onDidChangeTextEditorSelection?.(updateLineContext),
@@ -49487,12 +49511,8 @@ async function contexts(context) {
   );
   context?.subscriptions?.push?.(
     vscode2?.commands?.registerCommand?.("vext.proxyUndo", proxyUndo),
-    vscode2?.commands?.registerCommand?.("vext.proxyRedo", proxyRedo),
-    vscode2?.workspace?.onDidChangeTextDocument?.(updateUndoRedoContext),
-    vscode2?.window?.onDidChangeActiveTextEditor?.(updateUndoRedoContext)
+    vscode2?.commands?.registerCommand?.("vext.proxyRedo", proxyRedo)
   );
-  checkUndoRedo(vscode2);
-  updateUndoRedoContext();
   updateLineContext();
 }
 
