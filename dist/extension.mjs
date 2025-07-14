@@ -49415,6 +49415,96 @@ async function markdown(context) {
   context.subscriptions.push(...[convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml, copyAsMarkdown, copyAsHtml]?.filter?.((v) => v));
 }
 
+// src/context/states.ts
+async function updateLineContext() {
+  const vscode2 = await api_default;
+  const editor = vscode2.window.activeTextEditor;
+  if (!editor) {
+    vscode2.commands.executeCommand("setContext", "lineIsEmpty", false);
+    vscode2.commands.executeCommand("setContext", "cursorAtLineStart", false);
+    vscode2.commands.executeCommand("setContext", "cursorAtLineEnd", false);
+    vscode2.commands.executeCommand("setContext", "cursorAtLineStartAndEnd", false);
+    return;
+  }
+  const pos = editor.selection.active;
+  const line = editor.document.lineAt(pos.line);
+  const isEmpty = line.text.length === 0;
+  const atStart = pos.character === 0;
+  const atEnd = pos.character === line.text.length;
+  const atStartAndEnd = atStart && atEnd;
+  vscode2.commands.executeCommand("setContext", "lineIsEmpty", isEmpty);
+  vscode2.commands.executeCommand("setContext", "cursorAtLineStart", atStart);
+  vscode2.commands.executeCommand("setContext", "cursorAtLineEnd", atEnd);
+  vscode2.commands.executeCommand("setContext", "cursorAtLineStartAndEnd", atStartAndEnd);
+}
+var debounceTimer;
+async function proxyUndo() {
+  const vscode2 = await api_default;
+  await vscode2?.commands?.executeCommand?.("undo").then(
+    () => {
+      vscode2?.commands?.executeCommand?.("setContext", "canUndo", !!vscode2?.window?.activeTextEditor);
+      vscode2?.commands?.executeCommand?.("redo");
+    },
+    () => {
+      vscode2?.commands?.executeCommand?.("setContext", "canUndo", false);
+    }
+  );
+}
+async function proxyRedo() {
+  const vscode2 = await api_default;
+  await vscode2?.commands?.executeCommand?.("redo").then(
+    () => {
+      vscode2?.commands?.executeCommand?.("setContext", "canRedo", !!vscode2?.window?.activeTextEditor);
+      vscode2.commands?.executeCommand?.("undo");
+    },
+    () => {
+      vscode2?.commands?.executeCommand?.("setContext", "canRedo", false);
+    }
+  );
+}
+function checkUndoRedo(vscode2) {
+  const editor = vscode2.window.activeTextEditor;
+  if (!editor) {
+    vscode2.commands.executeCommand("setContext", "canUndo", false);
+    vscode2.commands.executeCommand("setContext", "canRedo", false);
+    return;
+  }
+  proxyUndo();
+  proxyRedo();
+}
+async function updateUndoRedoContext() {
+  const vscode2 = await api_default;
+  if (debounceTimer) {
+    clearTimeout(debounceTimer);
+    debounceTimer = void 0;
+  }
+  debounceTimer = setTimeout(() => checkUndoRedo(vscode2), 1e3);
+}
+async function contexts(context) {
+  const vscode2 = await api_default;
+  vscode2?.commands?.executeCommand?.("setContext", "canUndo", false);
+  vscode2?.commands?.executeCommand?.("setContext", "canRedo", false);
+  context?.subscriptions?.push?.(
+    vscode2?.window?.onDidChangeTextEditorSelection?.(updateUndoRedoContext),
+    vscode2?.window?.onDidChangeActiveTextEditor?.(updateUndoRedoContext),
+    vscode2?.workspace?.onDidChangeTextDocument?.(updateUndoRedoContext)
+  );
+  context?.subscriptions?.push?.(
+    vscode2?.window?.onDidChangeTextEditorSelection?.(updateLineContext),
+    vscode2?.window?.onDidChangeActiveTextEditor?.(updateLineContext),
+    vscode2?.workspace?.onDidChangeTextDocument?.(updateLineContext)
+  );
+  context?.subscriptions?.push?.(
+    vscode2?.commands?.registerCommand?.("vext.proxyUndo", proxyUndo),
+    vscode2?.commands?.registerCommand?.("vext.proxyRedo", proxyRedo),
+    vscode2?.workspace?.onDidChangeTextDocument?.(updateUndoRedoContext),
+    vscode2?.window?.onDidChangeActiveTextEditor?.(updateUndoRedoContext)
+  );
+  checkUndoRedo(vscode2);
+  updateUndoRedoContext();
+  updateLineContext();
+}
+
 // src/extension.mjs
 if (Promise.try === void 0 || Promise.try === null || !("try" in Promise)) {
   Promise.try = (fn, ...args) => {
@@ -49432,6 +49522,7 @@ function activate(context) {
   Promise.try(markdown, context)?.catch?.((e) => console.error(e));
   Promise.try(manager, context)?.catch?.((e) => console.error(e));
   Promise.try(webview, context)?.catch?.((e) => console.error(e));
+  Promise.try(contexts, context)?.catch?.((e) => console.error(e));
 }
 function deactivate() {
 }

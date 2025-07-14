@@ -111,6 +111,14 @@
         },
         "commands": [
             {
+                "command": "vext.proxyUndo",
+                "title": "Undo (contexted)"
+            },
+            {
+                "command": "vext.proxyRedo",
+                "title": "Redo (contexted)"
+            },
+            {
                 "command": "vext.htd.paste",
                 "title": "Paste as Markdown"
             },

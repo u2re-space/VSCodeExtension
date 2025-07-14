@@ -1,12 +1,15 @@
 // web-view instruments
-import {webview}  from './web/webview.mjs';
+import { webview }  from './web/webview.mjs';
 
 // project management
-import {manager}  from './views/manager.ts';
+import { manager }  from './views/manager.ts';
 
 // editor tools
-import {mathml}   from './editor/mathcopy.ts';
-import {markdown} from "./editor/markdown.ts";
+import { mathml }   from './editor/mathcopy.ts';
+import { markdown } from "./editor/markdown.ts";
+
+// context states
+import { contexts } from "./context/states.ts";
 
 //
 if (Promise.try === undefined || Promise.try === null || !("try" in Promise)) {
@@ -28,6 +31,7 @@ export function activate(context) {
     Promise.try(markdown, context)?.catch?.(e=>console.error(e));
     Promise.try(manager, context)?.catch?.(e=>console.error(e));
     Promise.try(webview, context)?.catch?.(e=>console.error(e));
+    Promise.try(contexts, context)?.catch?.(e=>console.error(e));
 }
 
 // This method is called when your extension is deactivated
