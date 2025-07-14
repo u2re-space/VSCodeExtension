@@ -8,39 +8,42 @@ import vscodePromise from '../imports/api.ts';
 async function updateLineContext() {
     const vscode = await vscodePromise;
     const editor = vscode.window.activeTextEditor;
+
+    //
     if (!editor) {
-        vscode.commands.executeCommand('setContext', 'lineIsEmpty', false);
-        vscode.commands.executeCommand('setContext', 'cursorAtLineStart', false);
-        vscode.commands.executeCommand('setContext', 'cursorAtLineEnd', false);
-        vscode.commands.executeCommand('setContext', 'cursorAtLineStartAndEnd', false);
+        vscode?.commands?.executeCommand?.('setContext', 'lineIsEmpty', false);
+        vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineStart', false);
+        vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineEnd', false);
+        vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineStartAndEnd', false);
         return;
     }
 
+    //
     const pos = editor.selection.active;
     const line = editor.document.lineAt(pos.line);
 
+    //
     const isEmpty = line.text.length === 0;
     const atStart = pos.character === 0;
     const atEnd = pos.character === line.text.length;
     const atStartAndEnd = atStart && atEnd; // строка пуста и курсор в начале
 
-    vscode.commands.executeCommand('setContext', 'lineIsEmpty', isEmpty);
-    vscode.commands.executeCommand('setContext', 'cursorAtLineStart', atStart);
-    vscode.commands.executeCommand('setContext', 'cursorAtLineEnd', atEnd);
-    vscode.commands.executeCommand('setContext', 'cursorAtLineStartAndEnd', atStartAndEnd);
+    //
+    vscode?.commands?.executeCommand?.('setContext', 'lineIsEmpty', isEmpty);
+    vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineStart', atStart);
+    vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineEnd', atEnd);
+    vscode?.commands?.executeCommand?.('setContext', 'cursorAtLineStartAndEnd', atStartAndEnd);
 }
 
 // @ts-ignore
 let debounceTimer: NodeJS.Timeout | undefined;
 
-
 //
 async function proxyUndo() {
     const vscode = await vscodePromise;
-    await vscode?.commands?.executeCommand?.('undo').then(
+    await vscode?.commands?.executeCommand?.('undo')?.then?.(
         () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canUndo', !!vscode?.window?.activeTextEditor);
-            vscode?.commands?.executeCommand?.('redo');
+            vscode?.commands?.executeCommand?.('setContext', 'canRedo', !!vscode?.window?.activeTextEditor);
         },
         () => {
             vscode?.commands?.executeCommand?.('setContext', 'canUndo', false);
@@ -51,10 +54,9 @@ async function proxyUndo() {
 //
 async function proxyRedo() {
     const vscode = await vscodePromise;
-    await vscode?.commands?.executeCommand?.('redo').then(
+    await vscode?.commands?.executeCommand?.('redo')?.then?.(
         () => {
-            vscode?.commands?.executeCommand?.('setContext', 'canRedo', !!vscode?.window?.activeTextEditor);
-            vscode.commands?.executeCommand?.('undo');
+            vscode?.commands?.executeCommand?.('setContext', 'canUndo', !!vscode?.window?.activeTextEditor);
         },
         () => {
             vscode?.commands?.executeCommand?.('setContext', 'canRedo', false);
@@ -62,21 +64,18 @@ async function proxyRedo() {
     );
 }
 
-
 //
 function checkUndoRedo(vscode) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-        vscode.commands.executeCommand('setContext', 'canUndo', false);
-        vscode.commands.executeCommand('setContext', 'canRedo', false);
+        vscode?.commands.executeCommand?.('setContext', 'canUndo', false);
+        vscode?.commands.executeCommand?.('setContext', 'canRedo', false);
         return;
     }
 
     //
-    proxyUndo();
-    proxyRedo();
+    vscode?.commands?.executeCommand('setContext', 'canUndo', true);
 }
-
 
 //
 async function updateUndoRedoContext() {
@@ -87,11 +86,10 @@ async function updateUndoRedoContext() {
     debounceTimer = setTimeout(() => checkUndoRedo(vscode), 1000);
 }
 
-
 //
 export async function contexts(context: vscode.ExtensionContext) {
     const vscode = await vscodePromise;
-    vscode?.commands?.executeCommand?.('setContext', 'canUndo', false);
+    vscode?.commands?.executeCommand?.('setContext', 'canUndo', !!vscode.window.activeTextEditor);
     vscode?.commands?.executeCommand?.('setContext', 'canRedo', false);
 
     //
