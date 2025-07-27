@@ -204,8 +204,8 @@ td.actions button:hover, td.actions button:active {
 }*/
 
 button:focus, td.actions button:focus {
-    outline: 2px solid var(--button-active);
-    outline-offset: 1px;
+    padding: calc(0.5rem - 1px);
+    border: 1px solid var(--button-active);;
 }
 
 .toolbar {
@@ -236,6 +236,16 @@ button:focus, td.actions button:focus {
     block-size: max-content;
     border-radius: 0.5rem;
     clip-path: inset(0 round 0.5rem);
+}
+
+button:first-child, .actions-container button:first-child {
+    border-start-start-radius: 0.5rem;
+    border-end-start-radius: 0.5rem;
+}
+
+button:last-child, .actions-container button:last-child {
+    border-start-end-radius: 0.5rem;
+    border-end-end-radius: 0.5rem;
 }
 
 .toolbar-label {
