@@ -19514,218 +19514,25 @@ async function webview(context) {
   }));
 }
 
-// src/views/default-css.ts
-var defaultCSS = `
-* {
-    box-sizing: border-box;
-}
-
-:root {
-    /* VS Code dark theme colors */
-    --highlight: color(srgb 1 1 1 / 0.01);
-    --background: #1e1e1e;
-    --foreground: #d4d4d4;
-    --border: #333;
-    --button-bg: #2d2d2d;
-    --button-hover: #3c3c3c;
-    --button-active: #007acc;
-    --button-fg: #d4d4d4;
-    --button-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    --row-hover: color(srgb 1 1 1 / 0.02);
-    --scrollbar-bg: #23272e;
-    --scrollbar-thumb: color(srgb 1 1 1 / 0.5);
-    --scrollbar-thumb-hover: color(srgb 1 1 1 / 0.6);
-}
-
-html {
-    padding: 0px;
-    margin: 0px;
-}
-
-body {
-    background: var(--background);
-    color: var(--foreground);
-    font-family: "Segoe UI", "Fira Code", "Consolas", monospace;
-    margin: 0;
-    padding: 0.5em 1em;
-    block-size: min(100svh, 100cqh);
-    min-block-size: min(100svh, 100cqh);
-    max-block-size: min(100svh, 100cqh);
-    overflow: hidden;
-    box-sizing: border-box;
-    container-type: size;
-    position: fixed;
-    inline-size: 100%;
-}
-
-table {
-    inline-size: 100%;
-    border-radius: 0.5rem;
-    border-collapse: collapse;
-    clip-path: inset(0 round 0.5rem);
-    margin-block-start: 3rem;
-    margin-block-end: 0rem;
-    overflow-y: auto;
-    overflow-x: hidden;
-
-    background: var(--highlight);
-    block-size: max-content;
-    max-block-size: stretch;
-    max-block-size: -webkit-fill-available;
-
-    display: flex;
-    flex-direction: column;
-    box-sizing: border-box;
-
-    scrollbar-width: thin;
-    scrollbar-color: var(--scrollbar-thumb) transparent;/*var(--scrollbar-bg)*/;
-    scrollbar-gutter: auto;
-}
-
-tr {
-    transition: background 0.2s;
-    max-block-size: max-content;
-    block-size: max-content;
-    overflow: hidden;
-    display: flex;
-    flex-direction: row;
-    flex-grow: 1;
-    flex-shrink: 0;
-    flex-basis: stretch;
-    inline-size: 100%;
-    place-content: center;
-    place-items: center;
-    padding-inline: 0.5rem;
-    box-sizing: border-box;
-}
-
-tr:hover { background: var(--row-hover); }
-
-td {
-    padding: 0px;
-    padding-block: 0.5rem;
-    vertical-align: middle;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    display: flex;
-    flex-direction: row;
-    flex-shrink: 0;
-    flex-grow: 1;
-    flex-basis: stretch;
-    text-align: start;
-    max-block-size: max-content;
-    block-size: max-content;
-    box-sizing: border-box;
-}
-
-button {
-    overflow: hidden;
-    background: var(--button-bg);
-    color: var(--button-fg);
-    border: none;
-    border-radius: 6px;
-    margin: 0 0.15em;
-    padding: 0.5rem;
-    font-size: 1em;
-    font-family: inherit;
-    cursor: pointer;
-    /*box-shadow: var(--button-shadow);*/
-    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
-    outline: none;
-    position: relative;
-    aspect-ratio: 1 / 1;
-    inline-size: 2rem;
-    block-size: 2rem;
-    display: inline flex;
-    place-content: center;
-    place-items: center;
-}
-
-button:hover {
-    background: var(--button-hover);
-    color: #fff;
-}
-
-button:active {
-    background: var(--button-active);
-    color: #fff;
-}
-
-button:focus {
-    /*box-shadow: 0 0 0 2px #007acc55;*/
-}
-
-@media (prefers-color-scheme: light) {
-    :root {
-        --highlight: color(srgb 0 0 0 / 0.01);
-        --background: #f3f3f3;
-        --foreground: #222;
-        --border: #e1e1e1;
-        --button-bg: #e7e7e7;
-        --button-hover: #d0d0d0;
-        --button-active: #007acc;
-        --button-fg: #222;
-        --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        --row-hover: color(srgb 0 0 0 / 0.02);
-        --scrollbar-bg: #f0f0f0;
-        --scrollbar-thumb: color(srgb 0 0 0 / 0.5);
-        --scrollbar-thumb-hover: color(srgb 0 0 0 / 0.6);
-    }
-}
-
-.toolbar {
-    place-content: center; place-items: center;
-    padding: 0.25rem 1rem 0.25rem 1rem;
-    display: flex; gap: 0.125rem;
-    padding-inline-end: 0.5rem;
-    background: var(--background);
-    border-radius: 0.5rem;
-    inset-inline-start: 0px;
-    inset-block-start: 0px;
-    position: fixed;
-    z-index: 2;
-    flex-directon: row;
-    text-align: start;
-    justify-content: start;
-    margin-block-start: 0.5rem;
-    margin-block-end: 0.5rem;
-    margin-inline: 0.75rem;
-    block-size: max-content;
-    min-block-size: 2rem;
-    inline-size: calc(100% - 1.5rem);
-}
-
-.toolbar-label {
-    font-weight: bold;
-    font-size: 1.1em;
-    block-size: max-content;
-}
-
-:where(.toolbar, tr):has(button:focus) {
-    border-bottom: 2px solid var(--button-active);
-}
-
-button:focus {
-    outline: 2px solid var(--button-active);
-    outline-offset: 1px;
-}
-`;
-
 // src/views/webview.ts
 async function getWebviewContent(webview2, extensionUri, modules) {
   const vscodeAPI2 = await api_default;
-  return `<html><head><link rel="stylesheet" href="${webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css") || "") || ""}"></head>
+  const defaultCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "webview.css")) || "";
+  const codiconCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css")) || "";
+  return `<html><head><link rel="stylesheet" href="${codiconCSS}"><link rel="stylesheet" href="${defaultCSS}"></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
-        <style>${defaultCSS}</style>
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
-            <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
-            <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
+            <div class="toolbar-actions">
+                <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
+                <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
+            </div>
         </div>
         <table>${modules?.map?.((m) => `<tr tabindex="0">
-            <td style="flex-basis: max-content; inline-size: -webkit-fill-available; padding-inline-start: 0.5rem; justify-content: start;">${m}</td>
-            <td style="flex-basis: max-content; inline-size: max-content; flex-shrink: 0; flex-grow: 0; justify-content: end;">
+            <td class="name">${m}</td>
+            <td class="actions">
+                <div class="actions-container">
+                <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
                 <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
                 <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
@@ -19733,6 +19540,7 @@ async function getWebviewContent(webview2, extensionUri, modules) {
                 <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
                 <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
                 <button onclick="send('push' , '${m}')" title="Git push"><i class="codicon codicon-cloud-upload"></i></button>
+                </div>
             </td>
         </tr>`)?.join?.("")}</table>
         <script>
@@ -19830,7 +19638,6 @@ async function getWebviewContent(webview2, extensionUri, modules) {
 }
 
 // src/views/manager.ts
-var MOD_DIR = "modules";
 var inWatch = /* @__PURE__ */ new Set([]);
 var vscodeAPI = null;
 var ctxMap = /* @__PURE__ */ new WeakMap();
@@ -19867,31 +19674,46 @@ var getWorkspaceFolder = async (workspace, res = "") => {
   }
   return folder?.uri || void 0;
 };
-async function getBaseDir(dir = MOD_DIR) {
-  const vscodeAPI2 = await initVscodeAPI();
-  const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-  if (!wsdUri) {
-    return { baseDir: vscodeAPI2.Uri.file(""), isModules: false };
-  }
-  const modulesDirUri = vscodeAPI2.Uri.joinPath(wsdUri, dir);
-  let isModules = false;
+async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
+  let result = [];
   try {
-    const stat = await vscodeAPI2.workspace.fs.stat(modulesDirUri);
-    isModules = stat.type === vscodeAPI2.FileType.Directory;
+    const entries = await vscodeAPI2.workspace.fs.readDirectory(baseDir);
+    let hasGit = false, hasPkg = false;
+    for (const [name, type] of entries) {
+      if (type === vscodeAPI2.FileType.File) {
+        if (name === ".git") {
+          hasGit = true;
+        }
+        if (name === "package.json") {
+          hasPkg = true;
+        }
+      }
+    }
+    if (hasGit || hasPkg) {
+      result.push(relPath || "./");
+    }
+    for (const [name, type] of entries) {
+      if (type === vscodeAPI2.FileType.Directory && name !== "node_modules" && !name.startsWith(".")) {
+        const subDir = vscodeAPI2.Uri.joinPath(baseDir, name);
+        const subRelPath = relPath ? `${relPath}/${name}` : name;
+        const subResult = await findProjectDirs(vscodeAPI2, subDir, subRelPath);
+        result.push(...subResult);
+      }
+    }
   } catch (e) {
   }
-  return { baseDir: isModules ? modulesDirUri : wsdUri, isModules };
+  return result;
 }
-var getDirs = async (context, dir = MOD_DIR) => {
-  const { baseDir, isModules } = await getBaseDir(dir);
-  if (!context || !isModules) {
+var getDirs = async (context) => {
+  const vscodeAPI2 = await initVscodeAPI();
+  const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
+  if (!context || !wsdUri) {
     return ["./"];
   }
   let modules = ctxMap.get(context) ?? [];
   ctxMap.set(context, modules);
   try {
-    const entries = await vscodeAPI?.workspace?.fs?.readDirectory?.(baseDir);
-    modules = entries.filter(([name, type]) => type === vscodeAPI?.FileType?.Directory).map(([name]) => isModules ? `${dir}/${name}` : name);
+    modules = await findProjectDirs(vscodeAPI2, wsdUri, "");
   } catch (e) {
   }
   if (modules?.length < 1) {
@@ -19976,6 +19798,9 @@ var ManagerViewProvider = class {
                 ], moduleUri?.path || moduleUri?.fsPath);
               }
               ;
+              break;
+            case "open-dir":
+              vscodeAPI2?.commands?.executeCommand("vscode.openFolder", moduleUri);
               break;
           }
         });

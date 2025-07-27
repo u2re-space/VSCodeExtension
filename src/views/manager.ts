@@ -69,18 +69,56 @@ async function getBaseDir(dir: string = MOD_DIR): Promise<{ baseDir: vscode.Uri,
     return { baseDir: isModules ? modulesDirUri : wsdUri, isModules };
 }
 
-//
-const getDirs = async (context, dir = MOD_DIR) => {
-    const { baseDir, isModules } = await getBaseDir(dir);
-    if (!context || !isModules) { return ["./"]; }
+// ...
+// Вспомогательная функция для поиска директорий с .git или package.json
+async function findProjectDirs(
+    vscodeAPI: any,
+    baseDir: vscode.Uri,
+    relPath: string = ""
+): Promise<string[]> {
+    let result: string[] = [];
+    try {
+        const entries = await vscodeAPI.workspace.fs.readDirectory(baseDir);
+        let hasGit = false, hasPkg = false;
+        for (const [name, type] of entries) {
+            if (type === vscodeAPI.FileType.File) {
+                if (name === ".git") {hasGit = true;}
+                if (name === "package.json") {hasPkg = true;}
+            }
+        }
+        // Если есть .git или package.json, добавляем путь
+        if (hasGit || hasPkg) {
+            result.push(relPath || "./");
+        }
+        // Рекурсивно обходим подпапки (кроме node_modules и скрытых)
+        for (const [name, type] of entries) {
+            if (
+                type === vscodeAPI.FileType.Directory &&
+                name !== "node_modules" &&
+                !name.startsWith(".")
+            ) {
+                const subDir = vscodeAPI.Uri.joinPath(baseDir, name);
+                const subRelPath = relPath ? `${relPath}/${name}` : name;
+                const subResult = await findProjectDirs(vscodeAPI, subDir, subRelPath);
+                result.push(...subResult);
+            }
+        }
+    } catch (e) {
+        // ignore
+    }
+    return result;
+}
+
+// Новый getDirs
+const getDirs = async (context) => {
+    const vscodeAPI = await initVscodeAPI();
+    const wsdUri: vscode.Uri | undefined = await getWorkspaceFolder(vscodeAPI?.workspace);
+    if (!context || !wsdUri) { return ["./"]; }
     let modules: string[] = ctxMap.get(context) ?? [];
     ctxMap.set(context, modules);
 
     try {
-        const entries = await vscodeAPI?.workspace?.fs?.readDirectory?.(baseDir);
-        modules = entries
-            .filter(([name, type]) => type === vscodeAPI?.FileType?.Directory)
-            .map(([name]) => (isModules ? `${dir}/${name}` : name));
+        modules = await findProjectDirs(vscodeAPI, wsdUri, "");
     } catch (e) { /* ignore */ }
 
     if (modules?.length < 1) { modules?.push?.("./"); }
@@ -143,6 +181,7 @@ export class ManagerViewProvider {
                             'git push --all'
                         ], moduleUri?.path || moduleUri?.fsPath);
                     }; break;
+                    case 'open-dir': vscodeAPI?.commands?.executeCommand('vscode.openFolder', moduleUri); break;
                 }
             });
         } catch(e) { console.warn(e); }}

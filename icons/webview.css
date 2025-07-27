@@ -1,4 +1,3 @@
-export const defaultCSS = `
 * {
     box-sizing: border-box;
 }
@@ -10,6 +9,8 @@ export const defaultCSS = `
     --foreground: #d4d4d4;
     --border: #333;
     --button-bg: #2d2d2d;
+    --button-act-bg: #1e1e1e;
+    --button-act-hover: #2d2d2d;
     --button-hover: #3c3c3c;
     --button-active: #007acc;
     --button-fg: #d4d4d4;
@@ -18,6 +19,26 @@ export const defaultCSS = `
     --scrollbar-bg: #23272e;
     --scrollbar-thumb: color(srgb 1 1 1 / 0.5);
     --scrollbar-thumb-hover: color(srgb 1 1 1 / 0.6);
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --highlight: color(srgb 0 0 0 / 0.01);
+        --background: #f3f3f3;
+        --foreground: #222;
+        --border: #e1e1e1;
+        --button-bg: #e7e7e7;
+        --button-act-bg: #e7e7e7;
+        --button-act-hover: #e7e7e7;
+        --button-hover: #d0d0d0;
+        --button-active: #007acc;
+        --button-fg: #222;
+        --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
+        --row-hover: color(srgb 0 0 0 / 0.02);
+        --scrollbar-bg: #f0f0f0;
+        --scrollbar-thumb: color(srgb 0 0 0 / 0.5);
+        --scrollbar-thumb-hover: color(srgb 0 0 0 / 0.6);
+    }
 }
 
 html {
@@ -100,6 +121,40 @@ td {
     max-block-size: max-content;
     block-size: max-content;
     box-sizing: border-box;
+    position: relative;
+}
+
+td.actions {
+    flex-basis: max-content;
+    inline-size: max-content;
+    flex-shrink: 0;
+    flex-grow: 0;
+    justify-content: end;
+}
+
+td.actions .actions-container {
+    flex-basis: max-content;
+    inline-size: max-content;
+    flex-shrink: 0;
+    flex-grow: 0;
+    justify-content: end;
+    display: flex;
+    flex-direction: row;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    block-size: max-content;
+    clip-path: inset(0px round 0.5rem);
+    position: relative;
+}
+
+td.name {
+    flex-basis: max-content;
+    inline-size: -webkit-fill-available;
+    padding-inline-start: 0.5rem;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    block-size: max-content;
 }
 
 button {
@@ -107,8 +162,6 @@ button {
     background: var(--button-bg);
     color: var(--button-fg);
     border: none;
-    border-radius: 6px;
-    margin: 0 0.15em;
     padding: 0.5rem;
     font-size: 1em;
     font-family: inherit;
@@ -116,7 +169,6 @@ button {
     /*box-shadow: var(--button-shadow);*/
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
-    position: relative;
     aspect-ratio: 1 / 1;
     inline-size: 2rem;
     block-size: 2rem;
@@ -127,41 +179,39 @@ button {
 
 button:hover {
     background: var(--button-hover);
-    color: #fff;
+    box-shadow: var(--button-shadow);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    outline: none;
 }
 
 button:active {
-    background: var(--button-active);
-    color: #fff;
+    background: var(--button-hover);
+    box-shadow: var(--button-shadow);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    outline: none;
 }
 
-button:focus {
-    /*box-shadow: 0 0 0 2px #007acc55;*/
+/*
+td.actions button {
+    background: var(--button-act-bg);
+    color: var(--button-fg);
+    transition: background 0.15s, color 0.15s;
+    outline: none;
 }
 
-@media (prefers-color-scheme: light) {
-    :root {
-        --highlight: color(srgb 0 0 0 / 0.01);
-        --background: #f3f3f3;
-        --foreground: #222;
-        --border: #e1e1e1;
-        --button-bg: #e7e7e7;
-        --button-hover: #d0d0d0;
-        --button-active: #007acc;
-        --button-fg: #222;
-        --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
-        --row-hover: color(srgb 0 0 0 / 0.02);
-        --scrollbar-bg: #f0f0f0;
-        --scrollbar-thumb: color(srgb 0 0 0 / 0.5);
-        --scrollbar-thumb-hover: color(srgb 0 0 0 / 0.6);
-    }
+td.actions button:hover, td.actions button:active {
+    background: var(--button-act-hover);
+}*/
+
+button:focus, td.actions button:focus {
+    outline: 2px solid var(--button-active);
+    outline-offset: 1px;
 }
 
 .toolbar {
     place-content: center; place-items: center;
     padding: 0.25rem 1rem 0.25rem 1rem;
-    display: flex; gap: 0.125rem;
-    padding-inline-end: 0.5rem;
+    display: flex;
     background: var(--background);
     border-radius: 0.5rem;
     inset-inline-start: 0px;
@@ -171,26 +221,30 @@ button:focus {
     flex-directon: row;
     text-align: start;
     justify-content: start;
-    margin-block-start: 0.5rem;
-    margin-block-end: 0.5rem;
-    margin-inline: 0.75rem;
     block-size: max-content;
     min-block-size: 2rem;
     inline-size: calc(100% - 1.5rem);
+    margin: 0 0.15em;
+    overflow: hidden;
+}
+
+.toolbar-actions {
+    display: flex;
+    flex-direction: row;
+    inline-size: max-content;
+    overflow: hidden;
+    block-size: max-content;
+    border-radius: 0.5rem;
+    clip-path: inset(0 round 0.5rem);
 }
 
 .toolbar-label {
     font-weight: bold;
     font-size: 1.1em;
     block-size: max-content;
+    overflow: hidden;
 }
 
 :where(.toolbar, tr):has(button:focus) {
     border-bottom: 2px solid var(--button-active);
 }
-
-button:focus {
-    outline: 2px solid var(--button-active);
-    outline-offset: 1px;
-}
-`;

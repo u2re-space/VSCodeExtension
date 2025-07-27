@@ -1,25 +1,30 @@
 //! use only TS types
 import * as vscode from "vscode";
-import { defaultCSS } from "./default-css.ts";
 
 //
 import vscodePromise from '../imports/api.ts';
 
 //
 export async function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri, modules: string[]): Promise<string> {
-    const vscodeAPI = await vscodePromise;
+    const vscodeAPI = await vscodePromise; // @ts-ignore
+    const defaultCSS = webview?.asWebviewUri(vscodeAPI?.Uri?.joinPath?.(extensionUri, 'icons', 'webview.css'))||'';
+    const codiconCSS = webview?.asWebviewUri(vscodeAPI?.Uri?.joinPath?.(extensionUri, 'icons', 'codicon.css'))||'';
+
     // @ts-ignore
-    return `<html><head><link rel="stylesheet" href="${webview?.asWebviewUri(vscodeAPI?.Uri?.joinPath?.(extensionUri, 'icons', 'codicon.css')||'')||''}"></head>
+    return `<html><head><link rel="stylesheet" href="${codiconCSS}"><link rel="stylesheet" href="${defaultCSS}"></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
-        <style>${defaultCSS}</style>
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
-            <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
-            <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
+            <div class="toolbar-actions">
+                <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
+                <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
+            </div>
         </div>
         <table>${modules?.map?.(m => `<tr tabindex="0">
-            <td style="flex-basis: max-content; inline-size: -webkit-fill-available; padding-inline-start: 0.5rem; justify-content: start;">${m}</td>
-            <td style="flex-basis: max-content; inline-size: max-content; flex-shrink: 0; flex-grow: 0; justify-content: end;">
+            <td class="name">${m}</td>
+            <td class="actions">
+                <div class="actions-container">
+                <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
                 <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
                 <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
@@ -27,6 +32,7 @@ export async function getWebviewContent(webview: vscode.Webview, extensionUri: v
                 <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
                 <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
                 <button onclick="send('push' , '${m}')" title="Git push"><i class="codicon codicon-cloud-upload"></i></button>
+                </div>
             </td>
         </tr>`)?.join?.('')}</table>
         <script>
