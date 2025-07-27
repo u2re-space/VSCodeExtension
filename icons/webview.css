@@ -226,6 +226,7 @@ button:focus, td.actions button:focus {
     inline-size: calc(100% - 1.5rem);
     margin: 0 0.15em;
     overflow: hidden;
+    padding-block-start: 0.75rem;
 }
 
 .toolbar-actions {
