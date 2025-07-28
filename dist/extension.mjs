@@ -19721,6 +19721,12 @@ var getDirs = async (context) => {
   }
   return modules;
 };
+var plNormalize = (m) => {
+  if (/^\/[a-zA-Z]:\//.test(m)) {
+    return m.slice(1);
+  }
+  return m;
+};
 var ManagerViewProvider = class {
   _extensionUri;
   static viewType = "vext.managerView";
@@ -19761,7 +19767,7 @@ var ManagerViewProvider = class {
                     "git add *",
                     `git commit -m "${commitMsg}"`,
                     "git push --all"
-                  ], mUri?.path || mUri?.fsPath);
+                  ], plNormalize(mUri?.path || mUri?.fsPath));
                 }
               }
               ;
@@ -19769,23 +19775,23 @@ var ManagerViewProvider = class {
             case "bulk_build":
               for (const m of modules2) {
                 const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
-                runInTerminal(["npm run build"], mUri?.path || mUri?.fsPath);
+                runInTerminal(["npm run build"], plNormalize(mUri?.path || mUri?.fsPath));
               }
               break;
             case "terminal":
-              runInTerminal([""], moduleUri?.path || moduleUri?.fsPath);
+              runInTerminal([""], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               break;
             case "build":
-              runInTerminal(["npm run build"], moduleUri?.path || moduleUri?.fsPath);
+              runInTerminal(["npm run build"], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               break;
             case "watch":
-              runInTerminal(["npm run watch"], moduleUri?.path || moduleUri?.fsPath, true);
+              runInTerminal(["npm run watch"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
               break;
             case "test":
-              runInTerminal(["npm run test"], moduleUri?.path || moduleUri?.fsPath, true);
+              runInTerminal(["npm run test"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
               break;
             case "diff":
-              runInTerminal(["git diff"], moduleUri?.path || moduleUri?.fsPath, true);
+              runInTerminal(["git diff"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
               break;
             case "push":
               {
@@ -19795,7 +19801,7 @@ var ManagerViewProvider = class {
                   "git add *",
                   `git commit -m "${commitMsg}"`,
                   "git push --all"
-                ], moduleUri?.path || moduleUri?.fsPath);
+                ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               }
               ;
               break;

@@ -126,6 +126,14 @@ const getDirs = async (context) => {
 };
 
 //
+const plNormalize = (m)=>{
+    if (/^\/[a-zA-Z]:\//.test(m)) {
+        return m.slice(1);
+    }
+    return m;
+};
+
+//
 export class ManagerViewProvider {
     _extensionUri: any; static viewType = "vext.managerView";
     constructor(extensionUri) { this._extensionUri = extensionUri; }
@@ -159,27 +167,27 @@ export class ManagerViewProvider {
                                 'git add .', 'git add *',
                                 `git commit -m "${commitMsg}"`,
                                 'git push --all'
-                            ], mUri?.path || mUri?.fsPath);
+                            ], plNormalize(mUri?.path || mUri?.fsPath));
                         }
                     }; break;
                     case 'bulk_build':
                         for (const m of modules) {
                             const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
-                            runInTerminal(['npm run build'], mUri?.path || mUri?.fsPath);
+                            runInTerminal(['npm run build'], plNormalize(mUri?.path || mUri?.fsPath));
                         }
                         break;
-                    case 'terminal': runInTerminal([''], moduleUri?.path || moduleUri?.fsPath); break;
-                    case 'build': runInTerminal(['npm run build'], moduleUri?.path || moduleUri?.fsPath); break;
-                    case 'watch': runInTerminal(['npm run watch'], moduleUri?.path || moduleUri?.fsPath, true); break;
-                    case 'test' : runInTerminal(['npm run test'] , moduleUri?.path || moduleUri?.fsPath, true); break;
-                    case 'diff': runInTerminal(['git diff'], moduleUri?.path || moduleUri?.fsPath, true); break;
+                    case 'terminal': runInTerminal([''], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
+                    case 'build': runInTerminal(['npm run build'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
+                    case 'watch': runInTerminal(['npm run watch'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
+                    case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
+                    case 'diff': runInTerminal(['git diff'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'push': {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
                         runInTerminal([
                             'git add .', 'git add *',
                             `git commit -m "${commitMsg}"`,
                             'git push --all'
-                        ], moduleUri?.path || moduleUri?.fsPath);
+                        ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
                     }; break;
                     case 'open-dir': vscodeAPI?.commands?.executeCommand('vscode.openFolder', moduleUri); break;
                 }
