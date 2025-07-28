@@ -166,6 +166,7 @@ export class ManagerViewProvider {
                             runInTerminal([
                                 'git add .', 'git add *',
                                 `git commit -m "${commitMsg}"`,
+                                'git pull --rebase --ff',
                                 'git push --all'
                             ], plNormalize(mUri?.path || mUri?.fsPath));
                         }
