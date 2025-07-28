@@ -164,6 +164,7 @@ export class ManagerViewProvider {
                         for (const m of modules) {
                             const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
                             runInTerminal([
+                                'git rm -r --cached .',
                                 'git add .', 'git add *',
                                 `git commit -m "${commitMsg}"`,
                                 'git pull --rebase --ff',
@@ -185,8 +186,10 @@ export class ManagerViewProvider {
                     case 'push': {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
                         runInTerminal([
+                            'git rm -r --cached .',
                             'git add .', 'git add *',
                             `git commit -m "${commitMsg}"`,
+                            'git pull --rebase --ff',
                             'git push --all'
                         ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
                     }; break;
