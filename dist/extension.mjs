@@ -19533,6 +19533,7 @@ async function getWebviewContent(webview2, extensionUri, modules) {
             <td class="actions">
                 <div class="actions-container">
                 <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
+                <button onclick="send('audit', '${m}')" title="Audit"><i class="codicon codicon-github-action"></i></button>
                 <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
                 <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
@@ -19782,6 +19783,9 @@ var ManagerViewProvider = class {
               break;
             case "terminal":
               runInTerminal([""], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+              break;
+            case "audit":
+              runInTerminal(["npm install -D", "npm audit fix"], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               break;
             case "build":
               runInTerminal(["npm run build"], plNormalize(moduleUri?.path || moduleUri?.fsPath));

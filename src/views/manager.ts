@@ -179,6 +179,7 @@ export class ManagerViewProvider {
                         }
                         break;
                     case 'terminal': runInTerminal([''], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
+                    case 'audit': runInTerminal(['npm install -D', 'npm audit fix'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
                     case 'build': runInTerminal(['npm run build'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
                     case 'watch': runInTerminal(['npm run watch'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
