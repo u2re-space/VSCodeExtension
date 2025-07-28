@@ -19763,9 +19763,11 @@ var ManagerViewProvider = class {
                 for (const m of modules2) {
                   const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
                   runInTerminal([
+                    "git rm -r --cached .",
                     "git add .",
                     "git add *",
                     `git commit -m "${commitMsg}"`,
+                    "git pull --rebase --ff",
                     "git push --all"
                   ], plNormalize(mUri?.path || mUri?.fsPath));
                 }
@@ -19797,9 +19799,11 @@ var ManagerViewProvider = class {
               {
                 const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "" }) || "Regular Update";
                 runInTerminal([
+                  "git rm -r --cached .",
                   "git add .",
                   "git add *",
                   `git commit -m "${commitMsg}"`,
+                  "git pull --rebase --ff",
                   "git push --all"
                 ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               }
