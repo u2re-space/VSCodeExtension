@@ -7116,32 +7116,32 @@ var require_URL = __commonJS({
           else
             return basepath.substring(0, lastslash + 1) + refpath;
         }
-        function remove_dot_segments(path2) {
-          if (!path2) return path2;
+        function remove_dot_segments(path3) {
+          if (!path3) return path3;
           var output = "";
-          while (path2.length > 0) {
-            if (path2 === "." || path2 === "..") {
-              path2 = "";
+          while (path3.length > 0) {
+            if (path3 === "." || path3 === "..") {
+              path3 = "";
               break;
             }
-            var twochars = path2.substring(0, 2);
-            var threechars = path2.substring(0, 3);
-            var fourchars = path2.substring(0, 4);
+            var twochars = path3.substring(0, 2);
+            var threechars = path3.substring(0, 3);
+            var fourchars = path3.substring(0, 4);
             if (threechars === "../") {
-              path2 = path2.substring(3);
+              path3 = path3.substring(3);
             } else if (twochars === "./") {
-              path2 = path2.substring(2);
+              path3 = path3.substring(2);
             } else if (threechars === "/./") {
-              path2 = "/" + path2.substring(3);
-            } else if (twochars === "/." && path2.length === 2) {
-              path2 = "/";
-            } else if (fourchars === "/../" || threechars === "/.." && path2.length === 3) {
-              path2 = "/" + path2.substring(4);
+              path3 = "/" + path3.substring(3);
+            } else if (twochars === "/." && path3.length === 2) {
+              path3 = "/";
+            } else if (fourchars === "/../" || threechars === "/.." && path3.length === 3) {
+              path3 = "/" + path3.substring(4);
               output = output.replace(/\/?[^\/]*$/, "");
             } else {
-              var segment = path2.match(/(\/?([^\/]*))/)[0];
+              var segment = path3.match(/(\/?([^\/]*))/)[0];
               output += segment;
-              path2 = path2.substring(segment.length);
+              path3 = path3.substring(segment.length);
             }
           }
           return output;
@@ -19342,7 +19342,7 @@ var require_turndown_cjs = __commonJS({
           );
         }
         if (input === "") return "";
-        var output = process.call(this, new RootNode(input, this.options));
+        var output = process2.call(this, new RootNode(input, this.options));
         return postProcess2.call(this, output);
       },
       /**
@@ -19409,7 +19409,7 @@ var require_turndown_cjs = __commonJS({
         }, string);
       }
     };
-    function process(parentNode) {
+    function process2(parentNode) {
       var self = this;
       return reduce.call(parentNode.childNodes, function(output, node) {
         node = new Node(node, self.options);
@@ -19419,26 +19419,26 @@ var require_turndown_cjs = __commonJS({
         } else if (node.nodeType === 1) {
           replacement = replacementForNode.call(self, node);
         }
-        return join(output, replacement);
+        return join2(output, replacement);
       }, "");
     }
     function postProcess2(output) {
       var self = this;
       this.rules.forEach(function(rule) {
         if (typeof rule.append === "function") {
-          output = join(output, rule.append(self.options));
+          output = join2(output, rule.append(self.options));
         }
       });
       return output.replace(/^[\t\r\n]+/, "").replace(/[\t\r\n\s]+$/, "");
     }
     function replacementForNode(node) {
       var rule = this.rules.forNode(node);
-      var content = process.call(this, node);
+      var content = process2.call(this, node);
       var whitespace = node.flankingWhitespace;
       if (whitespace.leading || whitespace.trailing) content = content.trim();
       return whitespace.leading + rule.replacement(content, node, this.options) + whitespace.trailing;
     }
-    function join(output, replacement) {
+    function join2(output, replacement) {
       var s1 = trimTrailingNewlines(output);
       var s2 = trimLeadingNewlines(replacement);
       var nls = Math.max(output.length - s1.length, replacement.length - s2.length);
@@ -19756,12 +19756,15 @@ var ManagerViewProvider = class {
       try {
         webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
           const moduleUri = vscodeAPI2.Uri.joinPath(wsdUri, message.module);
-          const modules2 = await getDirs(context) || ["./"];
+          modules = await getDirs(context) || ["./"];
           switch (message.command) {
             case "bulk_push":
               {
-                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "" }) || "Bulk Update";
-                for (const m of modules2) {
+                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "", default: "No Description" });
+                if (!commitMsg) {
+                  return;
+                }
+                for (const m of modules) {
                   const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
                   runInTerminal([
                     "git rm -r --cached .",
@@ -19776,7 +19779,7 @@ var ManagerViewProvider = class {
               ;
               break;
             case "bulk_build":
-              for (const m of modules2) {
+              for (const m of modules) {
                 const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
                 runInTerminal(["npm run build"], plNormalize(mUri?.path || mUri?.fsPath));
               }
@@ -19801,7 +19804,10 @@ var ManagerViewProvider = class {
               break;
             case "push":
               {
-                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "" }) || "Regular Update";
+                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "", default: "No Description" });
+                if (!commitMsg) {
+                  return;
+                }
                 runInTerminal([
                   "git rm -r --cached .",
                   "git add .",
@@ -19814,7 +19820,7 @@ var ManagerViewProvider = class {
               ;
               break;
             case "open-dir":
-              vscodeAPI2?.commands?.executeCommand("vscode.openFolder", moduleUri);
+              vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
               break;
           }
         });
@@ -35130,27 +35136,27 @@ var sqrtTall = function sqrtTall2(extraVinculum, hLinePad2, viewBoxHeight) {
 };
 var sqrtPath = function sqrtPath2(size, extraVinculum, viewBoxHeight) {
   extraVinculum = 1e3 * extraVinculum;
-  var path2 = "";
+  var path3 = "";
   switch (size) {
     case "sqrtMain":
-      path2 = sqrtMain(extraVinculum, hLinePad);
+      path3 = sqrtMain(extraVinculum, hLinePad);
       break;
     case "sqrtSize1":
-      path2 = sqrtSize1(extraVinculum, hLinePad);
+      path3 = sqrtSize1(extraVinculum, hLinePad);
       break;
     case "sqrtSize2":
-      path2 = sqrtSize2(extraVinculum, hLinePad);
+      path3 = sqrtSize2(extraVinculum, hLinePad);
       break;
     case "sqrtSize3":
-      path2 = sqrtSize3(extraVinculum, hLinePad);
+      path3 = sqrtSize3(extraVinculum, hLinePad);
       break;
     case "sqrtSize4":
-      path2 = sqrtSize4(extraVinculum, hLinePad);
+      path3 = sqrtSize4(extraVinculum, hLinePad);
       break;
     case "sqrtTall":
-      path2 = sqrtTall(extraVinculum, hLinePad, viewBoxHeight);
+      path3 = sqrtTall(extraVinculum, hLinePad, viewBoxHeight);
   }
-  return path2;
+  return path3;
 };
 var innerPath = function innerPath2(name, height) {
   switch (name) {
@@ -39575,8 +39581,8 @@ var svgData = {
 };
 var staticSvg = function staticSvg2(value, options2) {
   var [pathName, width, height] = svgData[value];
-  var path2 = new PathNode(pathName);
-  var svgNode = new SvgNode([path2], {
+  var path3 = new PathNode(pathName);
+  var svgNode = new SvgNode([path3], {
     "width": makeEm(width),
     "height": makeEm(height),
     // Override CSS rule `.katex svg { width: 100% }`
@@ -40502,8 +40508,8 @@ var svgSpan = function svgSpan2(group, options2) {
           pathName = "tilde" + imgIndex;
         }
       }
-      var path2 = new PathNode(pathName);
-      var svgNode = new SvgNode([path2], {
+      var path3 = new PathNode(pathName);
+      var svgNode = new SvgNode([path3], {
         "width": "100%",
         "height": makeEm(_height),
         "viewBox": "0 0 " + viewBoxWidth + " " + viewBoxHeight,
@@ -41774,8 +41780,8 @@ var makeGlyphSpan = function makeGlyphSpan2(symbol, font, mode) {
 };
 var makeInner = function makeInner2(ch, height, options2) {
   var width = fontMetricsData["Size4-Regular"][ch.charCodeAt(0)] ? fontMetricsData["Size4-Regular"][ch.charCodeAt(0)][4] : fontMetricsData["Size1-Regular"][ch.charCodeAt(0)][4];
-  var path2 = new PathNode("inner", innerPath(ch, Math.round(1e3 * height)));
-  var svgNode = new SvgNode([path2], {
+  var path3 = new PathNode("inner", innerPath(ch, Math.round(1e3 * height)));
+  var svgNode = new SvgNode([path3], {
     "width": makeEm(width),
     "height": makeEm(height),
     // Override CSS rule `.katex svg { width: 100% }`
@@ -41944,10 +41950,10 @@ var makeStackedDelim = function makeStackedDelim2(delim, heightTotal, center, op
     var midHeight = realHeightTotal - topHeightTotal - bottomHeightTotal;
     var viewBoxHeight = Math.round(realHeightTotal * 1e3);
     var pathStr = tallDelim(svgLabel, Math.round(midHeight * 1e3));
-    var path2 = new PathNode(svgLabel, pathStr);
+    var path3 = new PathNode(svgLabel, pathStr);
     var width = (viewBoxWidth / 1e3).toFixed(3) + "em";
     var height = (viewBoxHeight / 1e3).toFixed(3) + "em";
-    var svg = new SvgNode([path2], {
+    var svg = new SvgNode([path3], {
       "width": width,
       "height": height,
       "viewBox": "0 0 " + viewBoxWidth + " " + viewBoxHeight
@@ -41988,8 +41994,8 @@ var makeStackedDelim = function makeStackedDelim2(delim, heightTotal, center, op
 var vbPad = 80;
 var emPad = 0.08;
 var sqrtSvg = function sqrtSvg2(sqrtName, height, viewBoxHeight, extraVinculum, options2) {
-  var path2 = sqrtPath(sqrtName, extraVinculum, viewBoxHeight);
-  var pathNode = new PathNode(sqrtName, path2);
+  var path3 = sqrtPath(sqrtName, extraVinculum, viewBoxHeight);
+  var pathNode = new PathNode(sqrtName, path3);
   var svg = new SvgNode([pathNode], {
     // Note: 1000:1 ratio of viewBox to document em width.
     "width": "400em",
@@ -42498,8 +42504,8 @@ var htmlBuilder$7 = (group, options2) => {
     var angleHeight = inner3.height + inner3.depth + lineWeight + clearance;
     inner3.style.paddingLeft = makeEm(angleHeight / 2 + lineWeight);
     var viewBoxHeight = Math.floor(1e3 * angleHeight * scale);
-    var path2 = phasePath(viewBoxHeight);
-    var svgNode = new SvgNode([new PathNode("phase", path2)], {
+    var path3 = phasePath(viewBoxHeight);
+    var svgNode = new SvgNode([new PathNode("phase", path3)], {
       "width": "400em",
       "height": makeEm(viewBoxHeight / 1e3),
       "viewBox": "0 0 400000 " + viewBoxHeight,
@@ -49355,6 +49361,67 @@ async function contexts(context) {
   updateLineContext();
 }
 
+// src/explorer/symlink.ts
+import * as path2 from "path";
+async function getClipboardContent() {
+  const vscodeAPI2 = await api_default;
+  try {
+    const clipboardContent = await vscodeAPI2.env.clipboard.readText();
+    console.log("Clipboard content:", clipboardContent);
+    vscodeAPI2.window.showInformationMessage(`Clipboard: ${clipboardContent}`);
+    return clipboardContent;
+  } catch (error) {
+    console.error("Error reading clipboard:", error);
+    vscodeAPI2.window.showErrorMessage("Failed to read clipboard content.");
+  }
+}
+async function getDirectoryFromUri(uri) {
+  const vscodeAPI2 = await api_default;
+  const stat = await vscodeAPI2.workspace.fs.stat(uri);
+  if (stat.type & vscodeAPI2.FileType.Directory) {
+    return uri.fsPath.replace(/\\/g, "/");
+  } else {
+    return path2.dirname(uri.fsPath.replace(/\\/g, "/"));
+  }
+}
+function getBaseName(filePath) {
+  return filePath.replace(/\\/g, "/").split("/").pop() || "";
+}
+var copiedPath;
+async function symlink(context) {
+  const vscodeAPI2 = await api_default;
+  context.subscriptions.push(
+    vscodeAPI2.commands.registerCommand("vext.pasteAsSymlink", async (uri) => {
+      const clipboardContent = await getClipboardContent();
+      if (!clipboardContent) {
+        vscodeAPI2.window.showErrorMessage("No path copied for symlink.");
+        return;
+      } else {
+        copiedPath = clipboardContent;
+      }
+      copiedPath = copiedPath?.replace?.(/\\/g, "/");
+      const dirTo = await getDirectoryFromUri(uri);
+      const defaultName = getBaseName(copiedPath);
+      const linkName = await vscodeAPI2.window.showInputBox({
+        prompt: "Enter symlink name (leave empty to use original name)",
+        value: defaultName
+      }) || defaultName;
+      const finalLinkName = linkName.trim() === "" ? defaultName : linkName.trim();
+      const linkPath = path2.join(dirTo, finalLinkName)?.replace?.(/\\/g, "/");
+      let command = "";
+      if (process.platform === "win32" && !vscodeAPI2.env.remoteName) {
+        command = `New-Item -ItemType SymbolicLink -Path "${linkPath}" -Target "${copiedPath}"`;
+      } else {
+        command = `ln -s "${copiedPath}" "${linkPath}"`;
+      }
+      const terminal = vscodeAPI2.window.createTerminal({ cwd: dirTo, name: "Symlink Creator" });
+      terminal.show();
+      terminal.sendText(command);
+      vscodeAPI2.window.showInformationMessage("Symlink command sent to terminal. Press Enter in terminal if needed.");
+    })
+  );
+}
+
 // src/extension.mjs
 if (Promise.try === void 0 || Promise.try === null || !("try" in Promise)) {
   Promise.try = (fn, ...args) => {
@@ -49368,6 +49435,7 @@ if (Promise.try === void 0 || Promise.try === null || !("try" in Promise)) {
   };
 }
 function activate(context) {
+  Promise.try(symlink, context)?.catch?.((e) => console.error(e));
   Promise.try(mathml, context)?.catch?.((e) => console.error(e));
   Promise.try(markdown, context)?.catch?.((e) => console.error(e));
   Promise.try(manager, context)?.catch?.((e) => console.error(e));

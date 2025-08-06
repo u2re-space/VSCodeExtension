@@ -24,6 +24,12 @@
     "main": "./dist/extension.mjs",
     "contributes": {
         "menus": {
+            "explorer/context": [
+                {
+                    "command": "vext.pasteAsSymlink",
+                    "group": "5\\_cutcopypaste"
+                }
+            ],
             "editor/context": [
                 {
                     "command": "vext.htd.paste",
@@ -110,6 +116,10 @@
             ]
         },
         "commands": [
+            {
+                "command": "vext.pasteAsSymlink",
+                "title": "Paste as Symlink"
+            },
             {
                 "command": "vext.proxyUndo",
                 "title": "Undo (contexted)"

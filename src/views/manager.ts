@@ -147,20 +147,25 @@ export class ManagerViewProvider {
     //
     async resolveWebviewView(webviewView, context, token) {
         const vscodeAPI = await initVscodeAPI();
-        const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace); // vscode.Uri
+        const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
         let modules = await getDirs(context) || ["./"];
+
+        //
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
         try { await this.updateView(webviewView, context, modules); } catch(e) { console.warn(e); };
         inWatch?.add?.(()=>this.updateView(webviewView, context));
 
+        //
         if (modules = await getDirs(context) || ["./"]) { try {
             webviewView?.webview?.onDidReceiveMessage?.(async message => {
-                // Получаем Uri для модуля
                 const moduleUri = vscodeAPI.Uri.joinPath(wsdUri, message.module);
-                const modules = await getDirs(context) || ["./"];
+                modules = await getDirs(context) || ["./"];
+
+                //
                 switch (message.command) {
                     case 'bulk_push': {
-                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message for all?', value: '' }) || 'Bulk Update';
+                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message for all?', value: '', default: 'No Description' });
+                        if (!commitMsg) { return; }
                         for (const m of modules) {
                             const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
                             runInTerminal([
@@ -185,7 +190,8 @@ export class ManagerViewProvider {
                     case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'diff': runInTerminal(['git diff'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'push': {
-                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '' }) || 'Regular Update';
+                        const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '', default: 'No Description' });
+                        if (!commitMsg) { return; }
                         runInTerminal([
                             'git rm -r --cached .',
                             'git add .', 'git add *',
@@ -194,7 +200,7 @@ export class ManagerViewProvider {
                             'git push --all'
                         ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
                     }; break;
-                    case 'open-dir': vscodeAPI?.commands?.executeCommand('vscode.openFolder', moduleUri); break;
+                    case 'open-dir': vscodeAPI?.commands?.executeCommand?.('vscode.openFolder', moduleUri); break;
                 }
             });
         } catch(e) { console.warn(e); }}
