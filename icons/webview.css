@@ -71,7 +71,7 @@ body {
     gap: 0.25rem;
 }
 
-body * {
+body, body * {
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
