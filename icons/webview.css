@@ -307,7 +307,7 @@ button:focus, td.actions button:focus {
     text-align: start;
     justify-content: start;
     block-size: max-content;
-    min-block-size: 2rem;
+    min-block-size: 3rem;
     inline-size: calc(100% - 1.5rem);
     margin: 0 0.15em;
     overflow: hidden;
