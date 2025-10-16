@@ -68,6 +68,7 @@ body {
 
     justify-content: start;
     justify-items: start;
+    gap: 0.25rem;
 }
 
 body * {
@@ -83,6 +84,7 @@ body * {
     -o-user-drag: none;
     user-drag: none;
     user-drag: none;
+    box-sizing: border-box;
 }
 
 @supports (block-size: min(100svh, 100cqh)) {
@@ -224,6 +226,8 @@ td.actions {
     inline-size: fit-content;
     max-inline-size: -webkit-fill-available;
     max-inline-size: stretch;
+
+    padding-inline-end: 0.5rem;
 }
 
 td.actions .actions-container {
@@ -308,10 +312,9 @@ button:focus, td.actions button:focus {
     justify-content: start;
     block-size: max-content;
     min-block-size: 3rem;
-    inline-size: calc(100% - 1.5rem);
-    margin: 0 0.15em;
+    inline-size: 100%;
+    margin: 0px;
     overflow: hidden;
-    padding-block-start: 0.75rem;
 }
 
 .toolbar-actions {
