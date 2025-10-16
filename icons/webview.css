@@ -12,7 +12,7 @@
     --button-act-bg: #1e1e1e;
     --button-act-hover: #2d2d2d;
     --button-hover: #3c3c3c;
-    --button-active: #007acc;
+    --button-active: #108494;
     --button-fg: #d4d4d4;
     --button-shadow: 0 2px 8px rgba(0,0,0,0.2);
     --row-hover: color(srgb 1 1 1 / 0.02);
@@ -31,7 +31,7 @@
         --button-act-bg: #e7e7e7;
         --button-act-hover: #e7e7e7;
         --button-hover: #d0d0d0;
-        --button-active: #007acc;
+        --button-active: #17a9c1;
         --button-fg: #222;
         --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
         --row-hover: color(srgb 0 0 0 / 0.02);
@@ -52,23 +52,59 @@ body {
     font-family: "Segoe UI", "Fira Code", "Consolas", monospace;
     margin: 0;
     padding: 0.5em 1em;
-    block-size: min(100svh, 100cqh);
-    min-block-size: min(100svh, 100cqh);
-    max-block-size: min(100svh, 100cqh);
+    block-size: 100vh;
+    min-block-size: 100vh;
+    max-block-size: 100vh;
     overflow: hidden;
     box-sizing: border-box;
     container-type: size;
     position: fixed;
     inline-size: 100%;
+    max-inline-size: min(100dvi, 100cqi);
+    display: flex;
+    flex-direction: column;
+    place-content: center;
+    place-items: center;
+
+    justify-content: start;
+    justify-items: start;
+}
+
+body * {
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    -o-user-select: none;
+    user-drag: none;
+    -webkit-user-drag: none;
+    -moz-user-drag: none;
+    -ms-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+    user-drag: none;
+}
+
+@supports (block-size: min(100svh, 100cqh)) {
+    body {
+        block-size: min(100svh, 100cqh);
+        min-block-size: min(100svh, 100cqh);
+        max-block-size: min(100svh, 100cqh);
+    }
+}
+
+@supports (inline-size: max(100%, 100cqi)) {
+    body {
+        inline-size: max(100%, 100cqi);
+    }
 }
 
 table {
     inline-size: 100%;
+
     border-radius: 0.5rem;
     border-collapse: collapse;
     clip-path: inset(0 round 0.5rem);
-    margin-block-start: 3rem;
-    margin-block-end: 0rem;
     overflow-y: auto;
     overflow-x: hidden;
 
@@ -77,33 +113,59 @@ table {
     max-block-size: stretch;
     max-block-size: -webkit-fill-available;
 
-    display: flex;
+    display: grid;
     flex-direction: column;
     box-sizing: border-box;
+    grid-template-columns:
+        [label] minmax(0px, 1fr)
+        [actions] minmax(0px, max-content);
+    grid-auto-flow: row;
+    grid-auto-rows: minmax(0px, max-content);
 
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;/*var(--scrollbar-bg)*/;
     scrollbar-gutter: auto;
+
+    place-content: stretch;
+    place-items: stretch;
+
+    align-content: start;
+    align-items: start;
 }
 
 tr {
+    display: grid;
+    grid-column: label / actions;
+    grid-template-columns:
+        [label] minmax(0px, 1fr)
+        [actions] minmax(0px, max-content);
+    grid-template-rows: minmax(0px, max-content);
+
     transition: background 0.2s;
     max-block-size: max-content;
     block-size: max-content;
     overflow: hidden;
-    display: flex;
     flex-direction: row;
     flex-grow: 1;
     flex-shrink: 0;
     flex-basis: stretch;
-    inline-size: 100%;
+
     place-content: center;
     place-items: center;
+
+    justify-content: start;
+    justify-items: start;
+
+
     padding-inline: 0.5rem;
     box-sizing: border-box;
+
+    inline-size: max(100%, 100cqi);
 }
 
-tr:hover { background: var(--row-hover); }
+tr:hover {
+    background: var(--row-hover);
+}
 
 td {
     padding: 0px;
@@ -122,39 +184,73 @@ td {
     block-size: max-content;
     box-sizing: border-box;
     position: relative;
-}
+    gap: 0.5rem;
 
-td.actions {
-    flex-basis: max-content;
-    inline-size: max-content;
-    flex-shrink: 0;
-    flex-grow: 0;
-    justify-content: end;
-}
-
-td.actions .actions-container {
-    flex-basis: max-content;
-    inline-size: max-content;
-    flex-shrink: 0;
-    flex-grow: 0;
-    justify-content: end;
-    display: flex;
-    flex-direction: row;
-    border-radius: 0.5rem;
-    overflow: hidden;
-    block-size: max-content;
-    clip-path: inset(0px round 0.5rem);
-    position: relative;
+    min-inline-size: fit-content;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
 }
 
 td.name {
-    flex-basis: max-content;
-    inline-size: -webkit-fill-available;
+    grid-column: label;
+    flex: 1 1 auto;
+    min-inline-size: 0;
+    inline-size: 100%;
+
     padding-inline-start: 0.5rem;
     display: flex;
     flex-direction: row;
     overflow: hidden;
     block-size: max-content;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+td.actions {
+    grid-column: actions;
+    justify-content: end;
+    justify-items: end;
+    justify-self: end;
+
+    display: flex;
+    flex-direction: row;
+    flex-basis: max-content;
+    block-size: max-content;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: visible;
+
+    min-inline-size: fit-content;
+    inline-size: fit-content;
+    max-inline-size: -webkit-fill-available;
+    max-inline-size: stretch;
+}
+
+td.actions .actions-container {
+    justify-content: end;
+    justify-items: end;
+    display: flex;
+    flex-direction: row;
+    flex-basis: max-content;
+    overflow: hidden;
+    block-size: max-content;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    min-inline-size: fit-content;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
+
+    box-shadow: var(--button-shadow);
+    border-radius: 0.5rem;
+    clip-path: inset(0 round 0.5rem);
+}
+
+.actions-container {
+    overflow: hidden;
+    box-shadow: var(--button-shadow);
+    border-radius: 0.5rem;
+    clip-path: inset(0 round 0.5rem);
 }
 
 button {
@@ -166,7 +262,6 @@ button {
     font-size: 1em;
     font-family: inherit;
     cursor: pointer;
-    /*box-shadow: var(--button-shadow);*/
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
     aspect-ratio: 1 / 1;
@@ -179,46 +274,36 @@ button {
 
 button:hover {
     background: var(--button-hover);
-    box-shadow: var(--button-shadow);
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
 }
 
 button:active {
     background: var(--button-hover);
-    box-shadow: var(--button-shadow);
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
 }
 
-/*
-td.actions button {
-    background: var(--button-act-bg);
-    color: var(--button-fg);
-    transition: background 0.15s, color 0.15s;
-    outline: none;
-}
-
-td.actions button:hover, td.actions button:active {
-    background: var(--button-act-hover);
-}*/
-
 button:focus, td.actions button:focus {
     padding: calc(0.5rem - 1px);
-    border: 1px solid var(--button-active);;
+    background: var(--button-active);
+    color: var(--button-fg);
+    transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+    outline: none;
 }
 
 .toolbar {
     place-content: center; place-items: center;
     padding: 0.25rem 1rem 0.25rem 1rem;
-    display: flex;
     background: var(--background);
     border-radius: 0.5rem;
     inset-inline-start: 0px;
     inset-block-start: 0px;
-    position: fixed;
+    position: sticky;
     z-index: 2;
-    flex-directon: row;
+    display: grid;
+    grid-template-columns: minmax(0px, 1fr) minmax(0px, max-content);
+    grid-template-rows: minmax(0px, max-content);
     text-align: start;
     justify-content: start;
     block-size: max-content;
@@ -254,8 +339,13 @@ button:last-child, .actions-container button:last-child {
     font-size: 1.1em;
     block-size: max-content;
     overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-block-size: max-content;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
 }
 
 :where(.toolbar, tr):has(button:focus) {
-    border-bottom: 2px solid var(--button-active);
+    background: color-mix(in srgb, var(--button-active) 50%, transparent);
 }

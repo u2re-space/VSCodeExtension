@@ -19519,7 +19519,8 @@ async function getWebviewContent(webview2, extensionUri, modules) {
   const vscodeAPI2 = await api_default;
   const defaultCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "webview.css")) || "";
   const codiconCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css")) || "";
-  return `<html><head><link rel="stylesheet" href="${codiconCSS}"><link rel="stylesheet" href="${defaultCSS}"></head>
+  const actionsJS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "actions.mjs")) || "";
+  let layout = `<html><head><link rel="stylesheet" href="${codiconCSS}"><link rel="stylesheet" href="${defaultCSS}"><script src="${actionsJS}" async defer></script></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
@@ -19529,8 +19530,8 @@ async function getWebviewContent(webview2, extensionUri, modules) {
             </div>
         </div>
         <table>${modules?.map?.((m) => `<tr tabindex="0">
-            <td class="name">${m}</td>
-            <td class="actions">
+            <td class="name" style="display: flex; flex-basis: max-content; inline-size: -webkit-fill-available; inline-size: stretch;">${m}</td>
+            <td class="actions" style="min-inline-size: fit-content; inline-size: fit-content; max-inline-size: -webkit-fill-available; max-inline-size: stretch;">
                 <div class="actions-container">
                 <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
                 <button onclick="send('audit', '${m}')" title="Audit"><i class="codicon codicon-github-action"></i></button>
@@ -19544,98 +19545,10 @@ async function getWebviewContent(webview2, extensionUri, modules) {
                 </div>
             </td>
         </tr>`)?.join?.("")}</table>
-        <script>
-            const vscode = typeof acquireVsCodeApi != "undefined" ? acquireVsCodeApi?.() : null;
-            function send(command, module = "") {
-                vscode?.postMessage?.({ command, module });
-            }
-
-            // --- Keyboard navigation ---
-            const toolbar = document.querySelector('.toolbar');
-            const toolbarButtons = Array.from(toolbar.querySelectorAll('button'));
-            let rows = Array.from(document.querySelectorAll('tr'));
-            let current = 0; // \u0438\u043D\u0434\u0435\u043A\u0441 \u0441\u0442\u0440\u043E\u043A\u0438 \u0442\u0430\u0431\u043B\u0438\u0446\u044B
-            let inToolbar = false;
-            let toolbarBtnIdx = 0;
-
-            function focusToolbar(idx = 0) {
-                inToolbar = true;
-                toolbarBtnIdx = idx;
-                toolbarButtons[toolbarBtnIdx]?.focus?.();
-                rows.forEach(r => r.classList.remove('selected'));
-            }
-
-            function focusRow(idx, e) {
-                inToolbar = false;
-                if (rows[current]) rows[current].classList.remove('selected');
-                current = (idx + rows.length) % rows.length;
-                rows[current]?.classList?.add?.('selected');
-                rows[current]?.focus?.();
-
-                let btns = rows[current]?.querySelectorAll?.('button'), active = document.activeElement;
-                let btx = Array.from(btns).indexOf(active); if (btx < 0) { btx = 0; }
-                if (btx >= 0) btns[btx]?.focus?.(); else if (btns?.length) btns[btns.length - 1]?.focus?.();
-                if (e) e.preventDefault();
-            }
-
-            document.body.addEventListener('keydown', e => {
-                if (inToolbar) {
-                    if (e.key === 'ArrowDown') { focusRow(current + 1, e); }
-                    if (e.key === 'ArrowRight') {
-                        toolbarBtnIdx = (toolbarBtnIdx + 1) % toolbarButtons.length;
-                        toolbarButtons[toolbarBtnIdx]?.focus?.();
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowLeft') {
-                        toolbarBtnIdx = (toolbarBtnIdx - 1 + toolbarButtons.length) % toolbarButtons.length;
-                        toolbarButtons[toolbarBtnIdx]?.focus?.();
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowUp') {
-                        // \u043D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u0434\u0435\u043B\u0430\u0435\u043C, \u0438\u043B\u0438 \u043C\u043E\u0436\u043D\u043E \u0437\u0430\u0446\u0438\u043A\u043B\u0438\u0442\u044C \u043D\u0430 \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u044E\u044E \u0441\u0442\u0440\u043E\u043A\u0443
-                    }
-                    if (e.key === 'Enter') {
-                        toolbarButtons[toolbarBtnIdx]?.click?.();
-                        e.preventDefault();
-                    }
-                } else {
-                    if (e.key === 'ArrowDown') { focusRow(current + 1); e.preventDefault(); }
-                    if (e.key === 'ArrowUp') {
-                        if (current === 0) {
-                            focusToolbar(0);
-                        } else {
-                            focusRow(current - 1);
-                        }
-                        e.preventDefault();
-                    }
-                    if (e.key === 'Enter') {
-                        let btn = document.activeElement.tagName === 'BUTTON'
-                            ? document.activeElement
-                            : rows[current].querySelector('button');
-                        if (btn) btn?.click?.();
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowRight') {
-                        let btns = rows[current].querySelectorAll('button');
-                        let active = document.activeElement;
-                        let idx = Array.from(btns).indexOf(active);
-                        if (idx >= 0 && idx < btns.length - 1) btns[idx + 1]?.focus?.();
-                        else if (btns.length) btns[0]?.focus?.();
-                        e.preventDefault();
-                    }
-                    if (e.key === 'ArrowLeft') {
-                        let btns = rows[current].querySelectorAll('button');
-                        let active = document.activeElement;
-                        let idx = Array.from(btns).indexOf(active);
-                        if (idx > 0) btns[idx - 1]?.focus?.();
-                        else if (btns.length) btns[btns.length - 1]?.focus?.();
-                        e.preventDefault();
-                    }
-                }
-            });
-        </script>
     </body>
 </html>`;
+  layout = layout.replace(/[\s\t]+/g, " ");
+  return layout;
 }
 
 // src/views/manager.ts
