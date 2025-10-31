@@ -30,6 +30,7 @@ export async function getWebviewContent(webview: vscode.Webview, extensionUri: v
                 <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
                 <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
+                <button onclick="send('dev' , '${m}')" title="Dev Serve"><i class="codicon codicon-debug-alt"></i></button>
                 <button onclick="send('test' , '${m}')" title="Test"><i class="codicon codicon-beaker"></i></button>
                 <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
                 <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
