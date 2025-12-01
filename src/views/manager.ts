@@ -86,12 +86,14 @@ async function findProjectDirs(
                 if (name === "package.json") {hasPkg = true;}
             }
         }
+
         // Если есть .git или package.json, добавляем путь
         if (hasGit || hasPkg) {
             result.push(relPath || "./");
         }
+
         // Рекурсивно обходим подпапки (кроме node_modules и скрытых)
-        for (const [name, type] of entries) {
+        const subresults = [...entries]?.map?.(([name, type])=>{
             if (
                 type === vscodeAPI.FileType.Directory &&
                 name !== "node_modules" &&
@@ -99,14 +101,18 @@ async function findProjectDirs(
             ) {
                 const subDir = vscodeAPI.Uri.joinPath(baseDir, name);
                 const subRelPath = relPath ? `${relPath}/${name}` : name;
-                const subResult = await findProjectDirs(vscodeAPI, subDir, subRelPath);
-                result.push(...subResult);
+                return findProjectDirs(vscodeAPI, subDir, subRelPath);
             }
-        }
+        })?.flat?.()?.filter?.((e: any)=>!!e) ?? [];
+
+        //
+        result.push(...((await Promise.all(subresults?.flat?.() ?? []))?.flat?.() ?? []) as string[]);
     } catch (e) {
         // ignore
     }
-    return result;
+
+    //
+    return result?.sort?.((a, b) => a?.localeCompare?.(b) ?? 0) ?? [];
 }
 
 // Новый getDirs
@@ -177,19 +183,22 @@ export class ManagerViewProvider {
                             ], plNormalize(mUri?.path || mUri?.fsPath));
                         }
                     }; break;
-                    case 'bulk_build':
-                        for (const m of modules) {
-                            const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
-                            runInTerminal(['npm run build'], plNormalize(mUri?.path || mUri?.fsPath));
-                        }
-                        break;
-                    case 'terminal': runInTerminal([''], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
-                    case 'audit': runInTerminal(['npm install -D', 'npm audit fix'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
+                    case 'bulk_install':
+                        for (const m of modules) { const mUri = vscodeAPI.Uri.joinPath(wsdUri, m); runInTerminal(['git pull --rebase --ff', 'npm install -D', 'npm audit fix'], plNormalize(mUri?.path || mUri?.fsPath)); } break;
+                    case 'bulk_build': for (const m of modules) { const mUri = vscodeAPI.Uri.joinPath(wsdUri, m); runInTerminal(['npm run build'], plNormalize(mUri?.path || mUri?.fsPath)); } break;
+                    case 'open-dir': vscodeAPI?.commands?.executeCommand?.('vscode.openFolder', moduleUri); break;
+                    case 'terminal': runInTerminal([''], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'build': runInTerminal(['npm run build'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
                     case 'watch': runInTerminal(['npm run watch'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'dev' : runInTerminal(['npm run dev'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
                     case 'diff': runInTerminal(['git diff'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
+                    case 'install': runInTerminal([
+                        'git pull --rebase --ff',
+                        'git submodule update --init --recursive --remote --merge',
+                        'npm install -D',
+                        'npm audit fix'
+                    ], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
                     case 'push': {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '', default: 'No Description' });
                         if (!commitMsg) { return; }
@@ -201,7 +210,6 @@ export class ManagerViewProvider {
                             'git push --all'
                         ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
                     }; break;
-                    case 'open-dir': vscodeAPI?.commands?.executeCommand?.('vscode.openFolder', moduleUri); break;
                 }
             });
         } catch(e) { console.warn(e); }}

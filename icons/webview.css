@@ -66,12 +66,14 @@ body {
     place-content: center;
     place-items: center;
 
+    font-display: swap;
     justify-content: start;
     justify-items: start;
     gap: 0.25rem;
 }
 
 body, body * {
+    font-display: swap;
     user-select: none;
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -133,6 +135,9 @@ table {
 
     align-content: start;
     align-items: start;
+
+    content-visibility: auto;
+    contain-intrinsic-size: 100% 100%;
 }
 
 tr {

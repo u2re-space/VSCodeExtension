@@ -19520,12 +19520,16 @@ async function getWebviewContent(webview2, extensionUri, modules) {
   const defaultCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "webview.css")) || "";
   const codiconCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css")) || "";
   const actionsJS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "actions.mjs")) || "";
-  let layout = `<html><head><link rel="stylesheet" href="${codiconCSS}"><link rel="stylesheet" href="${defaultCSS}"><script src="${actionsJS}" async defer></script></head>
+  let layout = `<html><head>
+    <link rel="stylesheet" href="${codiconCSS}" rel="stylesheet">
+    <link rel="stylesheet" href="${defaultCSS}" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <script src="${actionsJS}" async defer></script></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
             <div class="toolbar-actions">
                 <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
+                <button onclick="send('bulk_install', '')" title="Install all"><i class='codicon codicon-cloud-download'></i></button>
                 <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
             </div>
         </div>
@@ -19534,14 +19538,14 @@ async function getWebviewContent(webview2, extensionUri, modules) {
             <td class="actions" style="min-inline-size: fit-content; inline-size: fit-content; max-inline-size: -webkit-fill-available; max-inline-size: stretch;">
                 <div class="actions-container">
                 <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
-                <button onclick="send('audit', '${m}')" title="Audit"><i class="codicon codicon-github-action"></i></button>
+                <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
+                <button onclick="send('dev' , '${m}')" title="Dev Serve"><i class="codicon codicon-debug-alt"></i></button>
+                <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
+                <button onclick="send('test' , '${m}')" title="Test"><i class="codicon codicon-beaker"></i></button>
                 <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
                 <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
-                <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
-                <button onclick="send('dev' , '${m}')" title="Dev Serve"><i class="codicon codicon-debug-alt"></i></button>
-                <button onclick="send('test' , '${m}')" title="Test"><i class="codicon codicon-beaker"></i></button>
                 <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
-                <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
+                <button onclick="send('install', '${m}')" title="Install"><i class="codicon codicon-cloud-download"></i></button>
                 <button onclick="send('push' , '${m}')" title="Git push"><i class="codicon codicon-cloud-upload"></i></button>
                 </div>
             </td>
@@ -19607,17 +19611,17 @@ async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
     if (hasGit || hasPkg) {
       result.push(relPath || "./");
     }
-    for (const [name, type] of entries) {
+    const subresults = [...entries]?.map?.(([name, type]) => {
       if (type === vscodeAPI2.FileType.Directory && name !== "node_modules" && !name.startsWith(".")) {
         const subDir = vscodeAPI2.Uri.joinPath(baseDir, name);
         const subRelPath = relPath ? `${relPath}/${name}` : name;
-        const subResult = await findProjectDirs(vscodeAPI2, subDir, subRelPath);
-        result.push(...subResult);
+        return findProjectDirs(vscodeAPI2, subDir, subRelPath);
       }
-    }
+    })?.flat?.()?.filter?.((e) => !!e) ?? [];
+    result.push(...(await Promise.all(subresults?.flat?.() ?? []))?.flat?.() ?? []);
   } catch (e) {
   }
-  return result;
+  return result?.sort?.((a, b) => a?.localeCompare?.(b) ?? 0) ?? [];
 }
 var getDirs = async (context) => {
   const vscodeAPI2 = await initVscodeAPI();
@@ -19692,17 +19696,23 @@ var ManagerViewProvider = class {
               }
               ;
               break;
+            case "bulk_install":
+              for (const m of modules) {
+                const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
+                runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.path || mUri?.fsPath));
+              }
+              break;
             case "bulk_build":
               for (const m of modules) {
                 const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
                 runInTerminal(["npm run build"], plNormalize(mUri?.path || mUri?.fsPath));
               }
               break;
-            case "terminal":
-              runInTerminal([""], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+            case "open-dir":
+              vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
               break;
-            case "audit":
-              runInTerminal(["npm install -D", "npm audit fix"], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+            case "terminal":
+              runInTerminal([""], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
               break;
             case "build":
               runInTerminal(["npm run build"], plNormalize(moduleUri?.path || moduleUri?.fsPath));
@@ -19718,6 +19728,14 @@ var ManagerViewProvider = class {
               break;
             case "diff":
               runInTerminal(["git diff"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              break;
+            case "install":
+              runInTerminal([
+                "git pull --rebase --ff",
+                "git submodule update --init --recursive --remote --merge",
+                "npm install -D",
+                "npm audit fix"
+              ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               break;
             case "push":
               {
@@ -19735,9 +19753,6 @@ var ManagerViewProvider = class {
                 ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
               }
               ;
-              break;
-            case "open-dir":
-              vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
               break;
           }
         });
