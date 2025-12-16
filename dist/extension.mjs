@@ -19604,6 +19604,7 @@ function getEmbedHtml(webview2) {
 }
 var CustomSidebarViewProvider = class {
   static viewType = "vext.gptView";
+  static panelViewType = "vext.gptPanelView";
   _extensionUri;
   _view;
   constructor(extensionUri) {
@@ -19635,8 +19636,10 @@ var CustomSidebarViewProvider = class {
 };
 async function webview(context) {
   const vscode2 = await api_default;
-  const provider = new CustomSidebarViewProvider(context.extensionUri);
-  context.subscriptions.push(vscode2.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, provider));
+  const providerSidebar = new CustomSidebarViewProvider(context.extensionUri);
+  const providerPanel = new CustomSidebarViewProvider(context.extensionUri);
+  context.subscriptions.push(vscode2.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, providerSidebar));
+  context.subscriptions.push(vscode2.window.registerWebviewViewProvider(CustomSidebarViewProvider.panelViewType, providerPanel));
   context.subscriptions.push(vscode2.commands.registerCommand("vext.openWebview", function() {
     const panel = vscode2.window.createWebviewPanel(
       "vext.gptView",
@@ -19649,72 +19652,72 @@ async function webview(context) {
 }
 
 // src/views/webview.ts
-async function getWebviewContent(webview2, extensionUri) {
+var appendVersion = (u, version3) => {
+  const sep = u.includes("?") ? "&" : "?";
+  return `${u}${sep}v=${encodeURIComponent(version3)}`;
+};
+var nonce32 = () => {
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let text3 = "";
+  for (let i = 0; i < 32; i++) {
+    text3 += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text3;
+};
+async function getWebviewContent(webview2, extensionUri, opts) {
   const vscodeAPI2 = await api_default;
-  const defaultCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "webview.css")) || "";
-  const codiconCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css")) || "";
-  const actionsJS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "actions.mjs")) || "";
-  const nonce = (() => {
-    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let text3 = "";
-    for (let i = 0; i < 32; i++) {
-      text3 += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text3;
-  })();
+  const nonce = nonce32();
+  const codiconCSS = appendVersion(
+    String(webview2.asWebviewUri(vscodeAPI2.Uri.joinPath(extensionUri, "icons", "codicon.css"))),
+    opts.version
+  );
+  const webviewCSS = appendVersion(
+    String(webview2.asWebviewUri(vscodeAPI2.Uri.joinPath(extensionUri, "icons", "webview.css"))),
+    opts.version
+  );
+  const actionsJS = appendVersion(
+    String(webview2.asWebviewUri(vscodeAPI2.Uri.joinPath(extensionUri, "icons", "actions.mjs"))),
+    opts.version
+  );
   const csp = [
     `default-src 'none'`,
-    `img-src ${webview2.cspSource} data:`,
-    `style-src ${webview2.cspSource} 'unsafe-inline'`,
-    `font-src ${webview2.cspSource}`,
-    // Use nonce-based CSP for maximum compatibility (incl. Remote-SSH).
-    // Keep `${webview.cspSource}` so external scripts loaded via asWebviewUri work.
+    `img-src ${webview2.cspSource} data: https:`,
+    `style-src ${webview2.cspSource}`,
+    `font-src ${webview2.cspSource} data:`,
     `script-src ${webview2.cspSource} 'nonce-${nonce}'`
   ].join("; ");
-  let layout = `<!DOCTYPE html><html><head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="${csp}">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="${codiconCSS}">
-    <link rel="stylesheet" href="${defaultCSS}">
-    <script nonce="${nonce}">
-      // acquireVsCodeApi() can only be called once. Cache it globally for other scripts.
-      let vscode = null;
-      try {
-        // @ts-ignore
-        vscode = globalThis.__vscodeApi || (typeof acquireVsCodeApi !== 'undefined' ? acquireVsCodeApi() : null);
-        // @ts-ignore
-        if (vscode) globalThis.__vscodeApi = vscode;
-      } catch {}
-      window.addEventListener('error', (e) => {
-        try { vscode?.postMessage?.({ type: 'webviewError', message: e?.message, filename: e?.filename, lineno: e?.lineno, colno: e?.colno, stack: e?.error?.stack }); } catch {}
-      });
-      window.addEventListener('unhandledrejection', (e) => {
-        try { vscode?.postMessage?.({ type: 'webviewError', message: 'unhandledrejection', reason: String(e?.reason ?? '') }); } catch {}
-      });
-    </script>
-    <script nonce="${nonce}" src="${actionsJS}" type="module"></script></head>
-    <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
-        <div class="toolbar" tabindex="0">
-            <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
-            <div class="toolbar-actions">
-                <button data-command="bulk_build" title="Build all"><i class='codicon codicon-package'></i></button>
-                <button data-command="bulk_install" title="Install all"><i class='codicon codicon-cloud-download'></i></button>
-                <button data-command="bulk_push" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
-            </div>
-        </div>
-        <table id="modulesTable" aria-label="Modules"><tbody id="modulesTbody">
-            <tr tabindex="0" data-module="./">
-                <td class="name" style="display:flex;flex-basis:max-content;inline-size:-webkit-fill-available;inline-size:stretch;">Loading\u2026</td>
-                <td class="actions" style="min-inline-size:fit-content;inline-size:fit-content;max-inline-size:-webkit-fill-available;max-inline-size:stretch;">
-                    <div class="actions-container"></div>
-                </td>
-            </tr>
-        </tbody></table>
-    </body>
+  return `<!doctype html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="vext-instance" content="${opts.instanceId}" />
+  <meta name="vext-viewType" content="${opts.viewType}" />
+  <meta name="vext-version" content="${opts.version}" />
+  <link rel="stylesheet" href="${codiconCSS}" />
+  <link rel="stylesheet" href="${webviewCSS}" />
+</head>
+<body>
+  <div class="toolbar" tabindex="0">
+    <span class="toolbar-label">Bulk actions:</span>
+    <div class="toolbar-actions">
+      <button data-command="bulk_build" title="Build all"><i class="codicon codicon-package"></i></button>
+      <button data-command="bulk_install" title="Install all"><i class="codicon codicon-cloud-download"></i></button>
+      <button data-command="bulk_push" title="Git add/commit/push all"><i class="codicon codicon-cloud-upload"></i></button>
+    </div>
+  </div>
+  <table id="modulesTable" aria-label="Modules">
+    <tbody id="modulesTbody">
+      <tr tabindex="0" data-module="./">
+        <td class="name">Loading\u2026</td>
+        <td class="actions"><div class="actions-container"></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <script nonce="${nonce}" type="module" src="${actionsJS}"></script>
+</body>
 </html>`;
-  layout = layout.replace(/[\s\t]+/g, " ");
-  return layout;
 }
 
 // src/views/manager.ts
@@ -19826,20 +19829,35 @@ async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
   }
   return result?.sort?.((a, b) => a?.localeCompare?.(b) ?? 0) ?? [];
 }
-var getDirs = async (context) => {
+var getDirs = async (extContext, force = false) => {
   const vscodeAPI2 = await initVscodeAPI();
   const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-  if (!context || !wsdUri) {
+  if (!extContext || !wsdUri) {
     return ["./"];
   }
-  let modules = ctxMap.get(context) ?? [];
-  ctxMap.set(context, modules);
+  const now = Date.now();
+  let cache = ctxMap.get(extContext);
+  if (!cache) {
+    cache = { modules: ["./"], lastScanMs: 0 };
+    ctxMap.set(extContext, cache);
+  }
+  const TTL_MS = 5e3;
+  if (!force && cache.modules?.length && now - cache.lastScanMs < TTL_MS) {
+    return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules || []]));
+  }
+  if (!force && cache.inflight) {
+    const mods = await cache.inflight.catch(() => cache?.modules || ["./"]);
+    return Array.from(/* @__PURE__ */ new Set(["./", ...mods || []]));
+  }
   try {
-    modules = await findProjectDirs(vscodeAPI2, wsdUri, "");
+    cache.inflight = findProjectDirs(vscodeAPI2, wsdUri, "");
+    const modules = await cache.inflight;
+    cache.modules = modules?.length ? modules : ["./"];
+    cache.lastScanMs = Date.now();
   } catch (e) {
   }
-  modules = modules?.length ? modules : ["./"];
-  return Array.from(/* @__PURE__ */ new Set(["./", ...modules]));
+  cache.inflight = void 0;
+  return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules || ["./"]]));
 };
 var plNormalize = (m) => {
   if (/^\/[a-zA-Z]:\//.test(m)) {
@@ -19849,43 +19867,53 @@ var plNormalize = (m) => {
 };
 var ManagerViewProvider = class {
   _extensionUri;
+  _viewType;
+  _extContext;
   static viewType = "vext.managerView";
-  constructor(extensionUri) {
+  static panelViewType = "vext.managerPanelView";
+  constructor(extContext, extensionUri, viewType) {
+    this._extContext = extContext;
     this._extensionUri = extensionUri;
+    this._viewType = viewType;
   }
   //
   async updateView(webviewView, context, modules) {
-    modules ??= await getDirs(context) || ["./"];
+    modules ??= await getDirs(this._extContext) || ["./"];
     webviewView?.webview?.postMessage?.({ type: "modules", modules });
   }
   //
-  async resolveWebviewView(webviewView, context, token) {
+  async resolveWebviewView(webviewView, _resolveContext, token) {
     const vscodeAPI2 = await initVscodeAPI();
-    const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-    let modules = ctxMap.get(context) ?? ["./"];
-    const refreshModules = async () => {
+    const extVersion = String(this._extContext?.extension?.packageJSON?.version ?? "0.0.0");
+    const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
+    const refreshModules = async (force = false) => {
       try {
-        const mods = await getDirs(context) || ["./"];
-        await this.updateView(webviewView, context, mods);
+        const mods = await getDirs(this._extContext, force) || ["./"];
+        await this.updateView(webviewView, _resolveContext, mods);
       } catch (e) {
         console.warn(e);
       }
     };
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
-    try {
-      webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri);
-    } catch (e) {
+    const html2 = await getWebviewContent(webviewView.webview, this._extensionUri, {
+      instanceId,
+      viewType: this._viewType,
+      version: extVersion
+    }).catch((e) => {
       console.warn(e);
+      return "";
+    });
+    if (html2) {
+      webviewView.webview.html = html2;
     }
-    ;
-    try {
-      await this.updateView(webviewView, context, modules?.length ? modules : ["./"]);
-    } catch (e) {
-      console.warn(e);
-    }
-    ;
-    Promise.resolve().then(refreshModules);
-    inWatch?.add?.(() => refreshModules());
+    const watchCb = () => refreshModules(true);
+    inWatch?.add?.(watchCb);
+    webviewView?.onDidDispose?.(() => inWatch?.delete?.(watchCb));
+    webviewView?.onDidChangeVisibility?.(() => {
+      if (webviewView?.visible) {
+        refreshModules(false);
+      }
+    });
     if (true) {
       try {
         webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
@@ -19896,14 +19924,15 @@ var ManagerViewProvider = class {
             return;
           }
           if (message?.command === "ready") {
-            return refreshModules();
+            return refreshModules(false);
           }
+          const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
           if (!wsdUri) {
             vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
             return;
           }
           const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
-          modules = await getDirs(context) || ["./"];
+          const modules = await getDirs(this._extContext, false) || ["./"];
           switch (message.command) {
             case "bulk_push":
               {
@@ -19993,10 +20022,141 @@ var ManagerViewProvider = class {
 };
 async function manager(context) {
   const vscodeAPI2 = await initVscodeAPI();
-  const provider = new ManagerViewProvider(context?.extensionUri);
-  const prov = vscodeAPI2?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, provider);
-  if (prov) {
-    context?.subscriptions?.push?.(prov);
+  const providerSidebar = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.viewType);
+  const providerPanel = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.panelViewType);
+  const prov1 = vscodeAPI2?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, providerSidebar);
+  const prov2 = vscodeAPI2?.window?.registerWebviewViewProvider?.(ManagerViewProvider.panelViewType, providerPanel);
+  if (prov1) {
+    context?.subscriptions?.push?.(prov1);
+  }
+  if (prov2) {
+    context?.subscriptions?.push?.(prov2);
+  }
+  const openPanelCmd = vscodeAPI2?.commands?.registerCommand?.("vext.openManagerPanel", async () => {
+    const extVersion = String(context?.extension?.packageJSON?.version ?? "0.0.0");
+    const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
+    const panel = vscodeAPI2.window.createWebviewPanel(
+      "vext.managerPanel",
+      `Manager (${extVersion})`,
+      vscodeAPI2.ViewColumn.One,
+      { enableScripts: true, localResourceRoots: [context.extensionUri] }
+    );
+    panel.webview.html = await getWebviewContent(panel.webview, context.extensionUri, {
+      instanceId,
+      viewType: "vext.managerPanel",
+      version: extVersion
+    });
+    const refreshModules = async (force = false) => {
+      try {
+        const mods = await getDirs(context, force);
+        panel?.webview?.postMessage?.({ type: "modules", modules: mods });
+      } catch (e) {
+        console.warn(e);
+      }
+    };
+    const watchCb = () => refreshModules(true);
+    inWatch.add(watchCb);
+    panel.onDidDispose(() => inWatch.delete(watchCb));
+    refreshModules(false);
+    panel.webview.onDidReceiveMessage(async (message) => {
+      if (message?.type === "webviewError") {
+        console.warn("[vext.managerPanel:webviewError]", message);
+        const msg = message?.message ? String(message.message) : "Webview error";
+        vscodeAPI2?.window?.showWarningMessage?.(`Manager Panel webview error: ${msg}`);
+        return;
+      }
+      if (message?.command === "ready") {
+        return refreshModules(false);
+      }
+      const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
+      if (!wsdUri) {
+        vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
+        return;
+      }
+      const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
+      const modules = await getDirs(context, false);
+      switch (message.command) {
+        case "bulk_push":
+          {
+            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "", default: "No Description" });
+            if (!commitMsg) {
+              return;
+            }
+            for (const m of modules) {
+              const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+              runInTerminal([
+                "git rm -r --cached .",
+                "git add .",
+                "git add *",
+                `git commit -m "${commitMsg}"`,
+                "git pull --rebase --ff",
+                "git push --all"
+              ], plNormalize(mUri?.fsPath || mUri?.path));
+            }
+          }
+          break;
+        case "bulk_install":
+          for (const m of modules) {
+            const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+            runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.fsPath || mUri?.path));
+          }
+          break;
+        case "bulk_build":
+          for (const m of modules) {
+            const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+            runInTerminal(["npm run build"], plNormalize(mUri?.fsPath || mUri?.path));
+          }
+          break;
+        case "open-dir":
+          vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
+          break;
+        case "terminal":
+          runInTerminal([""], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
+          break;
+        case "build":
+          runInTerminal(["npm run build"], plNormalize(moduleUri?.fsPath || moduleUri?.path));
+          break;
+        case "watch":
+          runInTerminal(["npm run watch"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
+          break;
+        case "dev":
+          runInTerminal(["npm run dev"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
+          break;
+        case "test":
+          runInTerminal(["npm run test"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
+          break;
+        case "diff":
+          runInTerminal(["git diff"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
+          break;
+        case "install":
+          runInTerminal([
+            "git pull --rebase --ff",
+            "git submodule update --init --recursive --remote --merge",
+            "npm install -D",
+            "npm audit fix"
+          ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
+          break;
+        case "push":
+          {
+            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "", default: "No Description" });
+            if (!commitMsg) {
+              return;
+            }
+            runInTerminal([
+              "git rm -r --cached .",
+              "git add .",
+              "git add *",
+              `git commit -m "${commitMsg}"`,
+              "git pull --rebase --ff",
+              "git push --all"
+            ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
+          }
+          break;
+      }
+    });
+  });
+  if (openPanelCmd) {
+    context?.subscriptions?.push?.(openPanelCmd);
   }
 }
 var terminalMap = /* @__PURE__ */ new Map();

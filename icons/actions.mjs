@@ -16,6 +16,29 @@ const vscode = (() => {
     return null;
 })();
 
+const meta = (name) => {
+    const el = document.querySelector(`meta[name="${name}"]`);
+    // @ts-ignore
+    return el?.content || "";
+};
+const INSTANCE_ID = meta("vext-instance");
+const VIEW_TYPE = meta("vext-viewType");
+const VERSION = meta("vext-version");
+
+const report = (payload) => {
+    try {
+        vscode?.postMessage?.({ type: "webviewError", instanceId: INSTANCE_ID, viewType: VIEW_TYPE, version: VERSION, ...payload });
+    } catch {}
+};
+
+// Hardening: surface any runtime issues in Extension Host logs
+window.addEventListener("error", (e) => {
+    report({ message: e?.message, filename: e?.filename, lineno: e?.lineno, colno: e?.colno, stack: e?.error?.stack });
+});
+window.addEventListener("unhandledrejection", (e) => {
+    report({ message: "unhandledrejection", reason: String(e?.reason ?? "") });
+});
+
 //
 function renderModules(modules = []) {
     const tbody = document.getElementById('modulesTbody');
@@ -51,18 +74,10 @@ function renderModules(modules = []) {
 
         const tdName = document.createElement('td');
         tdName.className = 'name';
-        tdName.style.display = 'flex';
-        tdName.style.flexBasis = 'max-content';
-        tdName.style.inlineSize = '-webkit-fill-available';
-        tdName.style.inlineSize = 'stretch';
         tdName.textContent = m;
 
         const tdActions = document.createElement('td');
         tdActions.className = 'actions';
-        tdActions.style.minInlineSize = 'fit-content';
-        tdActions.style.inlineSize = 'fit-content';
-        tdActions.style.maxInlineSize = '-webkit-fill-available';
-        tdActions.style.maxInlineSize = 'stretch';
 
         const wrap = document.createElement('div');
         wrap.className = 'actions-container';
@@ -89,8 +104,8 @@ function renderModules(modules = []) {
 }
 
 // --- Keyboard navigation ---
-const toolbar = document.querySelector('.toolbar');
-const toolbarButtons = Array.from(toolbar?.querySelectorAll?.('button')||[]);
+let toolbar = null;
+let toolbarButtons = [];
 
 //
 let rows = Array.from(document.querySelectorAll('tr'));
@@ -100,7 +115,7 @@ let toolbarBtnIdx = 0;
 
 //
 function send(command, module = "") {
-    vscode?.postMessage?.({ command, module });
+    vscode?.postMessage?.({ command, module, instanceId: INSTANCE_ID, viewType: VIEW_TYPE, version: VERSION });
 }
 
 //
@@ -206,5 +221,9 @@ window.addEventListener('message', (event) => {
 
 //
 window.addEventListener('DOMContentLoaded', () => {
+    toolbar = document.querySelector('.toolbar');
+    toolbarButtons = Array.from(toolbar?.querySelectorAll?.('button') || []);
+    rows = Array.from(document.querySelectorAll('tr'));
+
     send('ready', '');
 });

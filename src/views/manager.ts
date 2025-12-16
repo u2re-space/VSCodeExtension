@@ -11,7 +11,13 @@ const inWatch = new Set<any>([]);
 
 // Initialize vscode API asynchronously
 let vscodeAPI: any = null;
-let ctxMap = new WeakMap();
+
+type ModulesCache = {
+    modules: string[];
+    lastScanMs: number;
+    inflight?: Promise<string[]>;
+};
+const ctxMap = new WeakMap<vscode.ExtensionContext, ModulesCache>();
 
 /**
  * `vscode.Uri.joinPath(base, segment)` treats each argument as a single path segment.
@@ -153,21 +159,40 @@ async function findProjectDirs(
     return result?.sort?.((a, b) => a?.localeCompare?.(b) ?? 0) ?? [];
 }
 
-// Новый getDirs
-const getDirs = async (context) => {
+// Новый getDirs (cached per ExtensionContext)
+const getDirs = async (extContext: vscode.ExtensionContext, force = false) => {
     const vscodeAPI = await initVscodeAPI();
     const wsdUri: vscode.Uri | undefined = await getWorkspaceFolder(vscodeAPI?.workspace);
-    if (!context || !wsdUri) { return ["./"]; }
-    let modules: string[] = ctxMap.get(context) ?? [];
-    ctxMap.set(context, modules);
+    if (!extContext || !wsdUri) { return ["./"]; }
+
+    const now = Date.now();
+    let cache = ctxMap.get(extContext);
+    if (!cache) {
+        cache = { modules: ["./"], lastScanMs: 0 };
+        ctxMap.set(extContext, cache);
+    }
+
+    // Avoid rescanning on every focus/visibility/ready event
+    const TTL_MS = 5000;
+    if (!force && cache.modules?.length && (now - cache.lastScanMs) < TTL_MS) {
+        return Array.from(new Set(["./", ...(cache.modules || [])]));
+    }
+
+    if (!force && cache.inflight) {
+        const mods = await cache.inflight.catch(() => cache?.modules || ["./"]);
+        return Array.from(new Set(["./", ...(mods || [])]));
+    }
 
     try {
-        modules = await findProjectDirs(vscodeAPI, wsdUri, "");
+        cache.inflight = findProjectDirs(vscodeAPI, wsdUri, "");
+        const modules = await cache.inflight;
+        cache.modules = modules?.length ? modules : ["./"];
+        cache.lastScanMs = Date.now();
     } catch (e) { /* ignore */ }
+    cache.inflight = undefined;
 
-    modules = modules?.length ? modules : ["./"];
     // Always include ./ first
-    return Array.from(new Set(["./", ...modules]));
+    return Array.from(new Set(["./", ...(cache.modules || ["./"])]));
 };
 
 //
@@ -180,37 +205,48 @@ const plNormalize = (m)=>{
 
 //
 export class ManagerViewProvider {
-    _extensionUri: any; static viewType = "vext.managerView";
-    constructor(extensionUri) { this._extensionUri = extensionUri; }
+    _extensionUri: any; _viewType: string; _extContext: vscode.ExtensionContext;
+    static viewType = "vext.managerView";
+    static panelViewType = "vext.managerPanelView";
+    constructor(extContext: vscode.ExtensionContext, extensionUri, viewType: string) {
+        this._extContext = extContext;
+        this._extensionUri = extensionUri;
+        this._viewType = viewType;
+    }
 
     //
     async updateView(webviewView, context, modules?) {
-        modules ??= (await getDirs(context)) || ["./"];
+        modules ??= (await getDirs(this._extContext)) || ["./"];
         // async update: avoid resetting html (loses focus) once webview is loaded
         webviewView?.webview?.postMessage?.({ type: 'modules', modules });
     }
 
     //
-    async resolveWebviewView(webviewView, context, token) {
+    async resolveWebviewView(webviewView, _resolveContext, token) {
         const vscodeAPI = await initVscodeAPI();
-        const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
-        let modules = ctxMap.get(context) ?? ["./"];
+        const extVersion = String(this._extContext?.extension?.packageJSON?.version ?? "0.0.0");
+        const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
 
-        const refreshModules = async ()=>{
+        const refreshModules = async (force = false)=>{
             try {
-                const mods = await getDirs(context) || ["./"];
-                await this.updateView(webviewView, context, mods);
+                const mods = await getDirs(this._extContext, force) || ["./"];
+                await this.updateView(webviewView, _resolveContext, mods);
             } catch (e) { console.warn(e); }
         };
 
         //
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
-        try { webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri); } catch(e) { console.warn(e); };
-        // Always show something immediately, even on slow remote FS
-        try { await this.updateView(webviewView, context, modules?.length ? modules : ["./"]); } catch(e) { console.warn(e); };
-        // Refresh asynchronously (so SSH/remote doesn't appear "stuck")
-        Promise.resolve().then(refreshModules);
-        inWatch?.add?.(()=>refreshModules());
+        const html = await getWebviewContent(webviewView.webview, this._extensionUri, {
+            instanceId,
+            viewType: this._viewType,
+            version: extVersion
+        }).catch((e)=>{ console.warn(e); return ""; });
+        if (html) {webviewView.webview.html = html;}
+
+        const watchCb = ()=>refreshModules(true);
+        inWatch?.add?.(watchCb);
+        webviewView?.onDidDispose?.(() => inWatch?.delete?.(watchCb));
+        webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) {refreshModules(false);} });
 
         //
         if (true) { try {
@@ -226,17 +262,18 @@ export class ManagerViewProvider {
 
                 // Handle initial handshake first (before touching wsdUri / joinPath)
                 if (message?.command === 'ready') {
-                    return refreshModules();
+                    return refreshModules(false);
                 }
 
                 // For all other actions, we need a workspace folder
+                const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
                 if (!wsdUri) {
                     vscodeAPI?.window?.showWarningMessage?.('No workspace folder found. Open a folder/workspace first.');
                     return;
                 }
 
                 const moduleUri = joinModuleUri(vscodeAPI, wsdUri, message.module);
-                modules = await getDirs(context) || ["./"];
+                const modules = await getDirs(this._extContext, false) || ["./"];
 
                 //
                 switch (message.command) {
@@ -290,9 +327,109 @@ export class ManagerViewProvider {
 //
 export async function manager(context: vscode.ExtensionContext) {
     const vscodeAPI = await initVscodeAPI();
-    const provider = new ManagerViewProvider(context?.extensionUri);
-    const prov = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, provider);
-    if (prov) { context?.subscriptions?.push?.(prov); }
+    const providerSidebar = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.viewType);
+    const providerPanel = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.panelViewType);
+    const prov1 = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, providerSidebar);
+    const prov2 = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.panelViewType, providerPanel);
+    if (prov1) { context?.subscriptions?.push?.(prov1); }
+    if (prov2) { context?.subscriptions?.push?.(prov2); }
+
+    // Multi-instance support: open Manager as a standalone WebviewPanel (can open many)
+    const openPanelCmd = vscodeAPI?.commands?.registerCommand?.("vext.openManagerPanel", async () => {
+        const extVersion = String(context?.extension?.packageJSON?.version ?? "0.0.0");
+        const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
+        const panel = vscodeAPI.window.createWebviewPanel(
+            "vext.managerPanel",
+            `Manager (${extVersion})`,
+            vscodeAPI.ViewColumn.One,
+            { enableScripts: true, localResourceRoots: [context.extensionUri] }
+        );
+        panel.webview.html = await getWebviewContent(panel.webview, context.extensionUri, {
+            instanceId,
+            viewType: "vext.managerPanel",
+            version: extVersion
+        });
+
+        // Bind the same message handler behavior as the view
+        const refreshModules = async (force = false) => {
+            try {
+                const mods = await getDirs(context, force);
+                panel?.webview?.postMessage?.({ type: "modules", modules: mods });
+            } catch (e) { console.warn(e); }
+        };
+        const watchCb = () => refreshModules(true);
+        inWatch.add(watchCb);
+        panel.onDidDispose(() => inWatch.delete(watchCb));
+        refreshModules(false);
+
+        panel.webview.onDidReceiveMessage(async (message) => {
+            if (message?.type === "webviewError") {
+                console.warn("[vext.managerPanel:webviewError]", message);
+                const msg = message?.message ? String(message.message) : "Webview error";
+                vscodeAPI?.window?.showWarningMessage?.(`Manager Panel webview error: ${msg}`);
+                return;
+            }
+            if (message?.command === "ready") {return refreshModules(false);}
+
+            const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
+            if (!wsdUri) {
+                vscodeAPI?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
+                return;
+            }
+
+            const moduleUri = joinModuleUri(vscodeAPI, wsdUri, message.module);
+            const modules = await getDirs(context, false);
+            switch (message.command) {
+                case "bulk_push": {
+                    const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "", default: "No Description" });
+                    if (!commitMsg) {return;}
+                    for (const m of modules) {
+                        const mUri = joinModuleUri(vscodeAPI, wsdUri, m);
+                        runInTerminal([
+                            "git rm -r --cached .",
+                            "git add .", "git add *",
+                            `git commit -m "${commitMsg}"`,
+                            "git pull --rebase --ff",
+                            "git push --all"
+                        ], plNormalize(mUri?.fsPath || mUri?.path));
+                    }
+                } break;
+                case "bulk_install":
+                    for (const m of modules) { const mUri = joinModuleUri(vscodeAPI, wsdUri, m); runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.fsPath || mUri?.path)); }
+                    break;
+                case "bulk_build":
+                    for (const m of modules) { const mUri = joinModuleUri(vscodeAPI, wsdUri, m); runInTerminal(["npm run build"], plNormalize(mUri?.fsPath || mUri?.path)); }
+                    break;
+                case "open-dir": vscodeAPI?.commands?.executeCommand?.("vscode.openFolder", moduleUri); break;
+                case "terminal": runInTerminal([""], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                case "build": runInTerminal(["npm run build"], plNormalize(moduleUri?.fsPath || moduleUri?.path)); break;
+                case "watch": runInTerminal(["npm run watch"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                case "dev": runInTerminal(["npm run dev"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                case "test": runInTerminal(["npm run test"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                case "diff": runInTerminal(["git diff"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                case "install":
+                    runInTerminal([
+                        "git pull --rebase --ff",
+                        "git submodule update --init --recursive --remote --merge",
+                        "npm install -D",
+                        "npm audit fix"
+                    ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
+                    break;
+                case "push": {
+                    const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: "Commit Message?", value: "", default: "No Description" });
+                    if (!commitMsg) {return;}
+                    runInTerminal([
+                        "git rm -r --cached .",
+                        "git add .", "git add *",
+                        `git commit -m "${commitMsg}"`,
+                        "git pull --rebase --ff",
+                        "git push --all"
+                    ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
+                } break;
+            }
+        });
+    });
+    if (openPanelCmd) {context?.subscriptions?.push?.(openPanelCmd);}
 }
 
 //

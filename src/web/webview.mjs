@@ -132,6 +132,7 @@ function getEmbedHtml(webview) {
 //
 export class CustomSidebarViewProvider {
     static viewType = "vext.gptView";
+    static panelViewType = "vext.gptPanelView";
     _extensionUri; _view;
     constructor(extensionUri) { this._extensionUri = extensionUri; }
 
@@ -166,8 +167,10 @@ export class CustomSidebarViewProvider {
 //
 export async function webview(context) {
     const vscode = await vscodeAPI;
-    const provider = new CustomSidebarViewProvider(context.extensionUri);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, provider));
+    const providerSidebar = new CustomSidebarViewProvider(context.extensionUri);
+    const providerPanel = new CustomSidebarViewProvider(context.extensionUri);
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(CustomSidebarViewProvider.viewType, providerSidebar));
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(CustomSidebarViewProvider.panelViewType, providerPanel));
     context.subscriptions.push(vscode.commands.registerCommand('vext.openWebview', function () {
         const panel = vscode.window.createWebviewPanel(
             'vext.gptView',

@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.5",
+    "version": "0.0.8",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -28,7 +28,9 @@
     ],
     "activationEvents": [
         "onView:vext.managerView",
+        "onView:vext.managerPanelView",
         "onView:vext.gptView",
+        "onView:vext.gptPanelView",
         "onCommand:vext.pasteAsSymlink",
         "onCommand:vext.proxyUndo",
         "onCommand:vext.proxyRedo",
@@ -120,6 +122,18 @@
                     "title": "GPTunnel View",
                     "icon": "assets/openai.svg"
                 }
+            ],
+            "panel": [
+                {
+                    "id": "managerPanel",
+                    "title": "Manager",
+                    "icon": "assets/folder.svg"
+                },
+                {
+                    "id": "gptPanel",
+                    "title": "GPTunnel",
+                    "icon": "assets/openai.svg"
+                }
             ]
         },
         "views": {
@@ -132,6 +146,15 @@
                     "contextualTitle": "Manager View"
                 }
             ],
+            "managerPanel": [
+                {
+                    "icon": "assets/folder.svg",
+                    "type": "webview",
+                    "id": "vext.managerPanelView",
+                    "name": "Manager (Panel)",
+                    "contextualTitle": "Manager"
+                }
+            ],
             "gptView": [
                 {
                     "icon": "assets/openai.svg",
@@ -140,9 +163,22 @@
                     "name": "GPTunnel View",
                     "contextualTitle": "GPTunnel View"
                 }
+            ],
+            "gptPanel": [
+                {
+                    "icon": "assets/openai.svg",
+                    "type": "webview",
+                    "id": "vext.gptPanelView",
+                    "name": "GPTunnel (Panel)",
+                    "contextualTitle": "GPTunnel"
+                }
             ]
         },
         "commands": [
+            {
+                "command": "vext.openManagerPanel",
+                "title": "Open Manager (Panel)"
+            },
             {
                 "command": "vext.pasteAsSymlink",
                 "title": "Paste as Symlink"
