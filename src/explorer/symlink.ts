@@ -1,5 +1,5 @@
 //! use only TS types
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import * as path from "path";
 
 //

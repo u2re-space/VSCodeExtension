@@ -4,9 +4,9 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.1",
+    "version": "0.0.5",
     "engines": {
-        "vscode": "^1.99.3"
+        "vscode": "^1.105.1"
     },
     "icon": "./assets/service.png",
     "categories": [
@@ -16,10 +16,37 @@
         "Chat"
     ],
     "type": "module",
-    "activationEvents": [],
+    "files": [
+        "dist/extension.mjs",
+        "icons/**",
+        "assets/**",
+        "modules/**",
+        "LICENSE",
+        "README.md",
+        "CHANGELOG.md",
+        "package.json"
+    ],
+    "activationEvents": [
+        "onView:vext.managerView",
+        "onView:vext.gptView",
+        "onCommand:vext.pasteAsSymlink",
+        "onCommand:vext.proxyUndo",
+        "onCommand:vext.proxyRedo",
+        "onCommand:vext.htd.paste",
+        "onCommand:vext.htd.convert",
+        "onCommand:vext.htd.copy",
+        "onCommand:vext.dth.paste",
+        "onCommand:vext.dth.convert",
+        "onCommand:vext.dth.copy",
+        "onCommand:vext.ltm.paste",
+        "onCommand:vext.ltm.convert",
+        "onCommand:vext.ltm.copy",
+        "onCommand:vext.mtl.paste",
+        "onCommand:vext.mtl.convert",
+        "onCommand:vext.mtl.copy"
+    ],
     "extensionKind": [
-        "ui",
-        "workspace"
+        "ui"
     ],
     "main": "./dist/extension.mjs",
     "contributes": {
@@ -183,6 +210,10 @@
         "vscode:prepublish": "npm run package",
         "compile": "npm run check-types && npm run lint && node esbuild.js",
         "build": "npm run compile && npm run vscode:build",
+        "clean:cursor-cache": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --dry-run",
+        "clean:cursor-cache:apply": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --apply",
+        "clean:cursor-cache:purge": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --purge --dry-run",
+        "clean:cursor-cache:purge:apply": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --purge --apply",
         "watch": "npm-run-all -p watch:*",
         "watch:esbuild": "node esbuild.js --watch",
         "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
@@ -197,7 +228,7 @@
     "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "^20.17.57",
-        "@types/vscode": "^1.99",
+        "@types/vscode": "^1.105.1",
         "@typescript-eslint/eslint-plugin": "^8.10.0",
         "@typescript-eslint/parser": "^8.7.0",
         "@vscode/markdown-it-katex": "^1.1.2",

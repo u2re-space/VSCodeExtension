@@ -1,5 +1,5 @@
 //! use only TS types
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 
 //
 import vscodePromise from '../imports/api.ts';
@@ -12,6 +12,25 @@ const inWatch = new Set<any>([]);
 // Initialize vscode API asynchronously
 let vscodeAPI: any = null;
 let ctxMap = new WeakMap();
+
+/**
+ * `vscode.Uri.joinPath(base, segment)` treats each argument as a single path segment.
+ * If we pass "foo/bar" as one segment, VS Code will encode the slash ("foo%2Fbar"),
+ * which breaks paths (especially on Linux/SSH workspaces with nested modules).
+ */
+const normalizeModuleSegments = (modulePath: string): string[] => {
+    if (!modulePath) { return []; }
+    let m = String(modulePath).trim().replace(/\\/g, '/');
+    if (m === '.' || m === './') { return []; }
+    m = m.replace(/^\.\//, '').replace(/\/+$/, '');
+    if (!m) { return []; }
+    return m.split('/').filter(Boolean);
+};
+
+const joinModuleUri = (vscodeAPI: any, wsdUri: vscode.Uri, modulePath: string): vscode.Uri => {
+    const segs = normalizeModuleSegments(modulePath);
+    return segs.length ? vscodeAPI.Uri.joinPath(wsdUri, ...segs) : wsdUri;
+};
 
 //
 async function initVscodeAPI() {
@@ -37,6 +56,9 @@ async function initVscodeAPI() {
 const getWorkspaceFolder = async (workspace, res = "") => {
     const vscodeAPI = await initVscodeAPI();
     const editor = vscodeAPI?.window?.activeTextEditor;
+    // Prefer current editor URI if available; keep URI objects as-is.
+    // In remote/SSH scenarios, URIs are typically `vscode-remote://...`.
+    // If we can't resolve a specific folder, fall back to the first workspace folder.
     res = res || editor?.document?.uri || "";
 
     let folder: vscode.WorkspaceFolder | undefined;
@@ -45,7 +67,7 @@ const getWorkspaceFolder = async (workspace, res = "") => {
     else if (workspace.workspaceFolders.length === 1 || !res)
         {folder = workspace.workspaceFolders[0];}
     else
-        {folder = workspace.getWorkspaceFolder(res);}
+        {folder = workspace.getWorkspaceFolder(res) || workspace.workspaceFolders[0];}
 
     return folder?.uri || undefined;
 };
@@ -79,16 +101,27 @@ async function findProjectDirs(
     let result: string[] = [];
     try {
         const entries = await vscodeAPI.workspace.fs.readDirectory(baseDir);
-        let hasGit = false, hasPkg = false;
+        let hasRepo = false, hasPkg = false;
         for (const [name, type] of entries) {
+            // repo markers (dirs)
+            if (name === ".git" && type === vscodeAPI.FileType.Directory) { hasRepo = true; }
+            if ((name === ".hg" || name === ".svn") && type === vscodeAPI.FileType.Directory) { hasRepo = true; }
+
+            // package/project markers (files)
             if (type === vscodeAPI.FileType.File) {
-                if (name === ".git") {hasGit = true;}
-                if (name === "package.json") {hasPkg = true;}
+                if (name === "package.json") { hasPkg = true; }
+                if (name === "deno.json" || name === "deno.jsonc") { hasPkg = true; }
+                if (name === "jsr.json") { hasPkg = true; }
+                if (name === "pnpm-workspace.yaml" || name === "pnpm-lock.yaml") { hasPkg = true; }
+                if (name === "yarn.lock") { hasPkg = true; }
+                if (name === "Cargo.toml" || name === "go.mod") { hasPkg = true; }
+                if (name === "pyproject.toml" || name === "requirements.txt") { hasPkg = true; }
+                if (name === "composer.json") { hasPkg = true; }
             }
         }
 
         // Если есть .git или package.json, добавляем путь
-        if (hasGit || hasPkg) {
+        if (hasRepo || hasPkg) {
             result.push(relPath || "./");
         }
 
@@ -97,6 +130,11 @@ async function findProjectDirs(
             if (
                 type === vscodeAPI.FileType.Directory &&
                 name !== "node_modules" &&
+                name !== "dist" &&
+                name !== "out" &&
+                name !== "build" &&
+                name !== "coverage" &&
+                name !== "target" &&
                 !name.startsWith(".")
             ) {
                 const subDir = vscodeAPI.Uri.joinPath(baseDir, name);
@@ -127,8 +165,9 @@ const getDirs = async (context) => {
         modules = await findProjectDirs(vscodeAPI, wsdUri, "");
     } catch (e) { /* ignore */ }
 
-    if (modules?.length < 1) { modules?.push?.("./"); }
-    return modules;
+    modules = modules?.length ? modules : ["./"];
+    // Always include ./ first
+    return Array.from(new Set(["./", ...modules]));
 };
 
 //
@@ -147,24 +186,56 @@ export class ManagerViewProvider {
     //
     async updateView(webviewView, context, modules?) {
         modules ??= (await getDirs(context)) || ["./"];
-        webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri, modules);
+        // async update: avoid resetting html (loses focus) once webview is loaded
+        webviewView?.webview?.postMessage?.({ type: 'modules', modules });
     }
 
     //
     async resolveWebviewView(webviewView, context, token) {
         const vscodeAPI = await initVscodeAPI();
         const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
-        let modules = await getDirs(context) || ["./"];
+        let modules = ctxMap.get(context) ?? ["./"];
+
+        const refreshModules = async ()=>{
+            try {
+                const mods = await getDirs(context) || ["./"];
+                await this.updateView(webviewView, context, mods);
+            } catch (e) { console.warn(e); }
+        };
 
         //
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri]  };
-        try { await this.updateView(webviewView, context, modules); } catch(e) { console.warn(e); };
-        inWatch?.add?.(()=>this.updateView(webviewView, context));
+        try { webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri); } catch(e) { console.warn(e); };
+        // Always show something immediately, even on slow remote FS
+        try { await this.updateView(webviewView, context, modules?.length ? modules : ["./"]); } catch(e) { console.warn(e); };
+        // Refresh asynchronously (so SSH/remote doesn't appear "stuck")
+        Promise.resolve().then(refreshModules);
+        inWatch?.add?.(()=>refreshModules());
 
         //
-        if (modules = await getDirs(context) || ["./"]) { try {
+        if (true) { try {
             webviewView?.webview?.onDidReceiveMessage?.(async message => {
-                const moduleUri = vscodeAPI.Uri.joinPath(wsdUri, message.module);
+                // Webview error telemetry (helps diagnose Remote-SSH issues)
+                if (message?.type === 'webviewError') {
+                    console.warn('[vext.managerView:webviewError]', message);
+                    // Don't spam popups; show a single concise toast.
+                    const msg = message?.message ? String(message.message) : 'Webview error';
+                    vscodeAPI?.window?.showWarningMessage?.(`Manager View webview error: ${msg}`);
+                    return;
+                }
+
+                // Handle initial handshake first (before touching wsdUri / joinPath)
+                if (message?.command === 'ready') {
+                    return refreshModules();
+                }
+
+                // For all other actions, we need a workspace folder
+                if (!wsdUri) {
+                    vscodeAPI?.window?.showWarningMessage?.('No workspace folder found. Open a folder/workspace first.');
+                    return;
+                }
+
+                const moduleUri = joinModuleUri(vscodeAPI, wsdUri, message.module);
                 modules = await getDirs(context) || ["./"];
 
                 //
@@ -173,32 +244,32 @@ export class ManagerViewProvider {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message for all?', value: '', default: 'No Description' });
                         if (!commitMsg) { return; }
                         for (const m of modules) {
-                            const mUri = vscodeAPI.Uri.joinPath(wsdUri, m);
+                            const mUri = joinModuleUri(vscodeAPI, wsdUri, m);
                             runInTerminal([
                                 'git rm -r --cached .',
                                 'git add .', 'git add *',
                                 `git commit -m "${commitMsg}"`,
                                 'git pull --rebase --ff',
                                 'git push --all'
-                            ], plNormalize(mUri?.path || mUri?.fsPath));
+                            ], plNormalize(mUri?.fsPath || mUri?.path));
                         }
                     }; break;
                     case 'bulk_install':
-                        for (const m of modules) { const mUri = vscodeAPI.Uri.joinPath(wsdUri, m); runInTerminal(['git pull --rebase --ff', 'npm install -D', 'npm audit fix'], plNormalize(mUri?.path || mUri?.fsPath)); } break;
-                    case 'bulk_build': for (const m of modules) { const mUri = vscodeAPI.Uri.joinPath(wsdUri, m); runInTerminal(['npm run build'], plNormalize(mUri?.path || mUri?.fsPath)); } break;
+                        for (const m of modules) { const mUri = joinModuleUri(vscodeAPI, wsdUri, m); runInTerminal(['git pull --rebase --ff', 'npm install -D', 'npm audit fix'], plNormalize(mUri?.fsPath || mUri?.path)); } break;
+                    case 'bulk_build': for (const m of modules) { const mUri = joinModuleUri(vscodeAPI, wsdUri, m); runInTerminal(['npm run build'], plNormalize(mUri?.fsPath || mUri?.path)); } break;
                     case 'open-dir': vscodeAPI?.commands?.executeCommand?.('vscode.openFolder', moduleUri); break;
-                    case 'terminal': runInTerminal([''], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
-                    case 'build': runInTerminal(['npm run build'], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
-                    case 'watch': runInTerminal(['npm run watch'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
-                    case 'dev' : runInTerminal(['npm run dev'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
-                    case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
-                    case 'diff': runInTerminal(['git diff'], plNormalize(moduleUri?.path || moduleUri?.fsPath), true); break;
+                    case 'terminal': runInTerminal([''], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                    case 'build': runInTerminal(['npm run build'], plNormalize(moduleUri?.fsPath || moduleUri?.path)); break;
+                    case 'watch': runInTerminal(['npm run watch'], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                    case 'dev' : runInTerminal(['npm run dev'] , plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                    case 'test' : runInTerminal(['npm run test'] , plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
+                    case 'diff': runInTerminal(['git diff'], plNormalize(moduleUri?.fsPath || moduleUri?.path), true); break;
                     case 'install': runInTerminal([
                         'git pull --rebase --ff',
                         'git submodule update --init --recursive --remote --merge',
                         'npm install -D',
                         'npm audit fix'
-                    ], plNormalize(moduleUri?.path || moduleUri?.fsPath)); break;
+                    ], plNormalize(moduleUri?.fsPath || moduleUri?.path)); break;
                     case 'push': {
                         const commitMsg = await vscodeAPI?.window?.showInputBox?.({ prompt: 'Commit Message?', value: '', default: 'No Description' });
                         if (!commitMsg) { return; }
@@ -208,7 +279,7 @@ export class ManagerViewProvider {
                             `git commit -m "${commitMsg}"`,
                             'git pull --rebase --ff',
                             'git push --all'
-                        ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+                        ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
                     }; break;
                 }
             });

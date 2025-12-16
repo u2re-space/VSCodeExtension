@@ -27,9 +27,9 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 // node_modules/mathml-to-latex/dist/bundle.min.js
 var require_bundle_min = __commonJS({
   "node_modules/mathml-to-latex/dist/bundle.min.js"(exports, module) {
-    !function(e, t) {
+    !(function(e, t) {
       "object" == typeof exports && "object" == typeof module ? module.exports = t() : "function" == typeof define && define.amd ? define([], t) : "object" == typeof exports ? exports.MathMLToLaTeX = t() : e.MathMLToLaTeX = t();
-    }(exports, () => (() => {
+    })(exports, (() => (() => {
       var e = { 4582: (e2, t2) => {
         "use strict";
         function r2(e3, t3) {
@@ -76,7 +76,7 @@ var require_bundle_min = __commonJS({
         }
         d.prototype.parseFromString = function(e3, t3) {
           var r3 = this.options, a3 = new u(), n2 = r3.domBuilder || new m(), i2 = r3.errorHandler, s2 = r3.locator, c2 = r3.xmlns || {}, d2 = /\/x?html?$/.test(t3), p2 = d2 ? o.HTML_ENTITIES : o.XML_ENTITIES;
-          s2 && n2.setDocumentLocator(s2), a3.errorHandler = function(e4, t4, r4) {
+          s2 && n2.setDocumentLocator(s2), a3.errorHandler = (function(e4, t4, r4) {
             if (!e4) {
               if (t4 instanceof m) return t4;
               e4 = t4;
@@ -92,7 +92,7 @@ var require_bundle_min = __commonJS({
               };
             }
             return r4 = r4 || {}, o2("warning"), o2("error"), o2("fatalError"), a4;
-          }(i2, n2, s2), a3.domBuilder = r3.domBuilder || n2, d2 && (c2[""] = l.HTML), c2.xml = c2.xml || l.XML;
+          })(i2, n2, s2), a3.domBuilder = r3.domBuilder || n2, d2 && (c2[""] = l.HTML), c2.xml = c2.xml || l.XML;
           var x2 = r3.normalizeLineEndings || h;
           return e3 && "string" == typeof e3 ? a3.parse(x2(e3), c2, p2) : a3.errorHandler.error("invalid doc source"), n2.doc;
         }, m.prototype = { startDocument: function() {
@@ -145,11 +145,11 @@ var require_bundle_min = __commonJS({
           console.error("[xmldom error]	" + e3, f(this.locator));
         }, fatalError: function(e3) {
           throw new c(e3, this.locator);
-        } }, "endDTD,startEntity,endEntity,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,resolveEntity,getExternalSubset,notationDecl,unparsedEntityDecl".replace(/\w+/g, function(e3) {
+        } }, "endDTD,startEntity,endEntity,attributeDecl,elementDecl,externalEntityDecl,internalEntityDecl,resolveEntity,getExternalSubset,notationDecl,unparsedEntityDecl".replace(/\w+/g, (function(e3) {
           m.prototype[e3] = function() {
             return null;
           };
-        }), t2.DOMParser = d;
+        })), t2.DOMParser = d;
       }, 4722: (e2, t2, r2) => {
         var a2 = r2(4582), n = a2.find, o = a2.NAMESPACE;
         function i(e3) {
@@ -160,9 +160,9 @@ var require_bundle_min = __commonJS({
         }
         function l(e3) {
           if (!e3) return [];
-          var t3 = function(e4) {
+          var t3 = (function(e4) {
             return e4 ? e4.split(/[\t\n\f\r ]+/).filter(i) : [];
-          }(e3);
+          })(e3);
           return Object.keys(t3.reduce(s, {}));
         }
         function c(e3, t3) {
@@ -206,9 +206,9 @@ var require_bundle_min = __commonJS({
           if (a3 ? t3[S2(t3, a3)] = r3 : t3[t3.length++] = r3, e3) {
             r3.ownerElement = e3;
             var n2 = e3.ownerDocument;
-            n2 && (a3 && V(n2, e3, a3), function(e4, t4, r4) {
+            n2 && (a3 && V(n2, e3, a3), (function(e4, t4, r4) {
               e4 && e4._inc++, r4.namespaceURI === o.XMLNS && (t4._nsMap[r4.prefix ? r4.localName : ""] = r4.value);
-            }(n2, e3, r3));
+            })(n2, e3, r3));
           }
         }
         function P(e3, t3, r3) {
@@ -271,9 +271,9 @@ var require_bundle_min = __commonJS({
         }
         function Y(e3, t3) {
           var r3 = e3.childNodes || [];
-          if (n(r3, function(e4) {
+          if (n(r3, (function(e4) {
             return H(e4) && e4 !== t3;
-          })) return false;
+          }))) return false;
           var a3 = n(r3, X);
           return !(t3 && a3 && r3.indexOf(a3) > r3.indexOf(t3));
         }
@@ -301,22 +301,22 @@ var require_bundle_min = __commonJS({
           }
           if (H(t3) && !Y(e3, r3)) throw new T2(q, "Only one element can be added and only after doctype");
           if (X(t3)) {
-            if (n(a3, function(e4) {
+            if (n(a3, (function(e4) {
               return X(e4) && e4 !== r3;
-            })) throw new T2(q, "Only one doctype is allowed");
+            }))) throw new T2(q, "Only one doctype is allowed");
             var s2 = n(a3, H);
             if (r3 && a3.indexOf(s2) < a3.indexOf(r3)) throw new T2(q, "Doctype can only be inserted before an element");
           }
         }
         function Q(e3, t3, r3, a3) {
           (function(e4, t4, r4) {
-            if (!function(e5) {
+            if (!(function(e5) {
               return e5 && (e5.nodeType === R.DOCUMENT_NODE || e5.nodeType === R.DOCUMENT_FRAGMENT_NODE || e5.nodeType === R.ELEMENT_NODE);
-            }(e4)) throw new T2(q, "Unexpected parent node type " + e4.nodeType);
+            })(e4)) throw new T2(q, "Unexpected parent node type " + e4.nodeType);
             if (r4 && r4.parentNode !== e4) throw new T2(D2, "child not in parent");
-            if (!function(e5) {
+            if (!(function(e5) {
               return e5 && (H(e5) || W(e5) || X(e5) || e5.nodeType === R.DOCUMENT_FRAGMENT_NODE || e5.nodeType === R.COMMENT_NODE || e5.nodeType === R.PROCESSING_INSTRUCTION_NODE);
-            }(t4) || X(t4) && e4.nodeType !== R.DOCUMENT_NODE) throw new T2(q, "Unexpected node type " + t4.nodeType + " for parent node type " + e4.nodeType);
+            })(t4) || X(t4) && e4.nodeType !== R.DOCUMENT_NODE) throw new T2(q, "Unexpected node type " + t4.nodeType + " for parent node type " + e4.nodeType);
           })(e3, t3, r3), e3.nodeType === R.DOCUMENT_NODE && (a3 || J)(e3, t3, r3);
           var n2 = t3.parentNode;
           if (n2 && n2.removeChild(t3), t3.nodeType === A) {
@@ -583,14 +583,14 @@ var require_bundle_min = __commonJS({
           return xe(this, e3, t3);
         }, getElementById: function(e3) {
           var t3 = null;
-          return j(this.documentElement, function(r3) {
+          return j(this.documentElement, (function(r3) {
             if (r3.nodeType == d && r3.getAttribute("id") == e3) return t3 = r3, true;
-          }), t3;
+          })), t3;
         }, getElementsByClassName: function(e3) {
           var t3 = l(e3);
-          return new O(this, function(r3) {
+          return new O(this, (function(r3) {
             var a3 = [];
-            return t3.length > 0 && j(r3.documentElement, function(n2) {
+            return t3.length > 0 && j(r3.documentElement, (function(n2) {
               if (n2 !== r3 && n2.nodeType === d) {
                 var o2 = n2.getAttribute("class");
                 if (o2) {
@@ -605,8 +605,8 @@ var require_bundle_min = __commonJS({
                 }
               }
               var c2;
-            }), a3;
-          });
+            })), a3;
+          }));
         }, createElement: function(e3) {
           var t3 = new K();
           return t3.ownerDocument = this, t3.nodeName = e3, t3.tagName = e3, t3.localName = e3, t3.childNodes = new N(), (t3.attributes = new B())._ownerElement = t3, t3;
@@ -651,9 +651,9 @@ var require_bundle_min = __commonJS({
           var t3 = this.getAttributeNode(e3);
           t3 && this.removeAttributeNode(t3);
         }, appendChild: function(e3) {
-          return e3.nodeType === A ? this.insertBefore(e3, null) : function(e4, t3) {
+          return e3.nodeType === A ? this.insertBefore(e3, null) : (function(e4, t3) {
             return t3.parentNode && t3.parentNode.removeChild(t3), t3.parentNode = e4, t3.previousSibling = e4.lastChild, t3.nextSibling = null, t3.previousSibling ? t3.previousSibling.nextSibling = t3 : e4.firstChild = t3, e4.lastChild = t3, G(e4.ownerDocument, e4, t3), t3;
-          }(this, e3);
+          })(this, e3);
         }, setAttributeNode: function(e3) {
           return this.attributes.setNamedItem(e3);
         }, setAttributeNodeNS: function(e3) {
@@ -674,19 +674,19 @@ var require_bundle_min = __commonJS({
         }, getAttributeNodeNS: function(e3, t3) {
           return this.attributes.getNamedItemNS(e3, t3);
         }, getElementsByTagName: function(e3) {
-          return new O(this, function(t3) {
+          return new O(this, (function(t3) {
             var r3 = [];
-            return j(t3, function(a3) {
+            return j(t3, (function(a3) {
               a3 === t3 || a3.nodeType != d || "*" !== e3 && a3.tagName != e3 || r3.push(a3);
-            }), r3;
-          });
+            })), r3;
+          }));
         }, getElementsByTagNameNS: function(e3, t3) {
-          return new O(this, function(r3) {
+          return new O(this, (function(r3) {
             var a3 = [];
-            return j(r3, function(n2) {
+            return j(r3, (function(n2) {
               n2 === r3 || n2.nodeType !== d || "*" !== e3 && n2.namespaceURI !== e3 || "*" !== t3 && n2.localName != t3 || a3.push(n2);
-            }), a3;
-          });
+            })), a3;
+          }));
         } }, U.prototype.getElementsByTagName = K.prototype.getElementsByTagName, U.prototype.getElementsByTagNameNS = K.prototype.getElementsByTagNameNS, u(K, R), ee.prototype.nodeType = m, u(ee, R), te.prototype = { data: "", substringData: function(e3, t3) {
           return this.data.substring(e3, e3 + t3);
         }, appendData: function(e3) {
@@ -890,10 +890,10 @@ var require_bundle_min = __commonJS({
             var n2 = e3.indexOf("]]>", t3 + 9);
             return r3.startCDATA(), r3.characters(e3, t3 + 9, n2 - t3 - 9), r3.endCDATA(), n2 + 3;
           }
-          var o2 = function(e4, t4) {
+          var o2 = (function(e4, t4) {
             var r4, a4 = [], n3 = /'[^']+'|"[^"]+"|[^\s<>\/=]+=?|(\/?\s*>|<)/g;
             for (n3.lastIndex = t4, n3.exec(e4); r4 = n3.exec(e4); ) if (a4.push(r4), r4[1]) return a4;
-          }(e3, t3), i2 = o2.length;
+          })(e3, t3), i2 = o2.length;
           if (i2 > 1 && /!doctype/i.test(o2[0][0])) {
             var s2 = o2[1][0], l2 = false, c2 = false;
             i2 > 3 && (/^public$/i.test(o2[2][0]) ? (l2 = o2[3][0], c2 = i2 > 4 && o2[4][0]) : /^system$/i.test(o2[2][0]) && (c2 = o2[3][0]));
@@ -915,16 +915,16 @@ var require_bundle_min = __commonJS({
         }
         s.prototype = new Error(), s.prototype.name = s.name, l.prototype = { parse: function(e3, t3, r3) {
           var n2 = this.domBuilder;
-          n2.startDocument(), p(t3, t3 = {}), function(e4, t4, r4, n3, o2) {
+          n2.startDocument(), p(t3, t3 = {}), (function(e4, t4, r4, n3, o2) {
             function i2(e5) {
               var t5 = e5.slice(1, -1);
-              return Object.hasOwnProperty.call(r4, t5) ? r4[t5] : "#" === t5.charAt(0) ? function(e6) {
+              return Object.hasOwnProperty.call(r4, t5) ? r4[t5] : "#" === t5.charAt(0) ? (function(e6) {
                 if (e6 > 65535) {
                   var t6 = 55296 + ((e6 -= 65536) >> 10), r5 = 56320 + (1023 & e6);
                   return String.fromCharCode(t6, r5);
                 }
                 return String.fromCharCode(e6);
-              }(parseInt(t5.substr(1).replace("x", "0x"))) : (o2.error("entity not found:" + e5), e5);
+              })(parseInt(t5.substr(1).replace("x", "0x"))) : (o2.error("entity not found:" + e5), e5);
             }
             function l2(t5) {
               if (t5 > y) {
@@ -981,7 +981,7 @@ var require_bundle_min = __commonJS({
               }
               M > y ? y = M : l2(Math.max(_, y) + 1);
             }
-          }(e3, t3, r3, n2, this.errorHandler), n2.endDocument();
+          })(e3, t3, r3, n2, this.errorHandler), n2.endDocument();
         } }, g.prototype = { setTagName: function(e3) {
           if (!i.test(e3)) throw new Error("invalid tagName:" + e3);
           this.tagName = e3;
@@ -1041,7 +1041,7 @@ var require_bundle_min = __commonJS({
             return new r2(n)._join(e3);
           }
           _join(e3) {
-            return e3.reduce((e4, t3, r3, a2) => e4 + t3 + (r3 === a2.length - 1 ? "" : this._get(r3)), "");
+            return e3.reduce(((e4, t3, r3, a2) => e4 + t3 + (r3 === a2.length - 1 ? "" : this._get(r3))), "");
           }
           _get(e3) {
             return this._separators[e3] ? this._separators[e3] : this._separators[this._separators.length - 1];
@@ -1136,7 +1136,7 @@ var require_bundle_min = __commonJS({
             this._mathmlElement = e3;
           }
           convert() {
-            return this._mathmlElement.children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" ");
+            return this._mathmlElement.children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" ");
           }
         };
       }, 9376: (e2, t2, r2) => {
@@ -1170,9 +1170,9 @@ var require_bundle_min = __commonJS({
           }
         }
         var s;
-        !function(e3) {
+        !(function(e3) {
           e3[e3.Under = 0] = "Under", e3[e3.Over = 1] = "Over";
-        }(s || (s = {}));
+        })(s || (s = {}));
       }, 6959: (e2, t2, r2) => {
         "use strict";
         Object.defineProperty(t2, "__esModule", { value: true }), t2.Void = t2.MSpace = t2.MRow = t2.GenericUnderOver = t2.GenericSpacingWrapper = t2.MTr = t2.MTable = t2.MUnderover = t2.MText = t2.MMultiscripts = t2.MSubsup = t2.MSub = t2.MSup = t2.MPhantom = t2.MError = t2.MEnclose = t2.MAction = t2.MRoot = t2.MFrac = t2.MFenced = t2.MSqrt = t2.MN = t2.MO = t2.MI = t2.Math = void 0;
@@ -1286,7 +1286,7 @@ var require_bundle_min = __commonJS({
           }
           convert() {
             const { children: e3 } = this._mathmlElement;
-            return this._isToggle() ? e3.map((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4)).map((e4) => e4.convert()).join(" \\Longrightarrow ") : (0, a2.mathMLElementToLaTeXConverter)(e3[0]).convert();
+            return this._isToggle() ? e3.map(((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4))).map(((e4) => e4.convert())).join(" \\Longrightarrow ") : (0, a2.mathMLElementToLaTeXConverter)(e3[0]).convert();
           }
           _isToggle() {
             const { actiontype: e3 } = this._mathmlElement.attributes;
@@ -1302,7 +1302,7 @@ var require_bundle_min = __commonJS({
             this._mathmlElement = e3;
           }
           convert() {
-            const e3 = this._mathmlElement.children.map((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4)).map((e4) => e4.convert()).join(" ");
+            const e3 = this._mathmlElement.children.map(((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4))).map(((e4) => e4.convert())).join(" ");
             return (0, n.normalizeWhiteSpaces)(e3);
           }
         };
@@ -1315,7 +1315,7 @@ var require_bundle_min = __commonJS({
             this._mathmlElement = e3;
           }
           convert() {
-            const e3 = this._mathmlElement.children.map((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4)).map((e4) => e4.convert()).join(" ");
+            const e3 = this._mathmlElement.children.map(((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4))).map(((e4) => e4.convert())).join(" ");
             return "actuarial" === this._notation ? `\\overline{\\left.${e3}\\right|}` : "radical" === this._notation ? `\\sqrt{${e3}}` : ["box", "roundedbox", "circle"].includes(this._notation) ? `\\boxed{${e3}}` : "left" === this._notation ? `\\left|${e3}` : "right" === this._notation ? `${e3}\\right|` : "top" === this._notation ? `\\overline{${e3}}` : "bottom" === this._notation ? `\\underline{${e3}}` : "updiagonalstrike" === this._notation ? `\\cancel{${e3}}` : "downdiagonalstrike" === this._notation ? `\\bcancel{${e3}}` : "updiagonalarrow" === this._notation ? `\\cancelto{}{${e3}}` : ["verticalstrike", "horizontalstrike"].includes(this._notation) ? `\\hcancel{${e3}}` : "madruwb" === this._notation ? `\\underline{${e3}\\right|}` : "phasorangle" === this._notation ? `{\\angle \\underline{${e3}}}` : `\\overline{\\left.\\right)${e3}}`;
           }
           get _notation() {
@@ -1331,7 +1331,7 @@ var require_bundle_min = __commonJS({
             this._mathmlElement = e3;
           }
           convert() {
-            return `\\color{red}{${this._mathmlElement.children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" ")}}`;
+            return `\\color{red}{${this._mathmlElement.children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" ")}}`;
           }
         };
       }, 9511: (e2, t2, r2) => {
@@ -1343,13 +1343,13 @@ var require_bundle_min = __commonJS({
             this._mathmlElement = e3, this.open = this._mathmlElement.attributes.open || "", this.close = this._mathmlElement.attributes.close || "";
           }
           convert() {
-            const e3 = this._mathmlElement.children.map((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4)).map((e4) => e4.convert());
+            const e3 = this._mathmlElement.children.map(((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4))).map(((e4) => e4.convert()));
             if (this._isThereRelativeOfName(this._mathmlElement.children, "mtable")) return new i(this.open, this.close).apply(e3);
             const t3 = this._mathmlElement.attributes.separators, r3 = void 0 !== t3, n2 = t3 ? Array.from(t3) : [], s2 = r3 ? "" : ",";
             return new o(this.open, this.close, n2, s2).apply(e3);
           }
           _isThereRelativeOfName(e3, t3) {
-            return e3.some((e4) => e4.name === t3 || this._isThereRelativeOfName(e4.children, t3));
+            return e3.some(((e4) => e4.name === t3 || this._isThereRelativeOfName(e4.children, t3)));
           }
         };
         class o {
@@ -1612,7 +1612,7 @@ ${e3.join("")}
             this._mathmlElement = e3;
           }
           convert() {
-            return this._isLinearSystemPattern() ? this._convertAsLinearSystem() : this._mathmlElement.children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" ");
+            return this._isLinearSystemPattern() ? this._convertAsLinearSystem() : this._mathmlElement.children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" ");
           }
           _isLinearSystemPattern() {
             const { children: e3 } = this._mathmlElement;
@@ -1621,7 +1621,7 @@ ${e3.join("")}
             return r3 && a3 && o;
           }
           _convertAsLinearSystem() {
-            return `\\begin{cases} ${this._mathmlElement.children[1].children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" \\\\ ")} \\end{cases}`;
+            return `\\begin{cases} ${this._mathmlElement.children[1].children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" \\\\ ")} \\end{cases}`;
           }
         };
       }, 3700: (e2, t2) => {
@@ -1644,7 +1644,7 @@ ${e3.join("")}
             this._mathmlElement = e3;
           }
           convert() {
-            return `\\sqrt{${this._mathmlElement.children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" ")}}`;
+            return `\\sqrt{${this._mathmlElement.children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" ")}}`;
           }
         };
       }, 2564: (e2, t2, r2) => {
@@ -1729,16 +1729,16 @@ ${e3.join("")}
             this._mathmlElement = e3, this._addFlagRecursiveIfName(this._mathmlElement.children, "mtable", "innerTable");
           }
           convert() {
-            const e3 = this._mathmlElement.children.map((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4)).map((e4) => e4.convert()).join(" \\\\\n");
+            const e3 = this._mathmlElement.children.map(((e4) => (0, a2.mathMLElementToLaTeXConverter)(e4))).map(((e4) => e4.convert())).join(" \\\\\n");
             return this._hasFlag("innerTable") ? this._wrap(e3) : e3;
           }
           _wrap(e3) {
             return `\\begin{matrix}${e3}\\end{matrix}`;
           }
           _addFlagRecursiveIfName(e3, t3, r3) {
-            e3.forEach((e4) => {
+            e3.forEach(((e4) => {
               e4.name === t3 && (e4.attributes[r3] = r3), this._addFlagRecursiveIfName(e4.children, t3, r3);
-            });
+            }));
           }
           _hasFlag(e3) {
             return !!this._mathmlElement.attributes[e3];
@@ -1754,13 +1754,13 @@ ${e3.join("")}
           }
           convert() {
             const { attributes: e3, value: t3 } = this._mathmlElement;
-            return [...t3].map((e4) => /^[a-zA-Z0-9]$/.test(e4) || " " === e4 ? { value: e4, isAlphanumeric: true } : { value: e4, isAlphanumeric: false }).reduce((e4, t4) => {
+            return [...t3].map(((e4) => /^[a-zA-Z0-9]$/.test(e4) || " " === e4 ? { value: e4, isAlphanumeric: true } : { value: e4, isAlphanumeric: false })).reduce(((e4, t4) => {
               if (t4.isAlphanumeric) {
                 const r3 = e4[e4.length - 1];
                 if (r3 && r3.isAlphanumeric) return r3.value += t4.value, e4;
               }
               return [...e4, t4];
-            }, []).map((t4) => t4.isAlphanumeric ? new n(e3.mathvariant).apply(t4.value) : new a2.MI({ name: "mi", attributes: {}, children: [], value: t4.value }).convert()).join("");
+            }), []).map(((t4) => t4.isAlphanumeric ? new n(e3.mathvariant).apply(t4.value) : new a2.MI({ name: "mi", attributes: {}, children: [], value: t4.value }).convert())).join("");
           }
         };
         class n {
@@ -1768,7 +1768,7 @@ ${e3.join("")}
             this._mathvariant = e3 || "normal";
           }
           apply(e3) {
-            return this._commands.reduce((t3, r3, a3) => 0 === a3 ? `${r3}{${e3}}` : `${r3}{${t3}}`, "");
+            return this._commands.reduce(((t3, r3, a3) => 0 === a3 ? `${r3}{${e3}}` : `${r3}{${t3}}`), "");
           }
           get _commands() {
             switch (this._mathvariant) {
@@ -1799,7 +1799,7 @@ ${e3.join("")}
             this._mathmlElement = e3;
           }
           convert() {
-            return this._mathmlElement.children.map((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3)).map((e3) => e3.convert()).join(" & ");
+            return this._mathmlElement.children.map(((e3) => (0, a2.mathMLElementToLaTeXConverter)(e3))).map(((e3) => e3.convert())).join(" & ");
           }
         };
       }, 1222: (e2, t2, r2) => {
@@ -1907,20 +1907,20 @@ ${e3.join("")}
         "use strict";
         Object.defineProperty(t2, "__esModule", { value: true }), t2.ElementsToMathMLAdapter = void 0, t2.ElementsToMathMLAdapter = class {
           convert(e3) {
-            return e3.filter((e4) => void 0 !== e4.tagName).map((e4) => this._convertElement(e4));
+            return e3.filter(((e4) => void 0 !== e4.tagName)).map(((e4) => this._convertElement(e4)));
           }
           _convertElement(e3) {
             return { name: e3.tagName, attributes: this._convertElementAttributes(e3.attributes), value: this._hasElementChild(e3) ? "" : e3.textContent || "", children: this._hasElementChild(e3) ? this.convert(Array.from(e3.childNodes)) : [] };
           }
           _convertElementAttributes(e3) {
-            return Array.from(e3).reduce((e4, t3) => Object.assign({ [t3.nodeName]: t3.nodeValue === t3.nodeName ? "" : t3.nodeValue }, e4), {});
+            return Array.from(e3).reduce(((e4, t3) => Object.assign({ [t3.nodeName]: t3.nodeValue === t3.nodeName ? "" : t3.nodeValue }, e4)), {});
           }
           _hasElementChild(e3) {
             const t3 = e3.childNodes;
             return !!t3 && 0 !== t3.length && this._isThereAnyNoTextNode(t3);
           }
           _isThereAnyNoTextNode(e3) {
-            return Array.from(e3).some((e4) => "#text" !== e4.nodeName);
+            return Array.from(e3).some(((e4) => "#text" !== e4.nodeName));
           }
         };
       }, 9548: function(e2, t2, r2) {
@@ -1993,7 +1993,7 @@ ${e3.join("")}
         const a2 = r2(5443), n = r2(7941);
         t2.MathMLToLaTeX = class {
           static convert(e3) {
-            return (0, n.makeToMathElementsConverter)().convert(e3).map((e4) => new a2.MathMLElementToLatexConverterAdapter(e4).toLatexConverter()).map((e4) => e4.convert()).join("").trim();
+            return (0, n.makeToMathElementsConverter)().convert(e3).map(((e4) => new a2.MathMLElementToLatexConverterAdapter(e4).toLatexConverter())).map(((e4) => e4.convert())).join("").trim();
           }
         };
       }, 2965: (e2, t2) => {
@@ -2068,7 +2068,7 @@ ${e3.join("")}
           return t2.MathMLToLaTeX;
         } });
       })(), a;
-    })());
+    })()));
   }
 });
 
@@ -2142,9 +2142,9 @@ var require_UIEvent = __commonJS({
     }
     UIEvent.prototype = Object.create(Event.prototype, {
       constructor: { value: UIEvent },
-      initUIEvent: { value: function(type, bubbles, cancelable, view2, detail) {
+      initUIEvent: { value: function(type, bubbles, cancelable, view, detail) {
         this.initEvent(type, bubbles, cancelable);
-        this.view = view2;
+        this.view = view;
         this.detail = detail;
       } }
     });
@@ -2167,8 +2167,8 @@ var require_MouseEvent = __commonJS({
     }
     MouseEvent.prototype = Object.create(UIEvent.prototype, {
       constructor: { value: MouseEvent },
-      initMouseEvent: { value: function(type, bubbles, cancelable, view2, detail, screenX, screenY, clientX, clientY, ctrlKey, altKey, shiftKey, metaKey, button, relatedTarget) {
-        this.initEvent(type, bubbles, cancelable, view2, detail);
+      initMouseEvent: { value: function(type, bubbles, cancelable, view, detail, screenX, screenY, clientX, clientY, ctrlKey, altKey, shiftKey, metaKey, button, relatedTarget) {
+        this.initEvent(type, bubbles, cancelable, view, detail);
         this.screenX = screenX;
         this.screenY = screenY;
         this.clientX = clientX;
@@ -2907,8 +2907,8 @@ var require_NodeUtils = __commonJS({
       switch (kid.nodeType) {
         case 1:
           var ns = kid.namespaceURI;
-          var html3 = ns === NAMESPACE.HTML;
-          var tagname = html3 || ns === NAMESPACE.SVG || ns === NAMESPACE.MATHML ? kid.localName : kid.tagName;
+          var html2 = ns === NAMESPACE.HTML;
+          var tagname = html2 || ns === NAMESPACE.SVG || ns === NAMESPACE.MATHML ? kid.localName : kid.tagName;
           s += "<" + tagname;
           for (var j = 0, k = kid._numattrs; j < k; j++) {
             var a = kid._attr(j);
@@ -2916,12 +2916,12 @@ var require_NodeUtils = __commonJS({
             if (a.value !== void 0) s += '="' + escapeAttr(a.value) + '"';
           }
           s += ">";
-          if (!(html3 && emptyElements[tagname])) {
+          if (!(html2 && emptyElements[tagname])) {
             var ss = kid.serialize();
             if (hasRawContent[tagname.toUpperCase()]) {
               ss = escapeMatchingClosingTag(ss, tagname);
             }
-            if (html3 && extraNewLine[tagname] && ss.charAt(0) === "\n") s += "\n";
+            if (html2 && extraNewLine[tagname] && ss.charAt(0) === "\n") s += "\n";
             s += ss;
             s += "</" + tagname + ">";
           }
@@ -3199,7 +3199,7 @@ var require_Node = __commonJS({
         return child;
       } },
       // See: http://ejohn.org/blog/comparing-document-position/
-      contains: { value: function contains3(node) {
+      contains: { value: function contains(node) {
         if (node === null) {
           return false;
         }
@@ -4186,7 +4186,7 @@ var require_select = __commonJS({
         );
       });
     };
-    var indexOf = function() {
+    var indexOf = (function() {
       if (Array.prototype.indexOf) {
         return Array.prototype.indexOf;
       }
@@ -4197,7 +4197,7 @@ var require_select = __commonJS({
         }
         return -1;
       };
-    }();
+    })();
     var makeInside = function(start, end) {
       var regex = rules.inside.source.replace(/</g, start).replace(/>/g, end);
       return new RegExp(regex);
@@ -4241,7 +4241,7 @@ var require_select = __commonJS({
       };
     };
     var selectors = {
-      "*": function() {
+      "*": (function() {
         if (false) {
           return function(el) {
             if (el.nodeType === 1) return true;
@@ -4250,7 +4250,7 @@ var require_select = __commonJS({
         return function() {
           return true;
         };
-      }(),
+      })(),
       "type": function(type) {
         type = type.toLowerCase();
         return function(el) {
@@ -9471,7 +9471,7 @@ var require_Document = __commonJS({
     var select = require_select();
     var events = require_events();
     var xml = require_xmlnames();
-    var html3 = require_htmlelts();
+    var html2 = require_htmlelts();
     var svg = require_svg();
     var utils3 = require_utils();
     var MUTATE = require_MutationConstants();
@@ -9619,9 +9619,9 @@ var require_Document = __commonJS({
         if (this.isHTML) {
           if (/[A-Z]/.test(localName))
             localName = utils3.toASCIILowerCase(localName);
-          return html3.createElement(this, localName, null);
+          return html2.createElement(this, localName, null);
         } else if (this.contentType === "application/xhtml+xml") {
-          return html3.createElement(this, localName, null);
+          return html2.createElement(this, localName, null);
         } else {
           return new Element(this, localName, null, null);
         }
@@ -9636,7 +9636,7 @@ var require_Document = __commonJS({
       // elements with localNames containing ':' and non-default namespaces
       _createElementNS: { value: function(localName, namespace, prefix) {
         if (namespace === NAMESPACE.HTML) {
-          return html3.createElement(this, localName, prefix);
+          return html2.createElement(this, localName, prefix);
         } else if (namespace === NAMESPACE.SVG) {
           return svg.createElement(this, localName, prefix);
         }
@@ -10241,8 +10241,8 @@ var require_HTMLParser = __commonJS({
     var DocumentType = require_DocumentType();
     var Node = require_Node();
     var NAMESPACE = require_utils().NAMESPACE;
-    var html3 = require_htmlelts();
-    var impl = html3.elements;
+    var html2 = require_htmlelts();
+    var impl = html2.elements;
     var pushAll = Function.prototype.apply.bind(Array.prototype.push);
     var EOF = -1;
     var TEXT = 1;
@@ -13650,7 +13650,7 @@ var require_HTMLParser = __commonJS({
         }
       }
       function createHTMLElt(doc2, name, attrs) {
-        var elt = html3.createElement(doc2, name, null);
+        var elt = html2.createElement(doc2, name, null);
         if (attrs) {
           for (var i = 0, n = attrs.length; i < n; i++) {
             elt._setAttribute(attrs[i][0], attrs[i][1]);
@@ -18449,16 +18449,16 @@ var require_DOMImplementation = __commonJS({
       createHTMLDocument: function createHTMLDocument(titleText) {
         var d = new Document(true, null);
         d.appendChild(new DocumentType(d, "html"));
-        var html3 = d.createElement("html");
-        d.appendChild(html3);
+        var html2 = d.createElement("html");
+        d.appendChild(html2);
         var head = d.createElement("head");
-        html3.appendChild(head);
+        html2.appendChild(head);
         if (titleText !== void 0) {
           var title = d.createElement("title");
           head.appendChild(title);
           title.appendChild(d.createTextNode(titleText));
         }
-        html3.appendChild(d.createElement("body"));
+        html2.appendChild(d.createElement("body"));
         d.modclock = 1;
         return d;
       },
@@ -18659,10 +18659,10 @@ var require_lib = __commonJS({
     exports.createDOMImplementation = function() {
       return new DOMImplementation(null);
     };
-    exports.createDocument = function(html3, force) {
-      if (html3 || force) {
+    exports.createDocument = function(html2, force) {
+      if (html2 || force) {
         var parser2 = new HTMLParser();
-        parser2.parse(html3 || "", true);
+        parser2.parse(html2 || "", true);
         return parser2.document();
       }
       return new DOMImplementation(null).createHTMLDocument("");
@@ -18720,8 +18720,8 @@ var require_lib = __commonJS({
         }
       };
     };
-    exports.createWindow = function(html3, address) {
-      var document2 = exports.createDocument(html3);
+    exports.createWindow = function(html2, address) {
+      var document2 = exports.createDocument(html2);
       if (address !== void 0) {
         document2._address = address;
       }
@@ -18754,6 +18754,9 @@ var require_turndown_cjs = __commonJS({
       var indexEnd = string.length;
       while (indexEnd > 0 && string[indexEnd - 1] === "\n") indexEnd--;
       return string.substring(0, indexEnd);
+    }
+    function trimNewlines(string) {
+      return trimTrailingNewlines(trimLeadingNewlines(string));
     }
     var blockElements = [
       "ADDRESS",
@@ -18888,8 +18891,7 @@ var require_turndown_cjs = __commonJS({
     rules.blockquote = {
       filter: "blockquote",
       replacement: function(content) {
-        content = content.replace(/^\n+|\n+$/g, "");
-        content = content.replace(/^/gm, "> ");
+        content = trimNewlines(content).replace(/^/gm, "> ");
         return "\n\n" + content + "\n\n";
       }
     };
@@ -18907,7 +18909,6 @@ var require_turndown_cjs = __commonJS({
     rules.listItem = {
       filter: "li",
       replacement: function(content, node, options2) {
-        content = content.replace(/^\n+/, "").replace(/\n+$/, "\n").replace(/\n/gm, "\n    ");
         var prefix = options2.bulletListMarker + "   ";
         var parent = node.parentNode;
         if (parent.nodeName === "OL") {
@@ -18915,7 +18916,10 @@ var require_turndown_cjs = __commonJS({
           var index = Array.prototype.indexOf.call(parent.children, node);
           prefix = (start ? Number(start) + index : index + 1) + ".  ";
         }
-        return prefix + content + (node.nextSibling && !/\n$/.test(content) ? "\n" : "");
+        var isParagraph = /\n$/.test(content);
+        content = trimNewlines(content) + (isParagraph ? "\n" : "");
+        content = content.replace(/\n/gm, "\n" + " ".repeat(prefix.length));
+        return prefix + content + (node.nextSibling ? "\n" : "");
       }
     };
     rules.indentedCodeBlock = {
@@ -19454,49 +19458,179 @@ var require_turndown_cjs = __commonJS({
 
 // src/imports/api.ts
 import { createRequire } from "module";
-var vscode = null;
 var VSCODE_MOD_NAME = "vscode";
-var tryLegacyMethod = () => {
-  let require2 = null;
+var getVsCodeApi = () => {
   try {
-    require2 = createRequire(import.meta.url);
-  } catch (error) {
-    console.warn(error);
-  }
-  try {
-    return require2?.("" + VSCODE_MOD_NAME) ?? (typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis);
-  } catch (error) {
-    console.warn(error);
-    return typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis;
-  }
-};
-try {
-  vscode = import("" + VSCODE_MOD_NAME)?.catch?.((e) => {
+    const require2 = createRequire(import.meta.url);
+    return require2(VSCODE_MOD_NAME);
+  } catch (e) {
     console.warn(e);
-    return tryLegacyMethod();
-  });
-} catch (e) {
-  console.warn(e);
-  vscode = tryLegacyMethod();
-}
+  }
+  try {
+    if (typeof acquireVsCodeApi !== "undefined") {
+      return acquireVsCodeApi?.();
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+  return globalThis;
+};
+var vscode = Promise.resolve().then(getVsCodeApi);
 var api_default = vscode;
 
 // src/web/webview.mjs
-var view = `<iframe style="padding:0px;margin:0px;border:none 0px transparent;box-sizing:border-box;inline-size:100dvw;block-size:100dvh;" src="https://gptunnel.ru/model/gpt-4.1/"></iframe>`;
-var html = `<html><body style="inline-size:100dvw;block-size:100dvh;overflow:hidden;padding:0px;margin:0px;border:none 0px transparent;">${view}</body></html>`;
+var GPTUNNEL_URL = "https://gptunnel.ru/model/gpt-5.2/";
+function getNonce() {
+  let text3 = "";
+  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < 32; i++) {
+    text3 += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text3;
+}
+function getOfflineHtml(webview2) {
+  const nonce = getNonce();
+  const csp = [
+    "default-src 'none'",
+    `img-src ${webview2.cspSource} data:`,
+    `style-src ${webview2.cspSource} 'unsafe-inline'`,
+    `font-src ${webview2.cspSource}`,
+    `script-src 'nonce-${nonce}'`
+  ].join("; ");
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPTunnel</title>
+</head>
+<body style="margin:0;padding:14px;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);">
+  <div style="max-width: 880px;">
+    <h3 style="margin:0 0 8px 0;font-weight:600;">GPTunnel View</h3>
+    <p style="margin:0 0 12px 0;opacity:.9;">
+      Recent VSCode/Cursor builds often block remote sites inside WebViews (iframes) due to security headers (CSP / X-Frame-Options).
+      This view now defaults to an offline/local-safe UI.
+    </p>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin: 0 0 12px 0;">
+      <button id="openExternal">Open GPTunnel in browser</button>
+      <button id="tryEmbed" title="May be blocked by the remote site.">Try embed (may fail)</button>
+      <button id="reload">Reload</button>
+    </div>
+
+    <div style="padding:10px;border-radius:6px;border:1px solid var(--vscode-editorWidget-border);background:var(--vscode-editorWidget-background);">
+      <div style="font-weight:600;margin-bottom:6px;">URL</div>
+      <code>${GPTUNNEL_URL}</code>
+    </div>
+  </div>
+
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    document.getElementById('openExternal').addEventListener('click', () => vscode.postMessage({ command: 'openExternal' }));
+    document.getElementById('tryEmbed').addEventListener('click', () => vscode.postMessage({ command: 'tryEmbed' }));
+    document.getElementById('reload').addEventListener('click', () => vscode.postMessage({ command: 'reload' }));
+  </script>
+</body>
+</html>`;
+}
+function getEmbedHtml(webview2) {
+  const nonce = getNonce();
+  const csp = [
+    "default-src 'none'",
+    `frame-src https:`,
+    `img-src ${webview2.cspSource} data: https:`,
+    `style-src ${webview2.cspSource} 'unsafe-inline'`,
+    `script-src 'nonce-${nonce}'`
+  ].join("; ");
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="${csp}" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GPTunnel</title>
+</head>
+<body style="inline-size:100dvw;block-size:100dvh;overflow:hidden;padding:0;margin:0;border:none;background:var(--vscode-editor-background);color:var(--vscode-foreground);font-family:var(--vscode-font-family);">
+  <div id="shell" style="box-sizing:border-box;padding:12px;display:flex;flex-direction:column;gap:10px;block-size:100dvh;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+      <button id="loadFrame">Load embedded iframe</button>
+      <button id="openExternal">Open in browser</button>
+      <button id="back">Back</button>
+      <span style="opacity:.85">(${GPTUNNEL_URL})</span>
+    </div>
+    <div id="status" style="opacity:.85;">
+      The iframe is created lazily on click. If the site blocks framing (CSP / X-Frame-Options), it will stay blank.
+    </div>
+    <div id="frameHost" style="flex:1;min-block-size:0;border:1px solid var(--vscode-editorWidget-border);border-radius:6px;overflow:hidden;background:var(--vscode-editorWidget-background);"></div>
+  </div>
+  <script nonce="${nonce}">
+    const vscode = acquireVsCodeApi();
+    const host = document.getElementById('frameHost');
+    const status = document.getElementById('status');
+    let loaded = false;
+    let timer = null;
+
+    function setStatus(t) { if (status) status.textContent = t; }
+
+    function createIframe() {
+      if (loaded) return;
+      loaded = true;
+      setStatus('Loading\u2026 If this stays blank, the remote site likely blocks being embedded.');
+
+      const iframe = document.createElement('iframe');
+      iframe.style.cssText = 'padding:0;margin:0;border:none;box-sizing:border-box;inline-size:100%;block-size:100%;';
+      iframe.referrerPolicy = 'no-referrer';
+      iframe.src = ${JSON.stringify(GPTUNNEL_URL)};
+      iframe.addEventListener('load', () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        setStatus('Loaded (or at least navigated). If you still see blank content, it may be blocked inside an iframe.');
+      });
+      while (host.firstChild) { host.removeChild(host.firstChild); }
+      host.appendChild(iframe);
+
+      // If the remote site blocks framing, load may never fire; provide a friendly fallback.
+      timer = setTimeout(() => {
+        setStatus('Still not showing. This is usually blocked by the site\u2019s own CSP/X-Frame-Options. Use \u201COpen in browser\u201D.');
+      }, 6000);
+    }
+
+    document.getElementById('loadFrame').addEventListener('click', createIframe);
+    document.getElementById('openExternal').addEventListener('click', () => vscode.postMessage({ command: 'openExternal' }));
+    document.getElementById('back').addEventListener('click', () => vscode.postMessage({ command: 'reload' }));
+  </script>
+</body>
+</html>`;
+}
 var CustomSidebarViewProvider = class {
   static viewType = "vext.gptView";
+  _extensionUri;
+  _view;
   constructor(extensionUri) {
+    this._extensionUri = extensionUri;
   }
   //
   resolveWebviewView(webviewView, context, token) {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
+    webviewView.webview.onDidReceiveMessage?.(async (message) => {
+      const vscode2 = await api_default;
+      switch (message?.command) {
+        case "openExternal":
+          return vscode2?.env?.openExternal?.(vscode2.Uri.parse(GPTUNNEL_URL));
+        case "tryEmbed":
+          webviewView.webview.html = getEmbedHtml(webviewView.webview);
+          return;
+        case "reload":
+          webviewView.webview.html = getOfflineHtml(webviewView.webview);
+          return;
+      }
+    });
     webviewView.webview.html = this.getHtmlContent(webviewView.webview);
   }
   //
   getHtmlContent(webview2) {
-    return html;
+    return getOfflineHtml(webview2);
   }
 };
 async function webview(context) {
@@ -19510,46 +19644,73 @@ async function webview(context) {
       vscode2.ViewColumn.One,
       { enableScripts: true }
     );
-    panel.webview.html = html;
+    panel.webview.html = getOfflineHtml(panel.webview);
   }));
 }
 
 // src/views/webview.ts
-async function getWebviewContent(webview2, extensionUri, modules) {
+async function getWebviewContent(webview2, extensionUri) {
   const vscodeAPI2 = await api_default;
   const defaultCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "webview.css")) || "";
   const codiconCSS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "codicon.css")) || "";
   const actionsJS = webview2?.asWebviewUri(vscodeAPI2?.Uri?.joinPath?.(extensionUri, "icons", "actions.mjs")) || "";
-  let layout = `<html><head>
-    <link rel="stylesheet" href="${codiconCSS}" rel="stylesheet">
-    <link rel="stylesheet" href="${defaultCSS}" rel="preload" as="style" onload="this.onload=null;this.rel='stylesheet'">
-    <script src="${actionsJS}" async defer></script></head>
+  const nonce = (() => {
+    const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let text3 = "";
+    for (let i = 0; i < 32; i++) {
+      text3 += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text3;
+  })();
+  const csp = [
+    `default-src 'none'`,
+    `img-src ${webview2.cspSource} data:`,
+    `style-src ${webview2.cspSource} 'unsafe-inline'`,
+    `font-src ${webview2.cspSource}`,
+    // Use nonce-based CSP for maximum compatibility (incl. Remote-SSH).
+    // Keep `${webview.cspSource}` so external scripts loaded via asWebviewUri work.
+    `script-src ${webview2.cspSource} 'nonce-${nonce}'`
+  ].join("; ");
+  let layout = `<!DOCTYPE html><html><head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="${csp}">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="${codiconCSS}">
+    <link rel="stylesheet" href="${defaultCSS}">
+    <script nonce="${nonce}">
+      // acquireVsCodeApi() can only be called once. Cache it globally for other scripts.
+      let vscode = null;
+      try {
+        // @ts-ignore
+        vscode = globalThis.__vscodeApi || (typeof acquireVsCodeApi !== 'undefined' ? acquireVsCodeApi() : null);
+        // @ts-ignore
+        if (vscode) globalThis.__vscodeApi = vscode;
+      } catch {}
+      window.addEventListener('error', (e) => {
+        try { vscode?.postMessage?.({ type: 'webviewError', message: e?.message, filename: e?.filename, lineno: e?.lineno, colno: e?.colno, stack: e?.error?.stack }); } catch {}
+      });
+      window.addEventListener('unhandledrejection', (e) => {
+        try { vscode?.postMessage?.({ type: 'webviewError', message: 'unhandledrejection', reason: String(e?.reason ?? '') }); } catch {}
+      });
+    </script>
+    <script nonce="${nonce}" src="${actionsJS}" type="module"></script></head>
     <body style="margin: 0px; border: none 0px transparent; min-block-size: 100svh;">
         <div class="toolbar" tabindex="0">
             <span class="toolbar-label" style="flex-grow: 1;">Bulk actions:</span>
             <div class="toolbar-actions">
-                <button onclick="send('bulk_build', '')" title="Build all"><i class='codicon codicon-package'></i></button>
-                <button onclick="send('bulk_install', '')" title="Install all"><i class='codicon codicon-cloud-download'></i></button>
-                <button onclick="send('bulk_push', '')" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
+                <button data-command="bulk_build" title="Build all"><i class='codicon codicon-package'></i></button>
+                <button data-command="bulk_install" title="Install all"><i class='codicon codicon-cloud-download'></i></button>
+                <button data-command="bulk_push" title="Git add/commit/push all"><i class='codicon codicon-cloud-upload'></i></button>
             </div>
         </div>
-        <table>${modules?.map?.((m) => `<tr tabindex="0">
-            <td class="name" style="display: flex; flex-basis: max-content; inline-size: -webkit-fill-available; inline-size: stretch;">${m}</td>
-            <td class="actions" style="min-inline-size: fit-content; inline-size: fit-content; max-inline-size: -webkit-fill-available; max-inline-size: stretch;">
-                <div class="actions-container">
-                <button onclick="send('open-dir', '${m}')" title="Open"><i class="codicon codicon-folder-opened"></i></button>
-                <button onclick="send('terminal', '${m}')" title="Terminal"><i class="codicon codicon-terminal"></i></button>
-                <button onclick="send('dev' , '${m}')" title="Dev Serve"><i class="codicon codicon-debug-alt"></i></button>
-                <button onclick="send('build', '${m}')" title="Build"><i class="codicon codicon-package"></i></button>
-                <button onclick="send('test' , '${m}')" title="Test"><i class="codicon codicon-beaker"></i></button>
-                <button onclick="send('watch', '${m}')" title="Watch"><i class="codicon codicon-eye"></i></button>
-                <button onclick="send('debug', '${m}')" title="Debug"><i class="codicon codicon-debug"></i></button>
-                <button onclick="send('diff', '${m}')" title="Git diff"><i class="codicon codicon-diff"></i></button>
-                <button onclick="send('install', '${m}')" title="Install"><i class="codicon codicon-cloud-download"></i></button>
-                <button onclick="send('push' , '${m}')" title="Git push"><i class="codicon codicon-cloud-upload"></i></button>
-                </div>
-            </td>
-        </tr>`)?.join?.("")}</table>
+        <table id="modulesTable" aria-label="Modules"><tbody id="modulesTbody">
+            <tr tabindex="0" data-module="./">
+                <td class="name" style="display:flex;flex-basis:max-content;inline-size:-webkit-fill-available;inline-size:stretch;">Loading\u2026</td>
+                <td class="actions" style="min-inline-size:fit-content;inline-size:fit-content;max-inline-size:-webkit-fill-available;max-inline-size:stretch;">
+                    <div class="actions-container"></div>
+                </td>
+            </tr>
+        </tbody></table>
     </body>
 </html>`;
   layout = layout.replace(/[\s\t]+/g, " ");
@@ -19560,6 +19721,24 @@ async function getWebviewContent(webview2, extensionUri, modules) {
 var inWatch = /* @__PURE__ */ new Set([]);
 var vscodeAPI = null;
 var ctxMap = /* @__PURE__ */ new WeakMap();
+var normalizeModuleSegments = (modulePath) => {
+  if (!modulePath) {
+    return [];
+  }
+  let m = String(modulePath).trim().replace(/\\/g, "/");
+  if (m === "." || m === "./") {
+    return [];
+  }
+  m = m.replace(/^\.\//, "").replace(/\/+$/, "");
+  if (!m) {
+    return [];
+  }
+  return m.split("/").filter(Boolean);
+};
+var joinModuleUri = (vscodeAPI2, wsdUri, modulePath) => {
+  const segs = normalizeModuleSegments(modulePath);
+  return segs.length ? vscodeAPI2.Uri.joinPath(wsdUri, ...segs) : wsdUri;
+};
 async function initVscodeAPI() {
   if (!vscodeAPI) {
     vscodeAPI = await api_default;
@@ -19589,7 +19768,7 @@ var getWorkspaceFolder = async (workspace, res = "") => {
   } else if (workspace.workspaceFolders.length === 1 || !res) {
     folder = workspace.workspaceFolders[0];
   } else {
-    folder = workspace.getWorkspaceFolder(res);
+    folder = workspace.getWorkspaceFolder(res) || workspace.workspaceFolders[0];
   }
   return folder?.uri || void 0;
 };
@@ -19597,22 +19776,46 @@ async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
   let result = [];
   try {
     const entries = await vscodeAPI2.workspace.fs.readDirectory(baseDir);
-    let hasGit = false, hasPkg = false;
+    let hasRepo = false, hasPkg = false;
     for (const [name, type] of entries) {
+      if (name === ".git" && type === vscodeAPI2.FileType.Directory) {
+        hasRepo = true;
+      }
+      if ((name === ".hg" || name === ".svn") && type === vscodeAPI2.FileType.Directory) {
+        hasRepo = true;
+      }
       if (type === vscodeAPI2.FileType.File) {
-        if (name === ".git") {
-          hasGit = true;
-        }
         if (name === "package.json") {
+          hasPkg = true;
+        }
+        if (name === "deno.json" || name === "deno.jsonc") {
+          hasPkg = true;
+        }
+        if (name === "jsr.json") {
+          hasPkg = true;
+        }
+        if (name === "pnpm-workspace.yaml" || name === "pnpm-lock.yaml") {
+          hasPkg = true;
+        }
+        if (name === "yarn.lock") {
+          hasPkg = true;
+        }
+        if (name === "Cargo.toml" || name === "go.mod") {
+          hasPkg = true;
+        }
+        if (name === "pyproject.toml" || name === "requirements.txt") {
+          hasPkg = true;
+        }
+        if (name === "composer.json") {
           hasPkg = true;
         }
       }
     }
-    if (hasGit || hasPkg) {
+    if (hasRepo || hasPkg) {
       result.push(relPath || "./");
     }
     const subresults = [...entries]?.map?.(([name, type]) => {
-      if (type === vscodeAPI2.FileType.Directory && name !== "node_modules" && !name.startsWith(".")) {
+      if (type === vscodeAPI2.FileType.Directory && name !== "node_modules" && name !== "dist" && name !== "out" && name !== "build" && name !== "coverage" && name !== "target" && !name.startsWith(".")) {
         const subDir = vscodeAPI2.Uri.joinPath(baseDir, name);
         const subRelPath = relPath ? `${relPath}/${name}` : name;
         return findProjectDirs(vscodeAPI2, subDir, subRelPath);
@@ -19635,10 +19838,8 @@ var getDirs = async (context) => {
     modules = await findProjectDirs(vscodeAPI2, wsdUri, "");
   } catch (e) {
   }
-  if (modules?.length < 1) {
-    modules?.push?.("./");
-  }
-  return modules;
+  modules = modules?.length ? modules : ["./"];
+  return Array.from(/* @__PURE__ */ new Set(["./", ...modules]));
 };
 var plNormalize = (m) => {
   if (/^\/[a-zA-Z]:\//.test(m)) {
@@ -19655,25 +19856,53 @@ var ManagerViewProvider = class {
   //
   async updateView(webviewView, context, modules) {
     modules ??= await getDirs(context) || ["./"];
-    webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri, modules);
+    webviewView?.webview?.postMessage?.({ type: "modules", modules });
   }
   //
   async resolveWebviewView(webviewView, context, token) {
     const vscodeAPI2 = await initVscodeAPI();
     const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-    let modules = await getDirs(context) || ["./"];
+    let modules = ctxMap.get(context) ?? ["./"];
+    const refreshModules = async () => {
+      try {
+        const mods = await getDirs(context) || ["./"];
+        await this.updateView(webviewView, context, mods);
+      } catch (e) {
+        console.warn(e);
+      }
+    };
     webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
     try {
-      await this.updateView(webviewView, context, modules);
+      webviewView.webview.html = await getWebviewContent(webviewView.webview, this._extensionUri);
     } catch (e) {
       console.warn(e);
     }
     ;
-    inWatch?.add?.(() => this.updateView(webviewView, context));
-    if (modules = await getDirs(context) || ["./"]) {
+    try {
+      await this.updateView(webviewView, context, modules?.length ? modules : ["./"]);
+    } catch (e) {
+      console.warn(e);
+    }
+    ;
+    Promise.resolve().then(refreshModules);
+    inWatch?.add?.(() => refreshModules());
+    if (true) {
       try {
         webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
-          const moduleUri = vscodeAPI2.Uri.joinPath(wsdUri, message.module);
+          if (message?.type === "webviewError") {
+            console.warn("[vext.managerView:webviewError]", message);
+            const msg = message?.message ? String(message.message) : "Webview error";
+            vscodeAPI2?.window?.showWarningMessage?.(`Manager View webview error: ${msg}`);
+            return;
+          }
+          if (message?.command === "ready") {
+            return refreshModules();
+          }
+          if (!wsdUri) {
+            vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
+            return;
+          }
+          const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
           modules = await getDirs(context) || ["./"];
           switch (message.command) {
             case "bulk_push":
@@ -19683,7 +19912,7 @@ var ManagerViewProvider = class {
                   return;
                 }
                 for (const m of modules) {
-                  const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
+                  const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
                   runInTerminal([
                     "git rm -r --cached .",
                     "git add .",
@@ -19691,43 +19920,43 @@ var ManagerViewProvider = class {
                     `git commit -m "${commitMsg}"`,
                     "git pull --rebase --ff",
                     "git push --all"
-                  ], plNormalize(mUri?.path || mUri?.fsPath));
+                  ], plNormalize(mUri?.fsPath || mUri?.path));
                 }
               }
               ;
               break;
             case "bulk_install":
               for (const m of modules) {
-                const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
-                runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.path || mUri?.fsPath));
+                const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+                runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.fsPath || mUri?.path));
               }
               break;
             case "bulk_build":
               for (const m of modules) {
-                const mUri = vscodeAPI2.Uri.joinPath(wsdUri, m);
-                runInTerminal(["npm run build"], plNormalize(mUri?.path || mUri?.fsPath));
+                const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+                runInTerminal(["npm run build"], plNormalize(mUri?.fsPath || mUri?.path));
               }
               break;
             case "open-dir":
               vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
               break;
             case "terminal":
-              runInTerminal([""], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              runInTerminal([""], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
               break;
             case "build":
-              runInTerminal(["npm run build"], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+              runInTerminal(["npm run build"], plNormalize(moduleUri?.fsPath || moduleUri?.path));
               break;
             case "watch":
-              runInTerminal(["npm run watch"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              runInTerminal(["npm run watch"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
               break;
             case "dev":
-              runInTerminal(["npm run dev"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              runInTerminal(["npm run dev"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
               break;
             case "test":
-              runInTerminal(["npm run test"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              runInTerminal(["npm run test"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
               break;
             case "diff":
-              runInTerminal(["git diff"], plNormalize(moduleUri?.path || moduleUri?.fsPath), true);
+              runInTerminal(["git diff"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
               break;
             case "install":
               runInTerminal([
@@ -19735,7 +19964,7 @@ var ManagerViewProvider = class {
                 "git submodule update --init --recursive --remote --merge",
                 "npm install -D",
                 "npm audit fix"
-              ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+              ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
               break;
             case "push":
               {
@@ -19750,7 +19979,7 @@ var ManagerViewProvider = class {
                   `git commit -m "${commitMsg}"`,
                   "git pull --rebase --ff",
                   "git push --all"
-                ], plNormalize(moduleUri?.path || moduleUri?.fsPath));
+                ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
               }
               ;
               break;
@@ -20394,6 +20623,9 @@ var stretchyCodePoint = {
   xtwoheadrightarrow: "\u21A0",
   xlongequal: "=",
   xrightleftarrows: "\u21C4",
+  xtofrom: "\u21C4",
+  xleftrightharpoons: "\u21CB",
+  xrightleftharpoons: "\u21CC",
   yields: "\u2192",
   yieldsLeft: "\u2190",
   mesomerism: "\u2194",
@@ -20403,7 +20635,9 @@ var stretchyCodePoint = {
   eqleftharpoondown: "\u21BD",
   "\\cdrightarrow": "\u2192",
   "\\cdleftarrow": "\u2190",
-  "\\cdlongequal": "="
+  "\\cdlongequal": "=",
+  yieldsLeftRight: "\u21C4",
+  chemequilibrium: "\u21CC"
 };
 var mathMLnode = function(label) {
   const child = new mathMLTree.TextNode(stretchyCodePoint[label.slice(1)]);
@@ -21235,7 +21469,7 @@ defineSymbol(math, inner, "\u22EF", "\\@cdots", true);
 defineSymbol(math, inner, "\u22F1", "\\ddots", true);
 defineSymbol(math, textord, "\u22EE", "\\varvdots");
 defineSymbol(text, textord, "\u22EE", "\\varvdots");
-defineSymbol(math, accent, "\u02CA", "\\acute");
+defineSymbol(math, accent, "\xB4", "\\acute");
 defineSymbol(math, accent, "`", "\\grave");
 defineSymbol(math, accent, "\xA8", "\\ddot");
 defineSymbol(math, accent, "\u2026", "\\dddot");
@@ -21261,7 +21495,7 @@ defineSymbol(math, mathord, "\xD8", "\\O", true);
 defineSymbol(text, accent, "\u02CA", "\\'");
 defineSymbol(text, accent, "\u02CB", "\\`");
 defineSymbol(text, accent, "\u02C6", "\\^");
-defineSymbol(text, accent, "\u02DC", "\\~");
+defineSymbol(text, accent, "~", "\\~");
 defineSymbol(text, accent, "\u02C9", "\\=");
 defineSymbol(text, accent, "\u02D8", "\\u");
 defineSymbol(text, accent, "\u02D9", "\\.");
@@ -21273,7 +21507,7 @@ defineSymbol(text, accent, "\u02DD", "\\H");
 defineSymbol(math, accent, "\u02CA", "\\'");
 defineSymbol(math, accent, "\u02CB", "\\`");
 defineSymbol(math, accent, "\u02C6", "\\^");
-defineSymbol(math, accent, "\u02DC", "\\~");
+defineSymbol(math, accent, "~", "\\~");
 defineSymbol(math, accent, "\u02C9", "\\=");
 defineSymbol(math, accent, "\u02D8", "\\u");
 defineSymbol(math, accent, "\u02D9", "\\.");
@@ -21699,7 +21933,6 @@ var taggedExpression = (expression, tag2, style, leqno) => {
   const label = getLabel(expression);
   expression = new mathMLTree.MathNode("mtd", [expression]);
   const rowArray = [glue$1(), expression, glue$1()];
-  rowArray[leqno ? 0 : 2].classes.push(leqno ? "tml-left" : "tml-right");
   rowArray[leqno ? 0 : 2].children.push(tag2);
   const mtr = new mathMLTree.MathNode("mtr", rowArray, ["tml-tageqn"]);
   if (label) {
@@ -21746,71 +21979,50 @@ function buildMathML(tree, texExpression, style, settings) {
   return math3;
 }
 var smalls = "aceg\u0131\u0237mnopqrsuvwxyz\u03B1\u03B3\u03B5\u03B7\u03B9\u03BA\u03BC\u03BD\u03BF\u03C0\u03C1\u03C2\u03C3\u03C4\u03C5\u03C7\u03C9\u03D5\u{1D41A}\u{1D41C}\u{1D41E}\u{1D420}\u{1D426}\u{1D427}\u{1D428}\u{1D429}\u{1D42A}\u{1D42B}\u{1D42C}\u{1D42E}\u{1D42F}\u{1D430}\u{1D431}\u{1D432}\u{1D433}";
-var talls = "ABCDEFGHIJKLMNOPQRSTUVWXYZbdfhklt\u0391\u0392\u0393\u0394\u0395\u0396\u0397\u0398\u0399\u039A\u039B\u039C\u039D\u039E\u039F\u03A0\u03A1\u03A3\u03A4\u03A5\u03A6\u03A7\u03A8\u03A9\u03B2\u03B4\u03BB\u03B6\u03C6\u03B8\u03C8\u{1D400}\u{1D401}\u{1D402}\u{1D403}\u{1D404}\u{1D405}\u{1D406}\u{1D407}\u{1D408}\u{1D409}\u{1D40A}\u{1D40B}\u{1D40C}\u{1D40D}\u{1D40E}\u{1D40F}\u{1D410}\u{1D411}\u{1D412}\u{1D413}\u{1D414}\u{1D415}\u{1D416}\u{1D417}\u{1D418}\u{1D419}\u{1D41B}\u{1D41D}\u{1D41F}\u{1D421}\u{1D424}\u{1D425}\u{1D42D}";
-var longSmalls = /* @__PURE__ */ new Set([
-  "\\alpha",
-  "\\gamma",
-  "\\delta",
-  "\\epsilon",
-  "\\eta",
-  "\\iota",
-  "\\kappa",
-  "\\mu",
-  "\\nu",
-  "\\pi",
-  "\\rho",
-  "\\sigma",
-  "\\tau",
-  "\\upsilon",
-  "\\chi",
-  "\\psi",
-  "\\omega",
-  "\\imath",
-  "\\jmath"
-]);
-var longTalls = /* @__PURE__ */ new Set([
-  "\\Gamma",
-  "\\Delta",
-  "\\Sigma",
-  "\\Omega",
-  "\\beta",
-  "\\delta",
-  "\\lambda",
-  "\\theta",
-  "\\psi"
-]);
+var smallNudge = "DHKLUcegorsuvxyz\u03A0\u03A5\u03A8\u03B1\u03B4\u03B7\u03B9\u03BC\u03BD\u03BF\u03C4\u03C5\u03C7\u03F5";
+var mediumNudge = "BCEGIMNOPQRSTXZlpqtw\u0393\u0398\u039E\u03A3\u03A6\u03A9\u03B2\u03B5\u03B6\u03B8\u03BE\u03C1\u03C2\u03C6\u03C8\u03D1\u03D5\u03F1";
+var largeNudge = "AFJdf\u0394\u039B";
 var mathmlBuilder$a = (group, style) => {
   const accentNode2 = group.isStretchy ? stretchy.accentNode(group) : new mathMLTree.MathNode("mo", [makeText(group.label, group.mode)]);
-  if (group.label === "\\vec") {
-    accentNode2.style.transform = "scale(0.75) translate(10%, 30%)";
-  } else {
-    accentNode2.style.mathStyle = "normal";
-    accentNode2.style.mathDepth = "0";
-    if (needWebkitShift.has(group.label) && utils.isCharacterBox(group.base)) {
-      let shift = "";
-      const ch = group.base.text;
-      if (smalls.indexOf(ch) > -1 || longSmalls.has(ch)) {
-        shift = "tml-xshift";
-      }
-      if (talls.indexOf(ch) > -1 || longTalls.has(ch)) {
-        shift = "tml-capshift";
-      }
-      if (shift) {
-        accentNode2.classes.push(shift);
-      }
-    }
-  }
   if (!group.isStretchy) {
     accentNode2.setAttribute("stretchy", "false");
   }
-  const node = new mathMLTree.MathNode(
-    group.label === "\\c" ? "munder" : "mover",
-    [buildGroup$1(group.base, style), accentNode2]
-  );
+  if (group.label !== "\\vec") {
+    accentNode2.style.mathDepth = "0";
+  }
+  const tag2 = group.label === "\\c" ? "munder" : "mover";
+  const needsWbkVertShift = needsWebkitVerticalShift.has(group.label);
+  if (tag2 === "mover" && group.mode === "math" && !group.isStretchy && group.base.text && group.base.text.length === 1) {
+    const text3 = group.base.text;
+    const isVec = group.label === "\\vec";
+    const vecPostfix = isVec === "\\vec" ? "-vec" : "";
+    if (isVec) {
+      accentNode2.classes.push("tml-vec");
+    }
+    const wbkPostfix = isVec ? "-vec" : needsWbkVertShift ? "-acc" : "";
+    if (smallNudge.indexOf(text3) > -1) {
+      accentNode2.classes.push(`chr-sml${vecPostfix}`);
+      accentNode2.classes.push(`wbk-sml${wbkPostfix}`);
+    } else if (mediumNudge.indexOf(text3) > -1) {
+      accentNode2.classes.push(`chr-med${vecPostfix}`);
+      accentNode2.classes.push(`wbk-med${wbkPostfix}`);
+    } else if (largeNudge.indexOf(text3) > -1) {
+      accentNode2.classes.push(`chr-lrg${vecPostfix}`);
+      accentNode2.classes.push(`wbk-lrg${wbkPostfix}`);
+    } else if (isVec) {
+      accentNode2.classes.push(`wbk-vec`);
+    } else if (needsWbkVertShift) {
+      accentNode2.classes.push(`wbk-acc`);
+    }
+  } else if (needsWbkVertShift) {
+    accentNode2.classes.push("wbk-acc");
+  }
+  const node = new mathMLTree.MathNode(tag2, [buildGroup$1(group.base, style), accentNode2]);
   return node;
 };
 var nonStretchyAccents = /* @__PURE__ */ new Set([
   "\\acute",
+  "\\check",
   "\\grave",
   "\\ddot",
   "\\dddot",
@@ -21824,7 +22036,7 @@ var nonStretchyAccents = /* @__PURE__ */ new Set([
   "\\dot",
   "\\mathring"
 ]);
-var needWebkitShift = /* @__PURE__ */ new Set([
+var needsWebkitVerticalShift = /* @__PURE__ */ new Set([
   "\\acute",
   "\\bar",
   "\\breve",
@@ -21834,9 +22046,9 @@ var needWebkitShift = /* @__PURE__ */ new Set([
   "\\grave",
   "\\hat",
   "\\mathring",
+  "\\`",
   "\\'",
   "\\^",
-  "\\~",
   "\\=",
   "\\u",
   "\\.",
@@ -21856,7 +22068,8 @@ var combiningChar = {
   '\\"': "\u0308",
   "\\r": "\u030A",
   "\\H": "\u030B",
-  "\\v": "\u030C"
+  "\\v": "\u030C",
+  "\\c": "\u0327"
 };
 defineFunction({
   type: "accent",
@@ -21924,6 +22137,8 @@ defineFunction({
         mode: "text",
         text: base.text + combiningChar[context.funcName]
       };
+    } else if (context.funcName === "\\c" && mode === "text" && base.text && base.text.length === 1) {
+      return { type: "textord", mode: "text", text: base.text + "\u0327" };
     } else {
       return {
         type: "accent",
@@ -22067,25 +22282,25 @@ var calculateSize = function(sizeValue, style) {
       throw new ParseError("Invalid unit: '" + unit + "'");
   }
 };
-var padding$1 = (width) => {
+var padding = (width) => {
   const node = new mathMLTree.MathNode("mspace");
   node.setAttribute("width", width + "em");
   return node;
 };
 var paddedNode = (group, lspace = 0.3, rspace = 0, mustSmash = false) => {
   if (group == null && rspace === 0) {
-    return padding$1(lspace);
+    return padding(lspace);
   }
   const row = group ? [group] : [];
   if (lspace !== 0) {
-    row.unshift(padding$1(lspace));
+    row.unshift(padding(lspace));
   }
   if (rspace > 0) {
-    row.push(padding$1(rspace));
+    row.push(padding(rspace));
   }
   if (mustSmash) {
     const mpadded = new mathMLTree.MathNode("mpadded", row);
-    mpadded.setAttribute("height", "0");
+    mpadded.setAttribute("height", "0.1px");
     return mpadded;
   } else {
     return new mathMLTree.MathNode("mrow", row);
@@ -22155,12 +22370,20 @@ defineFunction({
     "\\xlongequal",
     "\\xtwoheadrightarrow",
     "\\xtwoheadleftarrow",
-    // The next 5 functions are here only to support mhchem
+    "\\xtofrom",
+    // expfeil
+    "\\xleftrightharpoons",
+    // mathtools
+    "\\xrightleftharpoons",
+    // mathtools
+    // The next 7 functions are here only to support mhchem
     "\\yields",
     "\\yieldsLeft",
     "\\mesomerism",
     "\\longrightharpoonup",
     "\\longleftharpoondown",
+    "\\yieldsLeftRight",
+    "\\chemequilibrium",
     // The next 3 functions are here only to support the {CD} environment.
     "\\\\cdrightarrow",
     "\\\\cdleftarrow",
@@ -22182,34 +22405,18 @@ defineFunction({
   mathmlBuilder(group, style) {
     const node = munderoverNode(group.name, group.body, group.below, style);
     const row = [node];
-    row.unshift(padding$1(0.2778));
-    row.push(padding$1(0.2778));
+    row.unshift(padding(0.2778));
+    row.push(padding(0.2778));
     return new mathMLTree.MathNode("mrow", row);
   }
 });
 var arrowComponent = {
-  "\\xtofrom": ["\\xrightarrow", "\\xleftarrow"],
-  "\\xleftrightharpoons": ["\\xleftharpoonup", "\\xrightharpoondown"],
-  "\\xrightleftharpoons": ["\\xrightharpoonup", "\\xleftharpoondown"],
-  "\\yieldsLeftRight": ["\\yields", "\\yieldsLeft"],
-  // The next three all get the same harpoon glyphs. Only the lengths and paddings differ.
-  "\\equilibrium": ["\\longrightharpoonup", "\\longleftharpoondown"],
   "\\equilibriumRight": ["\\longrightharpoonup", "\\eqleftharpoondown"],
   "\\equilibriumLeft": ["\\eqrightharpoonup", "\\longleftharpoondown"]
 };
 defineFunction({
   type: "stackedArrow",
   names: [
-    "\\xtofrom",
-    // expfeil
-    "\\xleftrightharpoons",
-    // mathtools
-    "\\xrightleftharpoons",
-    // mathtools
-    "\\yieldsLeftRight",
-    // mhchem
-    "\\equilibrium",
-    // mhchem
     "\\equilibriumRight",
     "\\equilibriumLeft"
   ],
@@ -22253,13 +22460,13 @@ defineFunction({
       botNode.setAttribute("width", "0.5em");
       wrapper = new mathMLTree.MathNode(
         "mpadded",
-        [padding$1(0.2778), botNode, raiseNode, padding$1(0.2778)]
+        [padding(0.2778), botNode, raiseNode, padding(0.2778)]
       );
     } else {
       raiseNode.setAttribute("width", group.name === "\\equilibriumRight" ? "0.5em" : "0");
       wrapper = new mathMLTree.MathNode(
         "mpadded",
-        [padding$1(0.2778), raiseNode, botArrow, padding$1(0.2778)]
+        [padding(0.2778), raiseNode, botArrow, padding(0.2778)]
       );
     }
     wrapper.setAttribute("voffset", "-0.18em");
@@ -22469,18 +22676,18 @@ defineFunction({
     if (group.label.body.length === 0) {
       return new mathMLTree.MathNode("mrow", style);
     }
-    const mtd = new mathMLTree.MathNode("mtd", [buildGroup$1(group.label, style)]);
+    const mrow = buildGroup$1(group.label, style);
+    if (group.side === "left") {
+      mrow.classes.push("tml-shift-left");
+    }
+    const mtd = new mathMLTree.MathNode("mtd", [mrow]);
     mtd.style.padding = "0";
     const mtr = new mathMLTree.MathNode("mtr", [mtd]);
     const mtable = new mathMLTree.MathNode("mtable", [mtr]);
     const label = new mathMLTree.MathNode("mpadded", [mtable]);
-    label.setAttribute("width", "0");
+    label.setAttribute("width", "0.1px");
     label.setAttribute("displaystyle", "false");
     label.setAttribute("scriptlevel", "1");
-    if (group.side === "left") {
-      label.style.display = "flex";
-      label.style.justifyContent = "flex-end";
-    }
     return label;
   }
 });
@@ -22590,7 +22797,6 @@ var bordermatrixParseTree = (matrix, delimiters3) => {
     alwaysHandleSupSub: true,
     parentIsSupSub: true,
     symbol: false,
-    stack: true,
     suppressBaseShift: true,
     body: [container]
   };
@@ -22599,6 +22805,7 @@ var bordermatrixParseTree = (matrix, delimiters3) => {
     // We're using the MathML equivalent
     mode: "math",
     // of TeX \overset.
+    stack: true,
     base,
     // That keeps the {pmatrix} aligned with
     sup: topWrapper,
@@ -24903,9 +25110,9 @@ var texify = {
       case "<-->":
         return "\\yieldsLeftRight";
       case "<=>":
-        return "\\equilibrium";
+        return "\\chemequilibrium";
       case "\u21CC":
-        return "\\equilibrium";
+        return "\\chemequilibrium";
       case "<=>>":
         return "\\equilibriumRight";
       case "<<=>":
@@ -25367,10 +25574,9 @@ var mathmlBuilder$9 = function(group, style) {
         [buildGroup$1(rw[j], style.withLevel(cellLevel))]
       );
       if (group.envClasses.includes("multline")) {
-        const align2 = i === 0 ? "left" : i === numRows - 1 ? "right" : "center";
-        mtd.setAttribute("columnalign", align2);
-        if (align2 !== "center") {
-          mtd.classes.push("tml-" + align2);
+        const align = i === 0 ? "left" : i === numRows - 1 ? "right" : "center";
+        if (align !== "center") {
+          mtd.classes.push("tml-" + align);
         }
       }
       row.push(mtd);
@@ -25396,10 +25602,8 @@ var mathmlBuilder$9 = function(group, style) {
         row.push(glue(group));
         if (group.leqno) {
           row[0].children.push(tagElement);
-          row[0].classes.push("tml-left");
         } else {
           row[row.length - 1].children.push(tagElement);
-          row[row.length - 1].classes.push("tml-right");
         }
       }
     }
@@ -25443,6 +25647,8 @@ var mathmlBuilder$9 = function(group, style) {
     }
     if (mustSquashRow) {
       for (let j = 0; j < mtr.children.length; j++) {
+        mtr.children[j].style.display = "block";
+        mtr.children[j].style.height = "0";
         mtr.children[j].style.paddingTop = "0";
         mtr.children[j].style.paddingBottom = "0";
       }
@@ -25506,16 +25712,16 @@ var mathmlBuilder$9 = function(group, style) {
     }
   }
   if (group.envClasses.length > 0) {
-    const align2 = group.envClasses.includes("align") || group.envClasses.includes("alignat");
+    const align = group.envClasses.includes("align") || group.envClasses.includes("alignat");
     for (let i = 0; i < tbl.length; i++) {
       const row = tbl[i];
-      if (align2) {
+      if (align) {
         for (let j = 0; j < row.children.length; j++) {
           row.children[j].classes = ["tml-" + (j % 2 ? "left" : "right")];
         }
         if (group.autoTag) {
           const k = group.leqno ? 0 : row.children.length - 1;
-          row.children[k].classes = ["tml-" + (group.leqno ? "left" : "right")];
+          row.children[k].classes = [];
         }
       }
       if (row.children.length > 1 && group.envClasses.includes("cases")) {
@@ -25542,7 +25748,6 @@ var mathmlBuilder$9 = function(group, style) {
   if (group.autoTag || group.envClasses.includes("multline")) {
     table.style.width = "100%";
   }
-  let align = "";
   if (group.cols && group.cols.length > 0) {
     const cols = group.cols;
     let prevTypeWasAlign = false;
@@ -25564,7 +25769,6 @@ var mathmlBuilder$9 = function(group, style) {
     for (let i = iStart; i < iEnd; i++) {
       if (cols[i].type === "align") {
         const colAlign = alignMap[cols[i].align];
-        align += colAlign;
         iCol += 1;
         for (const row of table.children) {
           if (colAlign.trim() !== "center" && iCol < row.children.length) {
@@ -25591,12 +25795,6 @@ var mathmlBuilder$9 = function(group, style) {
         row.children[row.children.length - 1].style.paddingRight = "0.4em";
       }
     }
-  }
-  if (group.autoTag) {
-    align = "left " + (align.length > 0 ? align : "center ") + "right ";
-  }
-  if (align) {
-    table.setAttribute("columnalign", align.trim());
   }
   if (group.envClasses.includes("small")) {
     table = new mathMLTree.MathNode("mstyle", [table]);
@@ -26616,6 +26814,9 @@ var dels = ["}", "\\left", "\\middle", "\\right"];
 var isDelimiter = (str) => str.length > 0 && (delimiters.includes(str) || delimiterSizes[str] || dels.includes(str));
 var sizeToMaxHeight = [0, 1.2, 1.8, 2.4, 3];
 function checkDelimiter(delim, context) {
+  if (delim.type === "ordgroup" && delim.body.length === 1) {
+    delim = delim.body[0];
+  }
   const symDelim = checkSymbolNodeType(delim);
   if (symDelim && delimiters.includes(symDelim.text)) {
     if (["<", "\\lt"].includes(symDelim.text)) {
@@ -26658,13 +26859,23 @@ defineFunction({
   },
   handler: (context, args) => {
     const delim = checkDelimiter(args[0], context);
-    return {
+    const delimNode = {
       type: "delimsizing",
       mode: context.parser.mode,
       size: delimiterSizes[context.funcName].size,
       mclass: delimiterSizes[context.funcName].mclass,
       delim: delim.text
     };
+    const nextToken = context.parser.fetch().text;
+    if (nextToken !== "^" && nextToken !== "_") {
+      return delimNode;
+    } else {
+      return {
+        type: "ordgroup",
+        mode: "math",
+        body: [delimNode, { type: "ordgroup", mode: "math", body: [] }]
+      };
+    }
   },
   mathmlBuilder: (group) => {
     const children = [];
@@ -26806,22 +27017,8 @@ defineFunction({
     return middleNode;
   }
 });
-var padding = (_) => {
-  const node = new mathMLTree.MathNode("mspace");
-  node.setAttribute("width", "3pt");
-  return node;
-};
 var mathmlBuilder$7 = (group, style) => {
-  let node;
-  if (group.label.indexOf("colorbox") > -1 || group.label === "\\boxed") {
-    node = new mathMLTree.MathNode("mrow", [
-      padding(),
-      buildGroup$1(group.body, style),
-      padding()
-    ]);
-  } else {
-    node = new mathMLTree.MathNode("menclose", [buildGroup$1(group.body, style)]);
-  }
+  const node = new mathMLTree.MathNode("menclose", [buildGroup$1(group.body, style)]);
   switch (group.label) {
     case "\\overline":
       node.setAttribute("notation", "top");
@@ -26868,7 +27065,8 @@ var mathmlBuilder$7 = (group, style) => {
       break;
     case "\\boxed":
       node.setAttribute("notation", "box");
-      node.classes.push("tml-box");
+      node.style.padding = "3pt";
+      node.style.border = "1px solid";
       node.setAttribute("scriptlevel", "0");
       node.setAttribute("displaystyle", "true");
       break;
@@ -26878,11 +27076,10 @@ var mathmlBuilder$7 = (group, style) => {
       break;
     case "\\fcolorbox":
     case "\\colorbox": {
-      const style2 = { padding: "3pt 0 3pt 0" };
+      node.style.padding = "3pt";
       if (group.label === "\\fcolorbox") {
-        style2.border = "0.0667em solid " + String(group.borderColor);
+        node.style.border = "0.0667em solid " + String(group.borderColor);
       }
-      node.style = style2;
       break;
     }
   }
@@ -27891,7 +28088,7 @@ defineFunction({
       const phantomInner = buildExpression(ordargument(group.body), style);
       const phantom2 = new mathMLTree.MathNode("mphantom", phantomInner);
       strut = new mathMLTree.MathNode("mpadded", [phantom2]);
-      strut.setAttribute("width", "0px");
+      strut.setAttribute("width", "0.1px");
     }
     const inner3 = buildGroup$1(group.body, style);
     let node;
@@ -27917,7 +28114,7 @@ defineFunction({
         node.style.justifyContent = "center";
       }
     }
-    node.setAttribute("width", "0px");
+    node.setAttribute("width", "0.1px");
     return node;
   }
 });
@@ -28023,16 +28220,16 @@ function mathmlBuilder$3(group, style) {
     if (node.type === "mrow") {
       if (doSpacing) {
         if (group.mclass === "mbin") {
-          node.children.unshift(padding$1(0.2222));
-          node.children.push(padding$1(0.2222));
+          node.children.unshift(padding(0.2222));
+          node.children.push(padding(0.2222));
         } else if (group.mclass === "mrel") {
-          node.children.unshift(padding$1(0.2778));
-          node.children.push(padding$1(0.2778));
+          node.children.unshift(padding(0.2778));
+          node.children.push(padding(0.2778));
         } else if (group.mclass === "mpunct") {
-          node.children.push(padding$1(0.1667));
+          node.children.push(padding(0.1667));
         } else if (group.mclass === "minner") {
-          node.children.unshift(padding$1(0.0556));
-          node.children.push(padding$1(0.0556));
+          node.children.unshift(padding(0.0556));
+          node.children.push(padding(0.0556));
         }
       }
     } else {
@@ -28113,7 +28310,7 @@ defineFunction({
   mathmlBuilder: mathmlBuilder$3
 });
 var binrelClass = (arg) => {
-  const atom = arg.type === "ordgroup" && arg.body.length ? arg.body[0] : arg;
+  const atom = arg.type === "ordgroup" && arg.body.length && arg.body.length === 1 ? arg.body[0] : arg;
   if (atom.type === "atom" && (atom.family === "bin" || atom.family === "rel")) {
     return "m" + atom.family;
   } else {
@@ -28145,20 +28342,27 @@ defineFunction({
   handler({ parser: parser2, funcName }, args) {
     const baseArg = args[1];
     const shiftedArg = args[0];
+    let mclass;
+    if (funcName !== "\\stackrel") {
+      mclass = binrelClass(baseArg);
+    } else {
+      mclass = "mrel";
+    }
+    const baseType = mclass === "mrel" || mclass === "mbin" ? "op" : "ordgroup";
     const baseOp = {
-      type: "op",
+      type: baseType,
       mode: baseArg.mode,
       limits: true,
       alwaysHandleSupSub: true,
       parentIsSupSub: false,
       symbol: false,
-      stack: true,
       suppressBaseShift: funcName !== "\\stackrel",
       body: ordargument(baseArg)
     };
     return {
       type: "supsub",
       mode: shiftedArg.mode,
+      stack: true,
       base: baseOp,
       sup: funcName === "\\underset" ? null : shiftedArg,
       sub: funcName === "\\underset" ? shiftedArg : null
@@ -28960,6 +29164,68 @@ defineFunction({
     return wrapper;
   }
 });
+var numRegEx = /^[0-9]$/;
+var unicodeNumSubs = {
+  "0": "\u2080",
+  "1": "\u2081",
+  "2": "\u2082",
+  "3": "\u2083",
+  "4": "\u2084",
+  "5": "\u2085",
+  "6": "\u2086",
+  "7": "\u2087",
+  "8": "\u2088",
+  "9": "\u2089"
+};
+var unicodeNumSups = {
+  "0": "\u2070",
+  "1": "\xB9",
+  "2": "\xB2",
+  "3": "\xB3",
+  "4": "\u2074",
+  "5": "\u2075",
+  "6": "\u2076",
+  "7": "\u2077",
+  "8": "\u2078",
+  "9": "\u2079"
+};
+defineFunction({
+  type: "sfrac",
+  names: ["\\sfrac"],
+  props: {
+    numArgs: 2,
+    allowedInText: true,
+    allowedInMath: true
+  },
+  handler({ parser: parser2 }, args) {
+    let numerator = "";
+    for (const node of args[0].body) {
+      if (node.type !== "textord" || !numRegEx.test(node.text)) {
+        throw new ParseError("Numerator must be an integer.", node);
+      }
+      numerator += node.text;
+    }
+    let denominator = "";
+    for (const node of args[1].body) {
+      if (node.type !== "textord" || !numRegEx.test(node.text)) {
+        throw new ParseError("Denominator must be an integer.", node);
+      }
+      denominator += node.text;
+    }
+    return {
+      type: "sfrac",
+      mode: parser2.mode,
+      numerator,
+      denominator
+    };
+  },
+  mathmlBuilder(group, style) {
+    const numerator = group.numerator.split("").map((c) => unicodeNumSups[c]).join("");
+    const denominator = group.denominator.split("").map((c) => unicodeNumSubs[c]).join("");
+    const text3 = new mathMLTree.TextNode(numerator + "\u2044" + denominator, group.mode, style);
+    return new mathMLTree.MathNode("mn", [text3], ["special-fraction"]);
+  }
+});
 var sizeMap = {
   "\\tiny": 0.5,
   "\\sixptsize": 0.6,
@@ -29066,6 +29332,42 @@ defineFunction({
     return node;
   }
 });
+var xHeights = [
+  "a",
+  "c",
+  "e",
+  "\u0131",
+  "m",
+  "n",
+  "o",
+  "r",
+  "s",
+  "u",
+  "v",
+  "w",
+  "x",
+  "z",
+  "\u03B1",
+  "\u03B5",
+  "\u03B9",
+  "\u03BA",
+  "\u03BD",
+  "\u03BF",
+  "\u03C0",
+  "\u03C3",
+  "\u03C4",
+  "\u03C5",
+  "\u03C9",
+  "\\alpha",
+  "\\epsilon",
+  "\\iota",
+  "\\kappa",
+  "\\nu",
+  "\\omega",
+  "\\pi",
+  "\\tau",
+  "\\omega"
+];
 defineFunction({
   type: "sqrt",
   names: ["\\sqrt"],
@@ -29076,6 +29378,15 @@ defineFunction({
   handler({ parser: parser2 }, args, optArgs) {
     const index = optArgs[0];
     const body = args[0];
+    if (body.body && body.body.length === 1 && body.body[0].text && xHeights.includes(body.body[0].text)) {
+      body.body.push({
+        "type": "rule",
+        "mode": "math",
+        "shift": null,
+        "width": { "number": 0, "unit": "pt" },
+        "height": { "number": 0.5, "unit": "em" }
+      });
+    }
     return {
       type: "sqrt",
       mode: parser2.mode,
@@ -29134,6 +29445,9 @@ defineFunction({
   }
 });
 var symbolRegEx = /^m(over|under|underover)$/;
+var smallPad = "DHKLUcegorsuvxyz\u03A0\u03A5\u03A8\u03B1\u03B4\u03B7\u03B9\u03BC\u03BD\u03BF\u03C4\u03C5\u03C7\u03F5";
+var mediumPad = "BCEFGIMNOPQRSTXZlpqtw\u0393\u0398\u039E\u03A3\u03A6\u03A9\u03B2\u03B5\u03B6\u03B8\u03BE\u03C1\u03C2\u03C6\u03C8\u03D1\u03D5\u03F1";
+var largePad = "AJdf\u0394\u039B";
 defineFunctionBuilders({
   type: "supsub",
   mathmlBuilder(group, style) {
@@ -29150,13 +29464,13 @@ defineFunctionBuilders({
         isOver = group.base.isOver;
       }
     }
-    if (group.base && !group.base.stack && (group.base.type === "op" || group.base.type === "operatorname")) {
+    if (group.base && !group.stack && (group.base.type === "op" || group.base.type === "operatorname")) {
       group.base.parentIsSupSub = true;
       appendApplyFunction = !group.base.symbol;
       appendSpace = appendApplyFunction && !group.isFollowedByDelimiter;
       needsLeadingSpace = group.base.needsLeadingSpace;
     }
-    const children = group.base && group.base.stack ? [buildGroup$1(group.base.body[0], style)] : [buildGroup$1(group.base, style)];
+    const children = group.stack && group.base.body.length === 1 ? [buildGroup$1(group.base.body[0], style)] : [buildGroup$1(group.base, style)];
     const childStyle = style.inSubOrSup();
     if (group.sub) {
       const sub2 = buildGroup$1(group.sub, childStyle);
@@ -29170,9 +29484,15 @@ defineFunctionBuilders({
       if (style.level === 3) {
         sup2.setAttribute("scriptlevel", "2");
       }
-      const testNode = sup2.type === "mrow" ? sup2.children[0] : sup2;
-      if (testNode && testNode.type === "mo" && testNode.classes.includes("tml-prime") && group.base && group.base.text && "fF".indexOf(group.base.text) > -1) {
-        testNode.classes.push("prime-pad");
+      if (group.base && group.base.text && group.base.text.length === 1) {
+        const text3 = group.base.text;
+        if (smallPad.indexOf(text3) > -1) {
+          sup2.classes.push("tml-sml-pad");
+        } else if (mediumPad.indexOf(text3) > -1) {
+          sup2.classes.push("tml-med-pad");
+        } else if (largePad.indexOf(text3) > -1) {
+          sup2.classes.push("tml-lrg-pad");
+        }
       }
       children.push(sup2);
     }
@@ -29190,7 +29510,9 @@ defineFunctionBuilders({
       }
     } else if (!group.sup) {
       const base = group.base;
-      if (base && base.type === "op" && base.limits && (style.level === StyleLevel.DISPLAY || base.alwaysHandleSupSub)) {
+      if (group.stack) {
+        nodeType = "munder";
+      } else if (base && base.type === "op" && base.limits && (style.level === StyleLevel.DISPLAY || base.alwaysHandleSupSub)) {
         nodeType = "munder";
       } else if (base && base.type === "operatorname" && base.alwaysHandleSupSub && (base.limits || style.level === StyleLevel.DISPLAY)) {
         nodeType = "munder";
@@ -29270,9 +29592,9 @@ defineFunctionBuilders({
       node.attributes.rspace = "0.2222em";
     } else if (group.needsSpacing) {
       if (group.family === "bin") {
-        return new mathMLTree.MathNode("mrow", [padding$1(0.222), node, padding$1(0.222)]);
+        return new mathMLTree.MathNode("mrow", [padding(0.222), node, padding(0.222)]);
       } else {
-        return new mathMLTree.MathNode("mrow", [padding$1(0.2778), node, padding$1(0.2778)]);
+        return new mathMLTree.MathNode("mrow", [padding(0.2778), node, padding(0.2778)]);
       }
     }
     return node;
@@ -31868,7 +32190,7 @@ var Style = class _Style {
     return this.color;
   }
 };
-var version = "0.11.07";
+var version = "0.11.11";
 function postProcess(block2) {
   const labelMap = {};
   let i = 0;
@@ -32484,7 +32806,7 @@ var def = edit(/^ {0,3}\[(label)\]: *(?:\n[ \t]*)?([^<\s][^\s]*|<.*?>)(?:(?: +(?
 var list = edit(/^( {0,3}bull)([ \t][^\n]+?)?(?:\n|$)/).replace(/bull/g, bullet).getRegex();
 var _tag = "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|meta|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
 var _comment = /<!--(?:-?>|[\s\S]*?(?:-->|$))/;
-var html2 = edit(
+var html = edit(
   "^ {0,3}(?:<(script|pre|style|textarea)[\\s>][\\s\\S]*?(?:</\\1>[^\\n]*\\n+|$)|comment[^\\n]*(\\n+|$)|<\\?[\\s\\S]*?(?:\\?>\\n*|$)|<![A-Z][\\s\\S]*?(?:>\\n*|$)|<!\\[CDATA\\[[\\s\\S]*?(?:\\]\\]>\\n*|$)|</?(tag)(?: +|\\n|/?>)[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|<(?!script|pre|style|textarea)([a-z][\\w-]*)(?:attribute)*? */?>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$)|</(?!script|pre|style|textarea)[a-z][\\w-]*\\s*>(?=[ \\t]*(?:\\n|$))[\\s\\S]*?(?:(?:\\n[ 	]*)+\\n|$))",
   "i"
 ).replace("comment", _comment).replace("tag", _tag).replace("attribute", / +[a-zA-Z:_][\w.:-]*(?: *= *"[^"\n]*"| *= *'[^'\n]*'| *= *[^\s"'=<>`]+)?/).getRegex();
@@ -32497,7 +32819,7 @@ var blockNormal = {
   fences,
   heading,
   hr,
-  html: html2,
+  html,
   lheading,
   list,
   newline,
@@ -32619,17 +32941,17 @@ var escapeReplacements = {
   "'": "&#39;"
 };
 var getEscapeReplacement = (ch) => escapeReplacements[ch];
-function escape22(html22, encode) {
+function escape22(html2, encode) {
   if (encode) {
-    if (other.escapeTest.test(html22)) {
-      return html22.replace(other.escapeReplace, getEscapeReplacement);
+    if (other.escapeTest.test(html2)) {
+      return html2.replace(other.escapeReplace, getEscapeReplacement);
     }
   } else {
-    if (other.escapeTestNoEncode.test(html22)) {
-      return html22.replace(other.escapeReplaceNoEncode, getEscapeReplacement);
+    if (other.escapeTestNoEncode.test(html2)) {
+      return html2.replace(other.escapeReplaceNoEncode, getEscapeReplacement);
     }
   }
-  return html22;
+  return html2;
 }
 function cleanUrl(href) {
   try {
@@ -34174,8 +34496,8 @@ var _Hooks = class {
   /**
    * Process HTML after marked is finished
    */
-  postprocess(html22) {
-    return html22;
+  postprocess(html2) {
+    return html2;
   }
   /**
    * Process all tokens before walk tokens
@@ -34431,7 +34753,7 @@ var Marked = class {
       const lexer2 = opt.hooks ? opt.hooks.provideLexer() : blockType ? _Lexer.lex : _Lexer.lexInline;
       const parser2 = opt.hooks ? opt.hooks.provideParser() : blockType ? _Parser.parse : _Parser.parseInline;
       if (opt.async) {
-        return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.hooks ? opt.hooks.processAllTokens(tokens) : tokens).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html22) => opt.hooks ? opt.hooks.postprocess(html22) : html22).catch(throwError);
+        return Promise.resolve(opt.hooks ? opt.hooks.preprocess(src) : src).then((src2) => lexer2(src2, opt)).then((tokens) => opt.hooks ? opt.hooks.processAllTokens(tokens) : tokens).then((tokens) => opt.walkTokens ? Promise.all(this.walkTokens(tokens, opt.walkTokens)).then(() => tokens) : tokens).then((tokens) => parser2(tokens, opt)).then((html2) => opt.hooks ? opt.hooks.postprocess(html2) : html2).catch(throwError);
       }
       try {
         if (opt.hooks) {
@@ -34444,11 +34766,11 @@ var Marked = class {
         if (opt.walkTokens) {
           this.walkTokens(tokens, opt.walkTokens);
         }
-        let html22 = parser2(tokens, opt);
+        let html2 = parser2(tokens, opt);
         if (opt.hooks) {
-          html22 = opt.hooks.postprocess(html22);
+          html2 = opt.hooks.postprocess(html2);
         }
-        return html22;
+        return html2;
       } catch (e) {
         return throwError(e);
       }
@@ -34611,9 +34933,6 @@ var ParseError2 = class _ParseError {
   }
 };
 ParseError2.prototype.__proto__ = Error.prototype;
-var contains = function contains2(list2, elem) {
-  return list2.indexOf(elem) !== -1;
-};
 var deflt2 = function deflt3(setting, defaultIfUndefined) {
   return setting === void 0 ? defaultIfUndefined : setting;
 };
@@ -34675,7 +34994,6 @@ var protocolFromUrl2 = function protocolFromUrl3(url) {
   return protocol[1].toLowerCase();
 };
 var utils2 = {
-  contains,
   deflt: deflt2,
   escape: escape3,
   hyphenate: hyphenate2,
@@ -35219,7 +35537,6 @@ var tallDelim = function tallDelim2(label, midHeight) {
   }
 };
 var DocumentFragment2 = class {
-  // HtmlDomNode
   // Never used; needed for satisfying interface.
   constructor(children) {
     this.children = void 0;
@@ -35236,7 +35553,7 @@ var DocumentFragment2 = class {
     this.style = {};
   }
   hasClass(className) {
-    return utils2.contains(this.classes, className);
+    return this.classes.includes(className);
   }
   /** Convert the fragment into a node. */
   toNode() {
@@ -37979,7 +38296,7 @@ var Span2 = class {
     this.attributes[attribute] = value;
   }
   hasClass(className) {
-    return utils2.contains(this.classes, className);
+    return this.classes.includes(className);
   }
   toNode() {
     return toNode2.call(this, "span");
@@ -38005,7 +38322,7 @@ var Anchor = class {
     this.attributes[attribute] = value;
   }
   hasClass(className) {
-    return utils2.contains(this.classes, className);
+    return this.classes.includes(className);
   }
   toNode() {
     return toNode2.call(this, "a");
@@ -38029,7 +38346,7 @@ var Img2 = class {
     this.style = style;
   }
   hasClass(className) {
-    return utils2.contains(this.classes, className);
+    return this.classes.includes(className);
   }
   toNode() {
     var node = document.createElement("img");
@@ -38094,7 +38411,7 @@ var SymbolNode = class {
     }
   }
   hasClass(className) {
-    return utils2.contains(this.classes, className);
+    return this.classes.includes(className);
   }
   /**
    * Creates a text node or span from a symbol node. Note that a span is only
@@ -39740,9 +40057,9 @@ var buildExpression$1 = function buildExpression2(expression, options2, isRealGr
   traverseNonSpaceNodes(groups, (node2, prev) => {
     var prevType = prev.classes[0];
     var type = node2.classes[0];
-    if (prevType === "mbin" && utils2.contains(binRightCanceller, type)) {
+    if (prevType === "mbin" && binRightCanceller.includes(type)) {
       prev.classes[0] = "mord";
-    } else if (type === "mbin" && utils2.contains(binLeftCanceller, prevType)) {
+    } else if (type === "mbin" && binLeftCanceller.includes(prevType)) {
       node2.classes[0] = "mord";
     }
   }, {
@@ -40150,7 +40467,7 @@ var getVariant2 = function getVariant3(group, options2) {
     return "monospace";
   }
   var text3 = group.text;
-  if (utils2.contains(["\\imath", "\\jmath"], text3)) {
+  if (["\\imath", "\\jmath"].includes(text3)) {
     return null;
   }
   if (symbols2[mode][text3] && symbols2[mode][text3].replace) {
@@ -40241,7 +40558,7 @@ var buildGroup3 = function buildGroup4(group, options2) {
 function buildMathML2(tree, texExpression, options2, isDisplayMode, forMathmlOnly) {
   var expression = buildExpression3(tree, options2);
   var wrapper;
-  if (expression.length === 1 && expression[0] instanceof MathNode2 && utils2.contains(["mrow", "mtable"], expression[0].type)) {
+  if (expression.length === 1 && expression[0] instanceof MathNode2 && ["mrow", "mtable"].includes(expression[0].type)) {
     wrapper = expression[0];
   } else {
     wrapper = new mathMLTree2.MathNode("mrow", expression);
@@ -40408,7 +40725,7 @@ var svgSpan = function svgSpan2(group, options2) {
   function buildSvgSpan_() {
     var viewBoxWidth = 4e5;
     var label = group.label.slice(1);
-    if (utils2.contains(["widehat", "widecheck", "widetilde", "utilde"], label)) {
+    if (["widehat", "widecheck", "widetilde", "utilde"].includes(label)) {
       var grp = group;
       var numChars = groupLength(grp.base);
       var viewBoxHeight;
@@ -41763,11 +42080,11 @@ var makeStackedDelim = function makeStackedDelim2(delim, heightTotal, center, op
     top = "\\Uparrow";
     repeat = "\u2016";
     bottom = "\\Downarrow";
-  } else if (utils2.contains(verts, delim)) {
+  } else if (verts.includes(delim)) {
     repeat = "\u2223";
     svgLabel = "vert";
     viewBoxWidth = 333;
-  } else if (utils2.contains(doubleVerts, delim)) {
+  } else if (doubleVerts.includes(delim)) {
     repeat = "\u2225";
     svgLabel = "doublevert";
     viewBoxWidth = 556;
@@ -41996,9 +42313,9 @@ var makeSizedDelim = function makeSizedDelim2(delim, size, options2, mode, class
   } else if (delim === ">" || delim === "\\gt" || delim === "\u27E9") {
     delim = "\\rangle";
   }
-  if (utils2.contains(stackLargeDelimiters, delim) || utils2.contains(stackNeverDelimiters, delim)) {
+  if (stackLargeDelimiters.includes(delim) || stackNeverDelimiters.includes(delim)) {
     return makeLargeDelim(delim, size, false, options2, mode, classes);
-  } else if (utils2.contains(stackAlwaysDelimiters, delim)) {
+  } else if (stackAlwaysDelimiters.includes(delim)) {
     return makeStackedDelim(delim, sizeToMaxHeight2[size], false, options2, mode, classes);
   } else {
     throw new ParseError2("Illegal delimiter: '" + delim + "'");
@@ -42098,9 +42415,9 @@ var makeCustomSizedDelim = function makeCustomSizedDelim2(delim, height, center,
     delim = "\\rangle";
   }
   var sequence;
-  if (utils2.contains(stackNeverDelimiters, delim)) {
+  if (stackNeverDelimiters.includes(delim)) {
     sequence = stackNeverDelimiterSequence;
-  } else if (utils2.contains(stackLargeDelimiters, delim)) {
+  } else if (stackLargeDelimiters.includes(delim)) {
     sequence = stackLargeDelimiterSequence;
   } else {
     sequence = stackAlwaysDelimiterSequence;
@@ -42210,7 +42527,7 @@ var delimiterSizes2 = {
 var delimiters2 = ["(", "\\lparen", ")", "\\rparen", "[", "\\lbrack", "]", "\\rbrack", "\\{", "\\lbrace", "\\}", "\\rbrace", "\\lfloor", "\\rfloor", "\u230A", "\u230B", "\\lceil", "\\rceil", "\u2308", "\u2309", "<", ">", "\\langle", "\u27E8", "\\rangle", "\u27E9", "\\lt", "\\gt", "\\lvert", "\\rvert", "\\lVert", "\\rVert", "\\lgroup", "\\rgroup", "\u27EE", "\u27EF", "\\lmoustache", "\\rmoustache", "\u23B0", "\u23B1", "/", "\\backslash", "|", "\\vert", "\\|", "\\Vert", "\\uparrow", "\\Uparrow", "\\downarrow", "\\Downarrow", "\\updownarrow", "\\Updownarrow", "."];
 function checkDelimiter2(delim, context) {
   var symDelim = checkSymbolNodeType2(delim);
-  if (symDelim && utils2.contains(delimiters2, symDelim.text)) {
+  if (symDelim && delimiters2.includes(symDelim.text)) {
     return symDelim;
   } else if (symDelim) {
     throw new ParseError2("Invalid delimiter '" + symDelim.text + "' after '" + context.funcName + "'", delim);
@@ -43499,7 +43816,7 @@ defineEnvironment2({
     numArgs: 0
   },
   handler(context) {
-    if (utils2.contains(["gather", "gather*"], context.envName)) {
+    if (["gather", "gather*"].includes(context.envName)) {
       validateAmsEnvironmentContext2(context);
     }
     var res = {
@@ -44452,11 +44769,14 @@ defineFunction2({
       case "\\htmlData": {
         var data = value.split(",");
         for (var i = 0; i < data.length; i++) {
-          var keyVal = data[i].split("=");
-          if (keyVal.length !== 2) {
-            throw new ParseError2("Error parsing key-value for \\htmlData");
+          var item = data[i];
+          var firstEquals = item.indexOf("=");
+          if (firstEquals < 0) {
+            throw new ParseError2("\\htmlData key/value '" + item + "' missing equals sign");
           }
-          attributes["data-" + keyVal[0].trim()] = keyVal[1].trim();
+          var key = item.slice(0, firstEquals);
+          var _value = item.slice(firstEquals + 1);
+          attributes["data-" + key.trim()] = _value;
         }
         trustContext = {
           command: "\\htmlData",
@@ -44954,7 +45274,7 @@ var htmlBuilder$2 = (grp, options2) => {
   }
   var style = options2.style;
   var large = false;
-  if (style.size === Style$1.DISPLAY.size && group.symbol && !utils2.contains(noSuccessor2, group.name)) {
+  if (style.size === Style$1.DISPLAY.size && group.symbol && !noSuccessor2.includes(group.name)) {
     large = true;
   }
   var base;
@@ -45020,7 +45340,7 @@ var mathmlBuilder$12 = (group, options2) => {
   var node;
   if (group.symbol) {
     node = new MathNode2("mo", [makeText2(group.name, group.mode)]);
-    if (utils2.contains(noSuccessor2, group.name)) {
+    if (noSuccessor2.includes(group.name)) {
       node.setAttribute("largeop", "false");
     }
   } else if (group.body) {
@@ -45159,7 +45479,8 @@ defineFunction2({
   type: "op",
   names: ["\\int", "\\iint", "\\iiint", "\\oint", "\\oiint", "\\oiiint", "\u222B", "\u222C", "\u222D", "\u222E", "\u222F", "\u2230"],
   props: {
-    numArgs: 0
+    numArgs: 0,
+    allowedInArgument: true
   },
   handler(_ref5) {
     var {
@@ -46836,7 +47157,7 @@ defineMacro2("\\dots", function(context) {
   } else if (next.slice(0, 4) === "\\not") {
     thedots = "\\dotsb";
   } else if (next in symbols2.math) {
-    if (utils2.contains(["bin", "rel"], symbols2.math[next].group)) {
+    if (["bin", "rel"].includes(symbols2.math[next].group)) {
       thedots = "\\dotsb";
     }
   }
@@ -47296,7 +47617,7 @@ var MacroExpander2 = class {
     }
     this.pushToken(new Token2("EOF", end.loc));
     this.pushTokens(tokens);
-    return start.range(end, "");
+    return new Token2("", SourceLocation2.range(start, end));
   }
   /**
    * Consume all following space tokens, without expansion.
@@ -48582,7 +48903,7 @@ var Parser2 = class _Parser2 {
     if (res == null) {
       return null;
     }
-    var match = /^(#[a-f0-9]{3}|#?[a-f0-9]{6}|[a-z]+)$/i.exec(res.text);
+    var match = /^(#[a-f0-9]{3,4}|#[a-f0-9]{6}|#[a-f0-9]{8}|[a-f0-9]{6}|[a-z]+)$/i.exec(res.text);
     if (!match) {
       throw new ParseError2("Invalid color: '" + res.text + "'", res);
     }
@@ -48945,7 +49266,7 @@ var renderToHTMLTree = function renderToHTMLTree2(expression, options2) {
     return renderError2(error, expression, settings);
   }
 };
-var version2 = "0.16.22";
+var version2 = "0.16.27";
 var __domTree = {
   Span: Span2,
   Anchor,
@@ -49171,22 +49492,22 @@ async function markdown(context) {
     }
   });
   const copyAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.copy", async () => {
-    let html3 = await convertToHtml(await getSelection());
-    if (html3) {
-      vscodeAPI2?.env?.clipboard?.writeText?.(html3);
+    let html2 = await convertToHtml(await getSelection());
+    if (html2) {
+      vscodeAPI2?.env?.clipboard?.writeText?.(html2);
       vscodeAPI2?.window?.showInformationMessage?.("Copied as HTML!");
     }
   });
   const convertAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.convert", async () => {
-    let html3 = await convertToHtml(await getSelection());
-    if (html3) {
-      await replaceSelectionWith(html3);
+    let html2 = await convertToHtml(await getSelection());
+    if (html2) {
+      await replaceSelectionWith(html2);
     }
   });
   const pasteAsHtml = vscodeAPI2?.commands?.registerCommand?.("vext.dth.paste", async () => {
-    const html3 = await getAsHtml();
-    if (html3) {
-      await replaceSelectionWith(html3);
+    const html2 = await getAsHtml();
+    if (html2) {
+      await replaceSelectionWith(html2);
     }
   });
   context.subscriptions.push(...[convertAsMarkdown, pasteAsMarkdown, convertAsHtml, pasteAsHtml, copyAsMarkdown, copyAsHtml]?.filter?.((v) => v));

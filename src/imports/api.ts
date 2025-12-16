@@ -1,39 +1,35 @@
-import { createRequire } from 'module';
+import { createRequire } from "module";
 
-// @ts-ignore
-let vscode: Promise<any> = null;
+// NOTE:
+// Cursor's extension host can fail to resolve the `vscode` module via ESM `import(...)`.
+// Using CommonJS `require('vscode')` via createRequire is the most compatible approach.
 
 // @ts-ignore
 const VSCODE_MOD_NAME = "vscode";
 
-//
-const tryLegacyMethod = ()=>{
-    // @ts-ignore
-    let require:any = null;
+const getVsCodeApi = () => {
+    // Extension host (Node): prefer require('vscode')
     try {
-        require = createRequire(import.meta.url);
-    } catch (error) {
-        console.warn(error); // @ts-ignore
+        const require = createRequire(import.meta.url);
+        // @ts-ignore
+        return require(VSCODE_MOD_NAME);
+    } catch (e) {
+        console.warn(e);
     }
 
-    try { // @ts-ignore
-        return require?.("" + VSCODE_MOD_NAME) ?? (typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis);
-    } catch (error) {
-        console.warn(error); // @ts-ignore
-        return (typeof acquireVsCodeApi !== "undefined" ? acquireVsCodeApi?.() : globalThis);
+    // Webview (browser): fallback to acquireVsCodeApi
+    try {
+        // @ts-ignore
+        if (typeof acquireVsCodeApi !== "undefined") { return acquireVsCodeApi?.(); }
+    } catch (e) {
+        console.warn(e);
     }
+
+    // Last resort
+    return globalThis;
 };
 
-//
-try {
-    vscode = import("" + VSCODE_MOD_NAME)?.catch?.((e)=>{
-        console.warn(e);
-        return tryLegacyMethod(); // @ts-ignore
-    });
-} catch (e) {
-    console.warn(e);
-    vscode = tryLegacyMethod();
-}
+// @ts-ignore
+const vscode = Promise.resolve().then(getVsCodeApi);
 
-//
 export default vscode;
