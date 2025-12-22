@@ -19742,6 +19742,13 @@ var joinModuleUri = (vscodeAPI2, wsdUri, modulePath) => {
   const segs = normalizeModuleSegments(modulePath);
   return segs.length ? vscodeAPI2.Uri.joinPath(wsdUri, ...segs) : wsdUri;
 };
+var normalizePath = (vscode2, uri) => {
+  let p = uri?.fsPath || uri?.path || "";
+  if (/^\/[a-zA-Z]:\//.test(p)) {
+    p = p.slice(1);
+  }
+  return p.replace(/\\/g, "/");
+};
 async function initVscodeAPI() {
   if (!vscodeAPI) {
     vscodeAPI = await api_default;
@@ -19749,8 +19756,8 @@ async function initVscodeAPI() {
     watcher?.onDidCreate?.(() => inWatch.forEach((cb) => cb?.()));
     watcher?.onDidDelete?.(() => inWatch.forEach((cb) => cb?.()));
     watcher?.onDidChange?.(() => inWatch.forEach((cb) => cb?.()));
-    vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => () => inWatch.forEach((cb) => cb?.()));
-    vscodeAPI?.window?.onDidChangeActiveTextEditor?.(() => () => inWatch.forEach((cb) => cb?.()));
+    vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => inWatch.forEach((cb) => cb?.()));
+    vscodeAPI?.window?.onDidChangeActiveTextEditor?.(() => inWatch.forEach((cb) => cb?.()));
     vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
       for (const [cwd, obj] of terminalMap.entries()) {
         if (obj.terminal === closedTerminal) {
@@ -19776,40 +19783,32 @@ var getWorkspaceFolder = async (workspace, res = "") => {
   return folder?.uri || void 0;
 };
 async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
-  let result = [];
+  const result = [];
   try {
     const entries = await vscodeAPI2.workspace.fs.readDirectory(baseDir);
     let hasRepo = false, hasPkg = false;
     for (const [name, type] of entries) {
-      if (name === ".git" && type === vscodeAPI2.FileType.Directory) {
-        hasRepo = true;
-      }
-      if ((name === ".hg" || name === ".svn") && type === vscodeAPI2.FileType.Directory) {
-        hasRepo = true;
+      if (type === vscodeAPI2.FileType.Directory) {
+        if (name === ".git" || name === ".hg" || name === ".svn") {
+          hasRepo = true;
+        }
       }
       if (type === vscodeAPI2.FileType.File) {
-        if (name === "package.json") {
-          hasPkg = true;
-        }
-        if (name === "deno.json" || name === "deno.jsonc") {
-          hasPkg = true;
-        }
-        if (name === "jsr.json") {
-          hasPkg = true;
-        }
-        if (name === "pnpm-workspace.yaml" || name === "pnpm-lock.yaml") {
-          hasPkg = true;
-        }
-        if (name === "yarn.lock") {
-          hasPkg = true;
-        }
-        if (name === "Cargo.toml" || name === "go.mod") {
-          hasPkg = true;
-        }
-        if (name === "pyproject.toml" || name === "requirements.txt") {
-          hasPkg = true;
-        }
-        if (name === "composer.json") {
+        const pkgMarkers = [
+          "package.json",
+          "deno.json",
+          "deno.jsonc",
+          "jsr.json",
+          "pnpm-workspace.yaml",
+          "pnpm-lock.yaml",
+          "yarn.lock",
+          "Cargo.toml",
+          "go.mod",
+          "pyproject.toml",
+          "requirements.txt",
+          "composer.json"
+        ];
+        if (pkgMarkers.includes(name)) {
           hasPkg = true;
         }
       }
@@ -19817,17 +19816,13 @@ async function findProjectDirs(vscodeAPI2, baseDir, relPath = "") {
     if (hasRepo || hasPkg) {
       result.push(relPath || "./");
     }
-    const subresults = [...entries]?.map?.(([name, type]) => {
-      if (type === vscodeAPI2.FileType.Directory && name !== "node_modules" && name !== "dist" && name !== "out" && name !== "build" && name !== "coverage" && name !== "target" && !name.startsWith(".")) {
-        const subDir = vscodeAPI2.Uri.joinPath(baseDir, name);
-        const subRelPath = relPath ? `${relPath}/${name}` : name;
-        return findProjectDirs(vscodeAPI2, subDir, subRelPath);
-      }
-    })?.flat?.()?.filter?.((e) => !!e) ?? [];
-    result.push(...(await Promise.all(subresults?.flat?.() ?? []))?.flat?.() ?? []);
-  } catch (e) {
+    const excludeDirs = ["node_modules", "dist", "out", "build", "coverage", "target"];
+    const subPromises = entries.filter(([name, type]) => type === vscodeAPI2.FileType.Directory && !excludeDirs.includes(name) && !name.startsWith(".")).map(([name]) => findProjectDirs(vscodeAPI2, vscodeAPI2.Uri.joinPath(baseDir, name), relPath ? `${relPath}/${name}` : name));
+    const subResults = await Promise.all(subPromises);
+    result.push(...subResults.flat());
+  } catch {
   }
-  return result?.sort?.((a, b) => a?.localeCompare?.(b) ?? 0) ?? [];
+  return result.sort((a, b) => a.localeCompare(b));
 }
 var getDirs = async (extContext, force = false) => {
   const vscodeAPI2 = await initVscodeAPI();
@@ -19843,28 +19838,123 @@ var getDirs = async (extContext, force = false) => {
   }
   const TTL_MS = 5e3;
   if (!force && cache.modules?.length && now - cache.lastScanMs < TTL_MS) {
-    return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules || []]));
+    return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules]));
   }
   if (!force && cache.inflight) {
     const mods = await cache.inflight.catch(() => cache?.modules || ["./"]);
-    return Array.from(/* @__PURE__ */ new Set(["./", ...mods || []]));
+    return Array.from(/* @__PURE__ */ new Set(["./", ...mods]));
   }
   try {
     cache.inflight = findProjectDirs(vscodeAPI2, wsdUri, "");
     const modules = await cache.inflight;
     cache.modules = modules?.length ? modules : ["./"];
     cache.lastScanMs = Date.now();
-  } catch (e) {
+  } catch {
   }
   cache.inflight = void 0;
-  return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules || ["./"]]));
+  return Array.from(/* @__PURE__ */ new Set(["./", ...cache.modules]));
 };
-var plNormalize = (m) => {
-  if (/^\/[a-zA-Z]:\//.test(m)) {
-    return m.slice(1);
+var getGitPushCommands = (commitMsg) => [
+  "git rm -r --cached .",
+  "git add .",
+  "git add *",
+  `git commit -m "${commitMsg}"`,
+  "git pull --rebase --ff",
+  "git push --all"
+];
+var getInstallCommands = () => [
+  "git pull --rebase --ff",
+  "git submodule update --init --recursive --remote --merge",
+  "npm install -D",
+  "npm audit fix"
+];
+async function handleWebviewMessage(message, extContext, refreshModules) {
+  const vscodeAPI2 = await initVscodeAPI();
+  if (message?.type === "webviewError") {
+    console.warn("[vext:webviewError]", message);
+    const msg = message?.message ? String(message.message) : "Webview error";
+    vscodeAPI2?.window?.showWarningMessage?.(`Manager webview error: ${msg}`);
+    return;
   }
-  return m;
-};
+  if (message?.command === "ready") {
+    return refreshModules(false);
+  }
+  const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
+  if (!wsdUri) {
+    vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
+    return;
+  }
+  const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
+  const modules = await getDirs(extContext, false);
+  const path3 = normalizePath(vscodeAPI2, moduleUri);
+  if (message.command?.startsWith("bulk_")) {
+    for (const m of modules) {
+      const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
+      const mPath = normalizePath(vscodeAPI2, mUri);
+      switch (message.command) {
+        case "bulk_push":
+          {
+            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({
+              prompt: "Commit Message for all?",
+              value: "",
+              default: "No Description"
+            });
+            if (!commitMsg) {
+              return;
+            }
+            runInTerminal(getGitPushCommands(commitMsg), mPath);
+          }
+          break;
+        case "bulk_install":
+          runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], mPath);
+          break;
+        case "bulk_build":
+          runInTerminal(["npm run build"], mPath);
+          break;
+      }
+    }
+    return;
+  }
+  switch (message.command) {
+    case "open-dir":
+      vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
+      break;
+    case "terminal":
+      runInTerminal([""], path3, true);
+      break;
+    case "build":
+      runInTerminal(["npm run build"], path3);
+      break;
+    case "watch":
+      runInTerminal(["npm run watch"], path3, true);
+      break;
+    case "dev":
+      runInTerminal(["npm run dev"], path3, true);
+      break;
+    case "test":
+      runInTerminal(["npm run test"], path3, true);
+      break;
+    case "diff":
+      runInTerminal(["git diff"], path3, true);
+      break;
+    case "install":
+      runInTerminal(getInstallCommands(), path3);
+      break;
+    case "push":
+      {
+        const commitMsg = await vscodeAPI2?.window?.showInputBox?.({
+          prompt: "Commit Message?",
+          value: "",
+          default: "No Description"
+        });
+        if (!commitMsg) {
+          return;
+        }
+        runInTerminal(getGitPushCommands(commitMsg), path3);
+      }
+      break;
+  }
+}
 var ManagerViewProvider = class {
   _extensionUri;
   _viewType;
@@ -19876,14 +19966,12 @@ var ManagerViewProvider = class {
     this._extensionUri = extensionUri;
     this._viewType = viewType;
   }
-  //
   async updateView(webviewView, context, modules) {
     modules ??= await getDirs(this._extContext) || ["./"];
     webviewView?.webview?.postMessage?.({ type: "modules", modules });
   }
-  //
-  async resolveWebviewView(webviewView, _resolveContext, token) {
-    const vscodeAPI2 = await initVscodeAPI();
+  async resolveWebviewView(webviewView, _resolveContext) {
+    await initVscodeAPI();
     const extVersion = String(this._extContext?.extension?.packageJSON?.version ?? "0.0.0");
     const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
     const refreshModules = async (force = false) => {
@@ -19914,109 +20002,12 @@ var ManagerViewProvider = class {
         refreshModules(false);
       }
     });
-    if (true) {
-      try {
-        webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
-          if (message?.type === "webviewError") {
-            console.warn("[vext.managerView:webviewError]", message);
-            const msg = message?.message ? String(message.message) : "Webview error";
-            vscodeAPI2?.window?.showWarningMessage?.(`Manager View webview error: ${msg}`);
-            return;
-          }
-          if (message?.command === "ready") {
-            return refreshModules(false);
-          }
-          const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-          if (!wsdUri) {
-            vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
-            return;
-          }
-          const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
-          const modules = await getDirs(this._extContext, false) || ["./"];
-          switch (message.command) {
-            case "bulk_push":
-              {
-                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "", default: "No Description" });
-                if (!commitMsg) {
-                  return;
-                }
-                for (const m of modules) {
-                  const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-                  runInTerminal([
-                    "git rm -r --cached .",
-                    "git add .",
-                    "git add *",
-                    `git commit -m "${commitMsg}"`,
-                    "git pull --rebase --ff",
-                    "git push --all"
-                  ], plNormalize(mUri?.fsPath || mUri?.path));
-                }
-              }
-              ;
-              break;
-            case "bulk_install":
-              for (const m of modules) {
-                const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-                runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.fsPath || mUri?.path));
-              }
-              break;
-            case "bulk_build":
-              for (const m of modules) {
-                const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-                runInTerminal(["npm run build"], plNormalize(mUri?.fsPath || mUri?.path));
-              }
-              break;
-            case "open-dir":
-              vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
-              break;
-            case "terminal":
-              runInTerminal([""], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-              break;
-            case "build":
-              runInTerminal(["npm run build"], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-              break;
-            case "watch":
-              runInTerminal(["npm run watch"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-              break;
-            case "dev":
-              runInTerminal(["npm run dev"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-              break;
-            case "test":
-              runInTerminal(["npm run test"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-              break;
-            case "diff":
-              runInTerminal(["git diff"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-              break;
-            case "install":
-              runInTerminal([
-                "git pull --rebase --ff",
-                "git submodule update --init --recursive --remote --merge",
-                "npm install -D",
-                "npm audit fix"
-              ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-              break;
-            case "push":
-              {
-                const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "", default: "No Description" });
-                if (!commitMsg) {
-                  return;
-                }
-                runInTerminal([
-                  "git rm -r --cached .",
-                  "git add .",
-                  "git add *",
-                  `git commit -m "${commitMsg}"`,
-                  "git pull --rebase --ff",
-                  "git push --all"
-                ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-              }
-              ;
-              break;
-          }
-        });
-      } catch (e) {
-        console.warn(e);
-      }
+    try {
+      webviewView?.webview?.onDidReceiveMessage?.(async (message) => {
+        await handleWebviewMessage(message, this._extContext, refreshModules);
+      });
+    } catch (e) {
+      console.warn(e);
     }
   }
 };
@@ -20059,100 +20050,7 @@ async function manager(context) {
     panel.onDidDispose(() => inWatch.delete(watchCb));
     refreshModules(false);
     panel.webview.onDidReceiveMessage(async (message) => {
-      if (message?.type === "webviewError") {
-        console.warn("[vext.managerPanel:webviewError]", message);
-        const msg = message?.message ? String(message.message) : "Webview error";
-        vscodeAPI2?.window?.showWarningMessage?.(`Manager Panel webview error: ${msg}`);
-        return;
-      }
-      if (message?.command === "ready") {
-        return refreshModules(false);
-      }
-      const wsdUri = await getWorkspaceFolder(vscodeAPI2?.workspace);
-      if (!wsdUri) {
-        vscodeAPI2?.window?.showWarningMessage?.("No workspace folder found. Open a folder/workspace first.");
-        return;
-      }
-      const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
-      const modules = await getDirs(context, false);
-      switch (message.command) {
-        case "bulk_push":
-          {
-            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message for all?", value: "", default: "No Description" });
-            if (!commitMsg) {
-              return;
-            }
-            for (const m of modules) {
-              const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-              runInTerminal([
-                "git rm -r --cached .",
-                "git add .",
-                "git add *",
-                `git commit -m "${commitMsg}"`,
-                "git pull --rebase --ff",
-                "git push --all"
-              ], plNormalize(mUri?.fsPath || mUri?.path));
-            }
-          }
-          break;
-        case "bulk_install":
-          for (const m of modules) {
-            const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-            runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], plNormalize(mUri?.fsPath || mUri?.path));
-          }
-          break;
-        case "bulk_build":
-          for (const m of modules) {
-            const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
-            runInTerminal(["npm run build"], plNormalize(mUri?.fsPath || mUri?.path));
-          }
-          break;
-        case "open-dir":
-          vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
-          break;
-        case "terminal":
-          runInTerminal([""], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-          break;
-        case "build":
-          runInTerminal(["npm run build"], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-          break;
-        case "watch":
-          runInTerminal(["npm run watch"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-          break;
-        case "dev":
-          runInTerminal(["npm run dev"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-          break;
-        case "test":
-          runInTerminal(["npm run test"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-          break;
-        case "diff":
-          runInTerminal(["git diff"], plNormalize(moduleUri?.fsPath || moduleUri?.path), true);
-          break;
-        case "install":
-          runInTerminal([
-            "git pull --rebase --ff",
-            "git submodule update --init --recursive --remote --merge",
-            "npm install -D",
-            "npm audit fix"
-          ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-          break;
-        case "push":
-          {
-            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({ prompt: "Commit Message?", value: "", default: "No Description" });
-            if (!commitMsg) {
-              return;
-            }
-            runInTerminal([
-              "git rm -r --cached .",
-              "git add .",
-              "git add *",
-              `git commit -m "${commitMsg}"`,
-              "git pull --rebase --ff",
-              "git push --all"
-            ], plNormalize(moduleUri?.fsPath || moduleUri?.path));
-          }
-          break;
-      }
+      await handleWebviewMessage(message, context, refreshModules);
     });
   });
   if (openPanelCmd) {
@@ -20162,7 +20060,8 @@ async function manager(context) {
 var terminalMap = /* @__PURE__ */ new Map();
 async function runInTerminal(cmds, cwd, longRunning = false) {
   const vscodeAPI2 = await initVscodeAPI();
-  let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => dir === cwd && obj.status === "free") : null, termObj = entry?.[1];
+  let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => dir === cwd && obj.status === "free") : null;
+  let termObj = entry?.[1];
   if (!termObj) {
     const terminal = vscodeAPI2?.window.createTerminal({ cwd });
     termObj = { terminal, status: longRunning ? "busy" : "free" };
@@ -20175,16 +20074,6 @@ async function runInTerminal(cmds, cwd, longRunning = false) {
   termObj?.terminal?.show();
   cmds.forEach((cmd) => termObj?.terminal?.sendText?.(cmd));
 }
-initVscodeAPI().then((vscodeAPI2) => {
-  vscodeAPI2?.window?.onDidCloseTerminal?.((closedTerminal) => {
-    for (const [cwd, obj] of terminalMap.entries()) {
-      if (obj.terminal === closedTerminal) {
-        terminalMap.delete(cwd);
-        break;
-      }
-    }
-  });
-});
 
 // src/imports/utils.ts
 var getSelection = async () => {
