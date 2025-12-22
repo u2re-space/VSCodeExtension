@@ -19887,58 +19887,43 @@ async function handleWebviewMessage(message, extContext, refreshModules) {
   const moduleUri = joinModuleUri(vscodeAPI2, wsdUri, message.module);
   const modules = await getDirs(extContext, false);
   const path3 = normalizePath(vscodeAPI2, moduleUri);
-  if (message.command?.startsWith("bulk_")) {
+  if (message.command?.startsWith?.("bulk_")) {
+    let commitMsg;
+    if (message.command === "bulk_push") {
+      commitMsg = await vscodeAPI2?.window?.showInputBox?.({
+        prompt: "Commit Message for all?",
+        value: "",
+        default: "No Description"
+      });
+      if (!commitMsg) {
+        return;
+      }
+    }
+    const commandMap2 = {
+      "bulk_push": getGitPushCommands(commitMsg),
+      "bulk_install": ["git pull --rebase --ff", "npm install -D", "npm audit fix"],
+      "bulk_build": ["npm run build"]
+    };
     for (const m of modules) {
       const mUri = joinModuleUri(vscodeAPI2, wsdUri, m);
       const mPath = normalizePath(vscodeAPI2, mUri);
-      switch (message.command) {
-        case "bulk_push":
-          {
-            const commitMsg = await vscodeAPI2?.window?.showInputBox?.({
-              prompt: "Commit Message for all?",
-              value: "",
-              default: "No Description"
-            });
-            if (!commitMsg) {
-              return;
-            }
-            runInTerminal(getGitPushCommands(commitMsg), mPath);
-          }
-          break;
-        case "bulk_install":
-          runInTerminal(["git pull --rebase --ff", "npm install -D", "npm audit fix"], mPath);
-          break;
-        case "bulk_build":
-          runInTerminal(["npm run build"], mPath);
-          break;
-      }
+      runInTerminal(commandMap2?.[message.command] || [], mPath);
     }
     return;
   }
+  const commandMap = {
+    "terminal": [""],
+    "build": ["npm run build"],
+    "watch": ["npm run watch"],
+    "dev": ["npm run dev"],
+    "test": ["npm run test"],
+    "diff": ["git diff"],
+    "install": getInstallCommands()
+  };
+  const openInNew = ["terminal", "watch", "dev", "test", "diff"];
   switch (message.command) {
     case "open-dir":
       vscodeAPI2?.commands?.executeCommand?.("vscode.openFolder", moduleUri);
-      break;
-    case "terminal":
-      runInTerminal([""], path3, true);
-      break;
-    case "build":
-      runInTerminal(["npm run build"], path3);
-      break;
-    case "watch":
-      runInTerminal(["npm run watch"], path3, true);
-      break;
-    case "dev":
-      runInTerminal(["npm run dev"], path3, true);
-      break;
-    case "test":
-      runInTerminal(["npm run test"], path3, true);
-      break;
-    case "diff":
-      runInTerminal(["git diff"], path3, true);
-      break;
-    case "install":
-      runInTerminal(getInstallCommands(), path3);
       break;
     case "push":
       {
@@ -19953,6 +19938,8 @@ async function handleWebviewMessage(message, extContext, refreshModules) {
         runInTerminal(getGitPushCommands(commitMsg), path3);
       }
       break;
+    default:
+      runInTerminal(commandMap?.[message.command] || [], path3, openInNew?.indexOf?.(message.command) >= 0);
   }
 }
 var ManagerViewProvider = class {

@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.9",
+    "version": "0.0.10",
     "engines": {
         "vscode": "^1.105.1"
     },
