@@ -2,6 +2,19 @@ import vscodeAPI from '../imports/api.ts';
 
 //
 const GPTUNNEL_URL = "https://gptunnel.ru/model/gpt-5.2/";
+const GPT_WEBVIEW_CSS = `
+body.gpt-body{margin:0;padding:14px;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background)}
+.gpt-wrap{max-width:880px}.gpt-title{margin:0 0 8px 0;font-weight:600}.gpt-text{margin:0 0 12px 0;opacity:.9}
+.gpt-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px 0}
+.gpt-card{padding:10px;border-radius:6px;border:1px solid var(--vscode-editorWidget-border);background:var(--vscode-editorWidget-background)}
+.gpt-card-title{font-weight:600;margin-bottom:6px}
+body.gpt-embed-body{inline-size:100dvw;block-size:100dvh;overflow:hidden;padding:0;margin:0;border:none;background:var(--vscode-editor-background);color:var(--vscode-foreground);font-family:var(--vscode-font-family)}
+#shell.gpt-shell{box-sizing:border-box;padding:12px;display:flex;flex-direction:column;gap:10px;block-size:100dvh}
+.gpt-embed-toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.gpt-url-note,#status.gpt-status{opacity:.85}
+#frameHost.gpt-frame-host{flex:1;min-block-size:0;border:1px solid var(--vscode-editorWidget-border);border-radius:6px;overflow:hidden;background:var(--vscode-editorWidget-background)}
+iframe.gpt-frame{padding:0;margin:0;border:none;box-sizing:border-box;inline-size:100%;block-size:100%}
+`;
 
 function getNonce() {
     let text = "";
@@ -15,7 +28,7 @@ function getOfflineHtml(webview) {
     const csp = [
         "default-src 'none'",
         `img-src ${webview.cspSource} data:`,
-        `style-src ${webview.cspSource} 'unsafe-inline'`,
+        `style-src ${webview.cspSource} 'nonce-${nonce}'`,
         `font-src ${webview.cspSource}`,
         `script-src 'nonce-${nonce}'`
     ].join("; ");
@@ -27,23 +40,24 @@ function getOfflineHtml(webview) {
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GPTunnel</title>
+  <style nonce="${nonce}">${GPT_WEBVIEW_CSS}</style>
 </head>
-<body style="margin:0;padding:14px;font-family:var(--vscode-font-family);color:var(--vscode-foreground);background:var(--vscode-editor-background);">
-  <div style="max-width: 880px;">
-    <h3 style="margin:0 0 8px 0;font-weight:600;">GPTunnel View</h3>
-    <p style="margin:0 0 12px 0;opacity:.9;">
+<body class="gpt-body">
+  <div class="gpt-wrap">
+    <h3 class="gpt-title">GPTunnel View</h3>
+    <p class="gpt-text">
       Recent VSCode/Cursor builds often block remote sites inside WebViews (iframes) due to security headers (CSP / X-Frame-Options).
       This view now defaults to an offline/local-safe UI.
     </p>
 
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin: 0 0 12px 0;">
+    <div class="gpt-actions">
       <button id="openExternal">Open GPTunnel in browser</button>
       <button id="tryEmbed" title="May be blocked by the remote site.">Try embed (may fail)</button>
       <button id="reload">Reload</button>
     </div>
 
-    <div style="padding:10px;border-radius:6px;border:1px solid var(--vscode-editorWidget-border);background:var(--vscode-editorWidget-background);">
-      <div style="font-weight:600;margin-bottom:6px;">URL</div>
+    <div class="gpt-card">
+      <div class="gpt-card-title">URL</div>
       <code>${GPTUNNEL_URL}</code>
     </div>
   </div>
@@ -65,7 +79,7 @@ function getEmbedHtml(webview) {
         "default-src 'none'",
         `frame-src https:`,
         `img-src ${webview.cspSource} data: https:`,
-        `style-src ${webview.cspSource} 'unsafe-inline'`,
+        `style-src ${webview.cspSource} 'nonce-${nonce}'`,
         `script-src 'nonce-${nonce}'`
     ].join("; ");
 
@@ -76,19 +90,20 @@ function getEmbedHtml(webview) {
   <meta http-equiv="Content-Security-Policy" content="${csp}" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GPTunnel</title>
+  <style nonce="${nonce}">${GPT_WEBVIEW_CSS}</style>
 </head>
-<body style="inline-size:100dvw;block-size:100dvh;overflow:hidden;padding:0;margin:0;border:none;background:var(--vscode-editor-background);color:var(--vscode-foreground);font-family:var(--vscode-font-family);">
-  <div id="shell" style="box-sizing:border-box;padding:12px;display:flex;flex-direction:column;gap:10px;block-size:100dvh;">
-    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+<body class="gpt-embed-body">
+  <div id="shell" class="gpt-shell">
+    <div class="gpt-embed-toolbar">
       <button id="loadFrame">Load embedded iframe</button>
       <button id="openExternal">Open in browser</button>
       <button id="back">Back</button>
-      <span style="opacity:.85">(${GPTUNNEL_URL})</span>
+      <span class="gpt-url-note">(${GPTUNNEL_URL})</span>
     </div>
-    <div id="status" style="opacity:.85;">
+    <div id="status" class="gpt-status">
       The iframe is created lazily on click. If the site blocks framing (CSP / X-Frame-Options), it will stay blank.
     </div>
-    <div id="frameHost" style="flex:1;min-block-size:0;border:1px solid var(--vscode-editorWidget-border);border-radius:6px;overflow:hidden;background:var(--vscode-editorWidget-background);"></div>
+    <div id="frameHost" class="gpt-frame-host"></div>
   </div>
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
@@ -105,7 +120,7 @@ function getEmbedHtml(webview) {
       setStatus('Loading… If this stays blank, the remote site likely blocks being embedded.');
 
       const iframe = document.createElement('iframe');
-      iframe.style.cssText = 'padding:0;margin:0;border:none;box-sizing:border-box;inline-size:100%;block-size:100%;';
+      iframe.className = 'gpt-frame';
       iframe.referrerPolicy = 'no-referrer';
       iframe.src = ${JSON.stringify(GPTUNNEL_URL)};
       iframe.addEventListener('load', () => {

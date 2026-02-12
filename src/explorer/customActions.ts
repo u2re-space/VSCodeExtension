@@ -1,0 +1,230 @@
+//! use only TS types
+import type * as vscode from "vscode";
+import * as path from "path";
+
+import vscodePromise from "../imports/api.ts";
+
+type ActionRuntime = "auto" | "bash" | "pwsh" | "ssh" | "node" | "deno" | "js";
+
+interface ActionConfig {
+    enabled?: boolean;
+    title?: string;
+    runtime?: ActionRuntime;
+    template?: string;
+    command?: string;
+    args?: string[];
+    cwd?: string;
+    env?: Record<string, string>;
+    openTerminal?: boolean;
+}
+
+const ACTION_IDS = [1, 2, 3] as const;
+const CMD_PREFIX = "vext.explorer.customAction";
+const CONFIG_PREFIX = "explorer.customAction";
+const GLOBAL_EXPLORER_CONFIG = "explorer.customActions.enableSubmenu";
+
+function getCommandId(index: (typeof ACTION_IDS)[number]): string {
+    return `${CMD_PREFIX}${index}`;
+}
+
+function getConfig(section: vscode.WorkspaceConfiguration, index: (typeof ACTION_IDS)[number]): ActionConfig {
+    const base = `${CONFIG_PREFIX}${index}`;
+    const legacy = section.get<ActionConfig>(base, {});
+    const enabled = section.get<boolean>(`${base}.enabled`, legacy.enabled ?? false);
+    const title = section.get<string>(`${base}.title`, legacy.title ?? `Explorer Action ${index}`);
+    const runtime = section.get<ActionRuntime>(`${base}.runtime`, legacy.runtime ?? "auto");
+    const template = section.get<string>(`${base}.template`, legacy.template ?? "");
+    const command = section.get<string>(`${base}.command`, legacy.command ?? "");
+    const args = section.get<string[]>(`${base}.args`, legacy.args ?? []);
+    const cwd = section.get<string>(`${base}.cwd`, legacy.cwd ?? "");
+    const env = section.get<Record<string, string>>(`${base}.env`, legacy.env ?? {});
+    const openTerminal = section.get<boolean>(`${base}.openTerminal`, legacy.openTerminal ?? true);
+
+    return {
+        enabled,
+        title,
+        runtime,
+        template,
+        command,
+        args,
+        cwd,
+        env,
+        openTerminal
+    };
+}
+
+function getWorkspaceFolderPath(vscodeAPI: typeof vscode, uri: vscode.Uri): string {
+    const ws = vscodeAPI.workspace.getWorkspaceFolder(uri);
+    return ws?.uri?.fsPath || "";
+}
+
+async function getTargetKind(vscodeAPI: typeof vscode, uri: vscode.Uri): Promise<"file" | "directory" | "unknown"> {
+    try {
+        const st = await vscodeAPI.workspace.fs.stat(uri);
+        if (st.type & vscodeAPI.FileType.Directory) {
+            return "directory";
+        }
+        return "file";
+    } catch {
+        return "unknown";
+    }
+}
+
+function normalizeSlashes(input: string): string {
+    return input.replace(/\\/g, "/");
+}
+
+function quoteArg(value: string): string {
+    const escaped = value.replace(/"/g, '\\"');
+    return `"${escaped}"`;
+}
+
+function applyRuntime(runtime: ActionRuntime, command: string, filePath: string): string {
+    const trimmed = command.trim();
+    switch (runtime) {
+        case "bash":
+            return `bash -lc ${quoteArg(trimmed)}`;
+        case "pwsh":
+            return `pwsh -NoLogo -Command ${quoteArg(trimmed)}`;
+        case "node":
+            return `node ${trimmed}`;
+        case "deno":
+            return `deno run ${trimmed}`;
+        case "js":
+            return trimmed.length > 0 ? `node ${trimmed}` : `node ${quoteArg(filePath)}`;
+        case "ssh":
+            return `ssh ${trimmed}`;
+        case "auto":
+        default:
+            return trimmed;
+    }
+}
+
+function interpolate(input: string, map: Record<string, string>): string {
+    return input.replace(/\$\{([A-Za-z0-9_]+)\}/g, (_match, key: string) => map[key] ?? "");
+}
+
+function toCommandFromTyped(config: ActionConfig, vars: Record<string, string>): string {
+    const command = (config.command || "").trim();
+    const args = Array.isArray(config.args) ? config.args : [];
+    const builtArgs = args.map((arg) => quoteArg(interpolate(String(arg), vars)));
+    if (!command && builtArgs.length === 0) {
+        return "";
+    }
+    if (!command) {
+        return builtArgs.join(" ");
+    }
+    return [interpolate(command, vars), ...builtArgs].join(" ").trim();
+}
+
+async function resolveCwd(vscodeAPI: typeof vscode, config: ActionConfig, vars: Record<string, string>): Promise<string | undefined> {
+    const raw = (config.cwd || "").trim();
+    if (!raw) {
+        return vars.workspaceFolder || vars.fileDir || undefined;
+    }
+    return interpolate(raw, vars);
+}
+
+async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): Promise<void> {
+    const vscodeAPI = await vscodePromise;
+    const fallbackUri = vscodeAPI.window.activeTextEditor?.document?.uri;
+    const targetUri = uri || fallbackUri;
+    if (!targetUri) {
+        vscodeAPI.window.showErrorMessage(`Custom Action ${index}: no target file or folder selected.`);
+        return;
+    }
+
+    const config = getConfig(vscodeAPI.workspace.getConfiguration("vext"), index);
+    if (config.enabled === false) {
+        vscodeAPI.window.showWarningMessage(`Custom Action ${index} is disabled in settings.`);
+        return;
+    }
+
+    const filePath = targetUri.fsPath;
+    const fileName = path.basename(filePath);
+    const fileDir = path.dirname(filePath);
+    const workspaceFolder = getWorkspaceFolderPath(vscodeAPI, targetUri);
+    const relativePath = workspaceFolder ? path.relative(workspaceFolder, filePath) : fileName;
+    const kind = await getTargetKind(vscodeAPI, targetUri);
+
+    const vars: Record<string, string> = {
+        filePath,
+        filePathUnix: normalizeSlashes(filePath),
+        fileName,
+        fileDir,
+        fileDirUnix: normalizeSlashes(fileDir),
+        workspaceFolder,
+        workspaceFolderUnix: normalizeSlashes(workspaceFolder),
+        relativePath,
+        relativePathUnix: normalizeSlashes(relativePath),
+        resourceType: kind
+    };
+
+    const template = (config.template || "").trim();
+    const fromTemplate = template ? interpolate(template, vars) : "";
+    const fromTyped = toCommandFromTyped(config, vars);
+    const rawCommand = fromTemplate || fromTyped;
+    if (!rawCommand) {
+        vscodeAPI.window.showErrorMessage(
+            `Custom Action ${index}: configure "vext.explorer.customAction${index}.template" or typed command fields.`
+        );
+        return;
+    }
+
+    const runtime: ActionRuntime = config.runtime || "auto";
+    const finalCommand = applyRuntime(runtime, rawCommand, filePath);
+    const cwd = await resolveCwd(vscodeAPI, config, vars);
+    const terminal = vscodeAPI.window.createTerminal({
+        name: config.title?.trim() || `Explorer Action ${index}`,
+        cwd,
+        env: config.env
+    });
+
+    const openTerminal = config.openTerminal !== false;
+    if (openTerminal) {
+        terminal.show();
+    }
+    terminal.sendText(finalCommand);
+}
+
+async function updateActionContexts(): Promise<void> {
+    const vscodeAPI = await vscodePromise;
+    const section = vscodeAPI.workspace.getConfiguration("vext");
+    const submenuEnabled = section.get<boolean>(GLOBAL_EXPLORER_CONFIG, true);
+    let anyEnabled = false;
+
+    for (const idx of ACTION_IDS) {
+        const cfg = getConfig(section, idx);
+        const enabled = submenuEnabled && cfg.enabled !== false;
+        anyEnabled = anyEnabled || enabled;
+        await vscodeAPI.commands.executeCommand("setContext", `vext.explorer.customAction${idx}.enabled`, enabled);
+    }
+
+    await vscodeAPI.commands.executeCommand("setContext", "vext.explorer.customActions.anyEnabled", anyEnabled);
+}
+
+export async function customActions(context: vscode.ExtensionContext): Promise<void> {
+    const vscodeAPI = await vscodePromise;
+    await updateActionContexts();
+
+    context.subscriptions.push(
+        vscodeAPI.workspace.onDidChangeConfiguration(async (event: vscode.ConfigurationChangeEvent) => {
+            if (event.affectsConfiguration("vext.explorer.customAction1") ||
+                event.affectsConfiguration("vext.explorer.customAction2") ||
+                event.affectsConfiguration("vext.explorer.customAction3") ||
+                event.affectsConfiguration("vext.explorer.customActions")) {
+                await updateActionContexts();
+            }
+        })
+    );
+
+    for (const idx of ACTION_IDS) {
+        context.subscriptions.push(
+            vscodeAPI.commands.registerCommand(getCommandId(idx), async (uri: vscode.Uri) => {
+                // Called from Explorer with URI, or from Command Palette without URI.
+                await runAction(idx, uri);
+            })
+        );
+    }
+}
+

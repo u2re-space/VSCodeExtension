@@ -4,6 +4,7 @@ import type * as vscode from "vscode";
 //
 import vscodePromise from '../imports/api.ts';
 import { getWebviewContent } from "./webview.ts";
+import { getFilteredActions, getManagerUiConfig, resolveTheme } from "./managerActions.ts";
 
 //
 const inWatch = new Set<any>([]);
@@ -175,6 +176,39 @@ const getInstallCommands = () => [
     'npm audit fix'
 ];
 
+const escapeDoubleQuoted = (input: string): string => String(input || "").replace(/["`$\\]/g, "\\$&").replace(/\r?\n/g, " ");
+
+const getActiveEditorPath = async (): Promise<string | undefined> => {
+    const vscodeAPI = await initVscodeAPI();
+    return vscodeAPI.window.activeTextEditor?.document?.uri?.fsPath;
+};
+
+const readActiveFileText = async (): Promise<string | undefined> => {
+    const vscodeAPI = await initVscodeAPI();
+    const editorUri = vscodeAPI.window.activeTextEditor?.document?.uri;
+    if (!editorUri) { return undefined; }
+    const bytes = await vscodeAPI.workspace.fs.readFile(editorUri);
+    return Buffer.from(bytes).toString("utf8");
+};
+
+const readActiveFileBase64 = async (): Promise<string | undefined> => {
+    const vscodeAPI = await initVscodeAPI();
+    const editorUri = vscodeAPI.window.activeTextEditor?.document?.uri;
+    if (!editorUri) { return undefined; }
+    const bytes = await vscodeAPI.workspace.fs.readFile(editorUri);
+    return Buffer.from(bytes).toString("base64");
+};
+
+const confirmDangerousAction = async (title: string): Promise<boolean> => {
+    const vscodeAPI = await initVscodeAPI();
+    const answer = await vscodeAPI.window.showWarningMessage(
+        `${title}: this is a power-user operation and may be destructive.`,
+        { modal: true },
+        "Run"
+    );
+    return answer === "Run";
+};
+
 /** Unified message handler for webview messages */
 async function handleWebviewMessage(
     message: any,
@@ -194,6 +228,14 @@ async function handleWebviewMessage(
     // Handle ready handshake
     if (message?.command === 'ready') {
         return refreshModules(false);
+    }
+
+    const uiConfig = getManagerUiConfig(vscodeAPI);
+    const actionCatalog = getFilteredActions(uiConfig);
+    const actionIds = new Set(actionCatalog.map((a) => a.id));
+
+    if (!actionIds.has(message?.command)) {
+        return;
     }
 
     // Get workspace folder
@@ -221,7 +263,7 @@ async function handleWebviewMessage(
         }
 
         const commandMap = {
-            'bulk_push': getGitPushCommands(commitMsg!),
+            'bulk_push': getGitPushCommands(escapeDoubleQuoted(commitMsg!)),
             'bulk_install': ['git pull --rebase --ff', 'npm install -D', 'npm audit fix'],
             'bulk_build': ['npm run build']
         };
@@ -243,7 +285,9 @@ async function handleWebviewMessage(
         'dev': ['npm run dev'],
         'test': ['npm run test'],
         'diff': ['git diff'],
-        'install': getInstallCommands()
+        'install': getInstallCommands(),
+        'audit-fix': ['npm audit fix'],
+        'install-fix': ['npm install -D', 'npm audit fix']
     };
 
     //
@@ -261,7 +305,41 @@ async function handleWebviewMessage(
                 default: 'No Description'
             });
             if (!commitMsg) { return; }
-            runInTerminal(getGitPushCommands(commitMsg), path);
+            runInTerminal(getGitPushCommands(escapeDoubleQuoted(commitMsg)), path);
+        } break;
+        case 'copy-file-content': {
+            const text = await readActiveFileText();
+            if (!text) { vscodeAPI.window.showWarningMessage("No active file content to copy."); return; }
+            await vscodeAPI.env.clipboard.writeText(text);
+            vscodeAPI.window.showInformationMessage("Active file content copied.");
+        } break;
+        case 'copy-file-base64': {
+            const b64 = await readActiveFileBase64();
+            if (!b64) { vscodeAPI.window.showWarningMessage("No active file content to encode."); return; }
+            await vscodeAPI.env.clipboard.writeText(b64);
+            vscodeAPI.window.showInformationMessage("Active file base64 copied.");
+        } break;
+        case 'git-revert-file': {
+            const activePath = await getActiveEditorPath();
+            if (!activePath) { vscodeAPI.window.showWarningMessage("No active file for git revert."); return; }
+            if (!(await confirmDangerousAction("Git revert active file"))) { return; }
+            const rel = normalizePath(vscodeAPI, vscodeAPI.Uri.file(activePath)).replace(normalizePath(vscodeAPI, wsdUri) + "/", "");
+            runInTerminal([`git restore -- "${escapeDoubleQuoted(rel)}"`], normalizePath(vscodeAPI, wsdUri));
+        } break;
+        case 'git-reset-file': {
+            const activePath = await getActiveEditorPath();
+            if (!activePath) { vscodeAPI.window.showWarningMessage("No active file for git reset."); return; }
+            if (!(await confirmDangerousAction("Git reset active file"))) { return; }
+            const rel = normalizePath(vscodeAPI, vscodeAPI.Uri.file(activePath)).replace(normalizePath(vscodeAPI, wsdUri) + "/", "");
+            runInTerminal([`git reset HEAD -- "${escapeDoubleQuoted(rel)}"`], normalizePath(vscodeAPI, wsdUri));
+        } break;
+        case 'git-revert-dir': {
+            if (!(await confirmDangerousAction("Git revert directory"))) { return; }
+            runInTerminal([`git restore --source=HEAD -- .`], path);
+        } break;
+        case 'git-reset-dir': {
+            if (!(await confirmDangerousAction("Git reset directory"))) { return; }
+            runInTerminal([`git reset --hard HEAD`], path);
         } break;
         default:
             runInTerminal(commandMap?.[message.command] || [], path, openInNew?.indexOf?.(message.command) >= 0);
@@ -284,14 +362,28 @@ export class ManagerViewProvider {
     }
 
     async updateView(webviewView, context, modules?) {
+        const vscodeAPI = await initVscodeAPI();
+        const uiConfig = getManagerUiConfig(vscodeAPI);
         modules ??= (await getDirs(this._extContext)) || ["./"];
-        webviewView?.webview?.postMessage?.({ type: 'modules', modules });
+        webviewView?.webview?.postMessage?.({
+            type: 'modules',
+            modules,
+            theme: resolveTheme(vscodeAPI, uiConfig.theme),
+            actionCatalog: getFilteredActions(uiConfig),
+            uiFlags: {
+                layout: uiConfig.layout,
+                primaryActions: uiConfig.primaryActions
+            }
+        });
     }
 
     async resolveWebviewView(webviewView, _resolveContext) {
-        await initVscodeAPI();
+        const vscodeAPI = await initVscodeAPI();
         const extVersion = String(this._extContext?.extension?.packageJSON?.version ?? "0.0.0");
         const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
+        const uiConfig = getManagerUiConfig(vscodeAPI);
+        const theme = resolveTheme(vscodeAPI, uiConfig.theme);
+        const actionCatalog = getFilteredActions(uiConfig);
 
         const refreshModules = async (force = false) => {
             try {
@@ -304,7 +396,13 @@ export class ManagerViewProvider {
         const html = await getWebviewContent(webviewView.webview, this._extensionUri, {
             instanceId,
             viewType: this._viewType,
-            version: extVersion
+            version: extVersion,
+            theme,
+            actionCatalog,
+            uiFlags: {
+                layout: uiConfig.layout,
+                primaryActions: uiConfig.primaryActions
+            }
         }).catch((e) => { console.warn(e); return ""; });
         if (html) { webviewView.webview.html = html; }
 
@@ -312,6 +410,18 @@ export class ManagerViewProvider {
         inWatch?.add?.(watchCb);
         webviewView?.onDidDispose?.(() => inWatch?.delete?.(watchCb));
         webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) { refreshModules(false); } });
+        this._extContext.subscriptions.push(
+            vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
+                if (event.affectsConfiguration("vext.managerView")) {
+                    this.updateView(webviewView, _resolveContext).catch(console.warn);
+                }
+            }),
+            vscodeAPI.window.onDidChangeActiveColorTheme(() => {
+                if (getManagerUiConfig(vscodeAPI).theme === "auto") {
+                    this.updateView(webviewView, _resolveContext).catch(console.warn);
+                }
+            })
+        );
 
         try {
             webviewView?.webview?.onDidReceiveMessage?.(async message => {
@@ -336,6 +446,9 @@ export async function manager(context: vscode.ExtensionContext) {
     const openPanelCmd = vscodeAPI?.commands?.registerCommand?.("vext.openManagerPanel", async () => {
         const extVersion = String(context?.extension?.packageJSON?.version ?? "0.0.0");
         const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
+        const uiConfig = getManagerUiConfig(vscodeAPI);
+        const theme = resolveTheme(vscodeAPI, uiConfig.theme);
+        const actionCatalog = getFilteredActions(uiConfig);
         const panel = vscodeAPI.window.createWebviewPanel(
             "vext.managerPanel",
             `Manager (${extVersion})`,
@@ -346,13 +459,29 @@ export async function manager(context: vscode.ExtensionContext) {
         panel.webview.html = await getWebviewContent(panel.webview, context.extensionUri, {
             instanceId,
             viewType: "vext.managerPanel",
-            version: extVersion
+            version: extVersion,
+            theme,
+            actionCatalog,
+            uiFlags: {
+                layout: uiConfig.layout,
+                primaryActions: uiConfig.primaryActions
+            }
         });
 
         const refreshModules = async (force = false) => {
             try {
                 const mods = await getDirs(context, force);
-                panel?.webview?.postMessage?.({ type: "modules", modules: mods });
+                const liveConfig = getManagerUiConfig(vscodeAPI);
+                panel?.webview?.postMessage?.({
+                    type: "modules",
+                    modules: mods,
+                    theme: resolveTheme(vscodeAPI, liveConfig.theme),
+                    actionCatalog: getFilteredActions(liveConfig),
+                    uiFlags: {
+                        layout: liveConfig.layout,
+                        primaryActions: liveConfig.primaryActions
+                    }
+                });
             } catch (e) { console.warn(e); }
         };
 
@@ -360,6 +489,18 @@ export async function manager(context: vscode.ExtensionContext) {
         inWatch.add(watchCb);
         panel.onDidDispose(() => inWatch.delete(watchCb));
         refreshModules(false);
+        context.subscriptions.push(
+            vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
+                if (event.affectsConfiguration("vext.managerView")) {
+                    refreshModules(false).catch(console.warn);
+                }
+            }),
+            vscodeAPI.window.onDidChangeActiveColorTheme(() => {
+                if (getManagerUiConfig(vscodeAPI).theme === "auto") {
+                    refreshModules(false).catch(console.warn);
+                }
+            })
+        );
 
         panel.webview.onDidReceiveMessage(async (message) => {
             await handleWebviewMessage(message, context, refreshModules);

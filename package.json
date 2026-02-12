@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.10",
+    "version": "0.0.17",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -26,27 +26,6 @@
         "CHANGELOG.md",
         "package.json"
     ],
-    "activationEvents": [
-        "onView:vext.managerView",
-        "onView:vext.managerPanelView",
-        "onView:vext.gptView",
-        "onView:vext.gptPanelView",
-        "onCommand:vext.pasteAsSymlink",
-        "onCommand:vext.proxyUndo",
-        "onCommand:vext.proxyRedo",
-        "onCommand:vext.htd.paste",
-        "onCommand:vext.htd.convert",
-        "onCommand:vext.htd.copy",
-        "onCommand:vext.dth.paste",
-        "onCommand:vext.dth.convert",
-        "onCommand:vext.dth.copy",
-        "onCommand:vext.ltm.paste",
-        "onCommand:vext.ltm.convert",
-        "onCommand:vext.ltm.copy",
-        "onCommand:vext.mtl.paste",
-        "onCommand:vext.mtl.convert",
-        "onCommand:vext.mtl.copy"
-    ],
     "extensionKind": [
         "ui"
     ],
@@ -56,59 +35,364 @@
             "explorer/context": [
                 {
                     "command": "vext.pasteAsSymlink",
-                    "group": "5\\_cutcopypaste"
+                    "group": "5_cutcopypaste"
+                },
+                {
+                    "submenu": "vext.submenu.explorerCustomActions",
+                    "group": "5_cutcopypaste@9",
+                    "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
                 }
             ],
             "editor/context": [
                 {
+                    "submenu": "vext.submenu.markdown",
+                    "group": "navigation@1"
+                },
+                {
+                    "submenu": "vext.submenu.html",
+                    "group": "navigation@2"
+                },
+                {
+                    "submenu": "vext.submenu.mathml",
+                    "group": "navigation@3"
+                },
+                {
+                    "submenu": "vext.submenu.latex",
+                    "group": "navigation@4"
+                }
+            ],
+            "submenu/vext.submenu.markdown": [
+                {
                     "command": "vext.htd.paste",
-                    "group": "Markdown@1"
+                    "group": "actions@1"
                 },
                 {
                     "command": "vext.htd.convert",
-                    "group": "Markdown@1"
+                    "group": "actions@2"
                 },
                 {
                     "command": "vext.htd.copy",
-                    "group": "Markdown@1"
-                },
+                    "group": "actions@3"
+                }
+            ],
+            "submenu/vext.submenu.html": [
                 {
                     "command": "vext.dth.paste",
-                    "group": "HTML@2"
+                    "group": "actions@1"
                 },
                 {
                     "command": "vext.dth.convert",
-                    "group": "HTML@2"
+                    "group": "actions@2"
                 },
                 {
                     "command": "vext.dth.copy",
-                    "group": "HTML@2"
-                },
+                    "group": "actions@3"
+                }
+            ],
+            "submenu/vext.submenu.mathml": [
                 {
                     "command": "vext.ltm.paste",
-                    "group": "MathML@3"
+                    "group": "actions@1"
                 },
                 {
                     "command": "vext.ltm.convert",
-                    "group": "MathML@3"
+                    "group": "actions@2"
                 },
                 {
                     "command": "vext.ltm.copy",
-                    "group": "MathML@3"
-                },
+                    "group": "actions@3"
+                }
+            ],
+            "submenu/vext.submenu.latex": [
                 {
                     "command": "vext.mtl.paste",
-                    "group": "LaTeX@4"
+                    "group": "actions@1"
                 },
                 {
                     "command": "vext.mtl.convert",
-                    "group": "LaTeX@4"
+                    "group": "actions@2"
                 },
                 {
                     "command": "vext.mtl.copy",
-                    "group": "LaTeX@4"
+                    "group": "actions@3"
+                }
+            ],
+            "submenu/vext.submenu.explorerCustomActions": [
+                {
+                    "command": "vext.explorer.customAction1",
+                    "group": "actions@1",
+                    "when": "config.vext.explorer.customAction1.enabled"
+                },
+                {
+                    "command": "vext.explorer.customAction2",
+                    "group": "actions@2",
+                    "when": "config.vext.explorer.customAction2.enabled"
+                },
+                {
+                    "command": "vext.explorer.customAction3",
+                    "group": "actions@3",
+                    "when": "config.vext.explorer.customAction3.enabled"
                 }
             ]
+        },
+        "submenus": [
+            {
+                "id": "vext.submenu.convertClipboard",
+                "label": "Convert and Clipboard"
+            },
+            {
+                "id": "vext.submenu.markdown",
+                "label": "Markdown"
+            },
+            {
+                "id": "vext.submenu.html",
+                "label": "HTML"
+            },
+            {
+                "id": "vext.submenu.mathml",
+                "label": "MathML"
+            },
+            {
+                "id": "vext.submenu.latex",
+                "label": "LaTeX"
+            },
+            {
+                "id": "vext.submenu.explorerCustomActions",
+                "label": "Explorer Custom Actions"
+            }
+        ],
+        "configuration": {
+            "title": "VEXT Settings",
+            "properties": {
+                "vext.managerView.theme": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "light",
+                        "dark",
+                        "oled"
+                    ],
+                    "default": "auto",
+                    "description": "Manager view theme. Auto follows current workbench theme."
+                },
+                "vext.managerView.layout": {
+                    "type": "string",
+                    "enum": [
+                        "compactMore"
+                    ],
+                    "default": "compactMore",
+                    "description": "Manager view action layout mode."
+                },
+                "vext.managerView.primaryActions": {
+                    "type": "array",
+                    "default": [
+                        "open-dir",
+                        "terminal",
+                        "dev",
+                        "build",
+                        "install"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Primary row actions shown before More menu."
+                },
+                "vext.managerView.smartActions.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable Smart Actions in Manager rows."
+                },
+                "vext.managerView.smartActions.powerUser": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable power-user Smart Actions, including dangerous git operations."
+                },
+                "vext.explorer.customActions.enableSubmenu": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show Explorer Custom Actions submenu in Explorer context menu."
+                },
+                "vext.explorer.customAction1.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Explorer custom action 1."
+                },
+                "vext.explorer.customAction1.title": {
+                    "type": "string",
+                    "default": "Explorer Action 1",
+                    "description": "Friendly title for custom action 1 terminal tab."
+                },
+                "vext.explorer.customAction1.runtime": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "bash",
+                        "pwsh",
+                        "ssh",
+                        "node",
+                        "deno",
+                        "js"
+                    ],
+                    "default": "auto",
+                    "description": "Runtime wrapper used for custom action 1."
+                },
+                "vext.explorer.customAction1.template": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Template command for action 1. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                },
+                "vext.explorer.customAction1.command": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Base command for typed mode for action 1."
+                },
+                "vext.explorer.customAction1.args": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for typed mode command of action 1."
+                },
+                "vext.explorer.customAction1.cwd": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Working directory for action 1. Supports placeholders."
+                },
+                "vext.explorer.customAction1.env": {
+                    "type": "object",
+                    "default": {},
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Additional environment variables for action 1."
+                },
+                "vext.explorer.customAction1.openTerminal": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Open terminal panel when running custom action 1."
+                },
+                "vext.explorer.customAction2.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Explorer custom action 2."
+                },
+                "vext.explorer.customAction2.title": {
+                    "type": "string",
+                    "default": "Explorer Action 2",
+                    "description": "Friendly title for custom action 2 terminal tab."
+                },
+                "vext.explorer.customAction2.runtime": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "bash",
+                        "pwsh",
+                        "ssh",
+                        "node",
+                        "deno",
+                        "js"
+                    ],
+                    "default": "auto",
+                    "description": "Runtime wrapper used for custom action 2."
+                },
+                "vext.explorer.customAction2.template": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Template command for action 2. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                },
+                "vext.explorer.customAction2.command": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Base command for typed mode for action 2."
+                },
+                "vext.explorer.customAction2.args": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for typed mode command of action 2."
+                },
+                "vext.explorer.customAction2.cwd": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Working directory for action 2. Supports placeholders."
+                },
+                "vext.explorer.customAction2.env": {
+                    "type": "object",
+                    "default": {},
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Additional environment variables for action 2."
+                },
+                "vext.explorer.customAction2.openTerminal": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Open terminal panel when running custom action 2."
+                },
+                "vext.explorer.customAction3.enabled": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable Explorer custom action 3."
+                },
+                "vext.explorer.customAction3.title": {
+                    "type": "string",
+                    "default": "Explorer Action 3",
+                    "description": "Friendly title for custom action 3 terminal tab."
+                },
+                "vext.explorer.customAction3.runtime": {
+                    "type": "string",
+                    "enum": [
+                        "auto",
+                        "bash",
+                        "pwsh",
+                        "ssh",
+                        "node",
+                        "deno",
+                        "js"
+                    ],
+                    "default": "auto",
+                    "description": "Runtime wrapper used for custom action 3."
+                },
+                "vext.explorer.customAction3.template": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Template command for action 3. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                },
+                "vext.explorer.customAction3.command": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Base command for typed mode for action 3."
+                },
+                "vext.explorer.customAction3.args": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for typed mode command of action 3."
+                },
+                "vext.explorer.customAction3.cwd": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Working directory for action 3. Supports placeholders."
+                },
+                "vext.explorer.customAction3.env": {
+                    "type": "object",
+                    "default": {},
+                    "additionalProperties": {
+                        "type": "string"
+                    },
+                    "description": "Additional environment variables for action 3."
+                },
+                "vext.explorer.customAction3.openTerminal": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Open terminal panel when running custom action 3."
+                }
+            }
         },
         "viewsContainers": {
             "activitybar": [
@@ -238,14 +522,31 @@
             {
                 "command": "vext.mtl.copy",
                 "title": "Copy as LaTeX"
+            },
+            {
+                "command": "vext.explorer.customAction1",
+                "title": "Run Explorer Custom Action 1"
+            },
+            {
+                "command": "vext.explorer.customAction2",
+                "title": "Run Explorer Custom Action 2"
+            },
+            {
+                "command": "vext.explorer.customAction3",
+                "title": "Run Explorer Custom Action 3"
             }
         ]
     },
     "scripts": {
-        "vscode:build": "vsce package --allow-missing-repository --out ./dist",
-        "vscode:prepublish": "npm run package",
-        "compile": "npm run check-types && npm run lint && node esbuild.js",
-        "build": "npm run compile && npm run vscode:build",
+        "vscode:build": "node -e \"require('fs').mkdirSync('artifacts',{recursive:true})\" && vsce package --allow-missing-repository --out ./artifacts/vext.vsix",
+        "vscode:prepublish": "npm run clean && npm run check-types && npm run lint && npm run bundle:prod",
+        "bundle": "node esbuild.js",
+        "bundle:prod": "node esbuild.js --production",
+        "clean": "rimraf dist",
+        "clean:all": "rimraf dist artifacts",
+        "clean-build": "npm run clean && npm run bundle",
+        "compile": "npm run clean-build && npm run check-types && npm run lint",
+        "build": "npm run compile",
         "clean:cursor-cache": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --dry-run",
         "clean:cursor-cache:apply": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --apply",
         "clean:cursor-cache:purge": "node scripts/clean-extension-cache.mjs --id u2re-dev.vext --purge --dry-run",
@@ -253,7 +554,7 @@
         "watch": "npm-run-all -p watch:*",
         "watch:esbuild": "node esbuild.js --watch",
         "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
-        "package": "npm run check-types && npm run lint && node esbuild.js --production",
+        "package": "npm run vscode:build",
         "compile-tests": "tsc -p . --outDir out",
         "watch-tests": "tsc -p . -w --outDir out",
         "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -276,6 +577,7 @@
         "marked-katex-extension": "^5.1.5",
         "mathml-to-latex": "^1.5.0",
         "npm-run-all": "^4.1.5",
+        "rimraf": "^6.1.2",
         "temml": "^0.11.7",
         "tsx": "^4.19.4",
         "turndown": "^7.2.0",

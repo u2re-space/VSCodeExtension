@@ -41,6 +41,60 @@
     }
 }
 
+[data-theme="light"] {
+    --highlight: color(srgb 0 0 0 / 0.01);
+    --background: #f3f3f3;
+    --foreground: #222;
+    --border: #e1e1e1;
+    --button-bg: #e7e7e7;
+    --button-act-bg: #e7e7e7;
+    --button-act-hover: #e7e7e7;
+    --button-hover: #d0d0d0;
+    --button-active: #17a9c1;
+    --button-fg: #222;
+    --button-shadow: 0 2px 8px rgba(0,0,0,0.07);
+    --row-hover: color(srgb 0 0 0 / 0.02);
+    --scrollbar-bg: #f0f0f0;
+    --scrollbar-thumb: color(srgb 0 0 0 / 0.5);
+    --scrollbar-thumb-hover: color(srgb 0 0 0 / 0.6);
+}
+
+[data-theme="dark"] {
+    --highlight: color(srgb 1 1 1 / 0.01);
+    --background: #1e1e1e;
+    --foreground: #d4d4d4;
+    --border: #333;
+    --button-bg: #2d2d2d;
+    --button-act-bg: #1e1e1e;
+    --button-act-hover: #2d2d2d;
+    --button-hover: #3c3c3c;
+    --button-active: #108494;
+    --button-fg: #d4d4d4;
+    --button-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    --row-hover: color(srgb 1 1 1 / 0.02);
+    --scrollbar-bg: #23272e;
+    --scrollbar-thumb: color(srgb 1 1 1 / 0.5);
+    --scrollbar-thumb-hover: color(srgb 1 1 1 / 0.6);
+}
+
+[data-theme="oled"] {
+    --highlight: color(srgb 1 1 1 / 0.01);
+    --background: #000000;
+    --foreground: #e7e7e7;
+    --border: #151515;
+    --button-bg: #0d0d0d;
+    --button-act-bg: #0a0a0a;
+    --button-act-hover: #111111;
+    --button-hover: #1c1c1c;
+    --button-active: #0c8f9d;
+    --button-fg: #e7e7e7;
+    --button-shadow: 0 2px 8px rgba(0,0,0,0.45);
+    --row-hover: color(srgb 1 1 1 / 0.05);
+    --scrollbar-bg: #111;
+    --scrollbar-thumb: color(srgb 1 1 1 / 0.35);
+    --scrollbar-thumb-hover: color(srgb 1 1 1 / 0.6);
+}
+
 html {
     padding: 0px;
     margin: 0px;
@@ -57,7 +111,7 @@ body {
     min-block-size: max(max(100dvh, 100cqh), 100%);
     inline-size: max(max(100dvi, 100cqi), 100%);
     block-size: max(max(100dvh, 100cqh), 100%);
-    overflow: hidden;
+    overflow: visible;
     box-sizing: border-box;
     container-type: size;
     position: fixed;
@@ -139,6 +193,24 @@ table {
     perspective: 1000;
 }
 
+thead {
+    max-block-size: max-content;
+    block-size: max-content;
+    min-block-size: max-content;
+    overflow: visible;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
+}
+
+tbody {
+    max-block-size: max-content;
+    block-size: max-content;
+    min-block-size: max-content;
+    overflow: visible;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
+}
+
 tr {
     display: grid;
     grid-column: label / actions;
@@ -150,7 +222,9 @@ tr {
     transition: background 0.2s;
     max-block-size: max-content;
     block-size: max-content;
-    overflow: hidden;
+    min-block-size: max-content;
+
+    overflow: visible;
     flex-direction: row;
     flex-grow: 1;
     flex-shrink: 0;
@@ -192,6 +266,10 @@ td {
     position: relative;
     gap: 0.5rem;
 
+    max-block-size: max-content;
+    block-size: max-content;
+    min-block-size: max-content;
+
     min-inline-size: fit-content;
     inline-size: -webkit-fill-available;
     inline-size: stretch;
@@ -231,34 +309,7 @@ td.actions {
     max-inline-size: -webkit-fill-available;
     max-inline-size: stretch;
 
-    padding-inline-end: 0.5rem;
-}
-
-td.actions .actions-container {
-    justify-content: end;
-    justify-items: end;
-    display: flex;
-    flex-direction: row;
-    flex-basis: max-content;
-    overflow: hidden;
-    block-size: max-content;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    min-inline-size: fit-content;
-    inline-size: -webkit-fill-available;
-    inline-size: stretch;
-
-    box-shadow: var(--button-shadow);
-    border-radius: 0.5rem;
-    clip-path: inset(0 round 0.5rem);
-}
-
-.actions-container {
-    overflow: hidden;
-    box-shadow: var(--button-shadow);
-    border-radius: 0.5rem;
-    clip-path: inset(0 round 0.5rem);
+    padding-inline: 0.5rem;
 }
 
 button {
@@ -280,6 +331,65 @@ button {
     place-items: center;
 }
 
+td.actions .actions-container {
+    justify-content: end;
+    justify-items: end;
+    display: flex;
+    flex-direction: row;
+    flex-basis: max-content;
+    overflow: visible;
+    block-size: max-content;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    min-inline-size: fit-content;
+    inline-size: -webkit-fill-available;
+    inline-size: stretch;
+
+    box-shadow: var(--button-shadow);
+    border-radius: 0.5rem;
+    clip-path: none;
+}
+
+.actions-container {
+    overflow: visible;
+    box-shadow: var(--button-shadow);
+    border-radius: 0.5rem;
+    clip-path: none;
+
+    button:last-of-type {
+        border-start-end-radius: 0.5rem;
+        border-end-end-radius: 0.5rem;
+    }
+
+    button:first-of-type {
+        border-start-start-radius: 0.5rem;
+        border-end-start-radius: 0.5rem;
+    }
+}
+
+.ph-icon {
+    inline-size: 1rem;
+    block-size: 1rem;
+    fill: currentColor;
+    pointer-events: none;
+}
+
+.ph-sprite {
+    position: absolute;
+    inset: 0;
+    inline-size: 0;
+    block-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.ph-sprite-svg {
+    inline-size: 0;
+    block-size: 0;
+}
+
 button:hover {
     background: var(--button-hover);
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
@@ -298,6 +408,15 @@ button:focus, td.actions button:focus {
     color: var(--button-fg);
     transition: background 0.15s, color 0.15s, box-shadow 0.15s;
     outline: none;
+}
+
+button.danger {
+    color: color-mix(in srgb, var(--button-fg) 80%, #ff5a5a 20%);
+}
+
+button.danger:hover,
+button.danger:focus {
+    background: color-mix(in srgb, var(--button-hover) 75%, #8b1b1b 25%);
 }
 
 .toolbar {
@@ -329,6 +448,46 @@ button:focus, td.actions button:focus {
     block-size: max-content;
     border-radius: 0.5rem;
     clip-path: inset(0 round 0.5rem);
+}
+
+.more-menu {
+    position: relative;
+    background: var(--button-bg);
+    border-radius: 0.5rem;
+    margin-inline-start: 0.5rem;
+}
+
+.more-menu > summary {
+    list-style: none;
+    cursor: pointer;
+    inline-size: 2rem;
+    block-size: 2rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.more-menu > summary::-webkit-details-marker {
+    display: none;
+}
+
+.more-menu-list {
+    position: absolute;
+    inset-inline-end: calc(100% + 0.25rem);
+    inset-block-start: 0;
+    display: grid;
+    grid-auto-flow: column;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    box-shadow: var(--button-shadow);
+    overflow: hidden;
+    z-index: 5;
+    flex-direction: row;
+}
+
+.more-menu-list > button {
+    border-radius: 0;
 }
 
 button:first-child, .actions-container button:first-child {

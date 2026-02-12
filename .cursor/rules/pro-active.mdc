@@ -1,0 +1,124 @@
+---
+description: Proactive SCSS + TS/JS consolidation, dedupe, layering, tokens, and modern selectors.
+globs: "*.scss,*.css,*.ts,*.tsx,*.js,*.mjs"
+alwaysApply: true
+---
+
+# Proactive Refactor & Consolidation Rules (SCSS/CSS + TS/JS)
+
+## Core goal
+Continuously (while editing any file) refactor, dedupe, and consolidate code/styles into the most logical, reusable, and canonical implementation, minimizing repeated logic and fragmentation.
+
+**Default behavior:** if you see duplicates / near-duplicates / parallel implementations, proactively search the repo for similar code and unify it safely.
+
+---
+
+## SCSS/CSS: Refactor + Architecture (Always-on)
+
+### 1) DRY + Consolidation (default)
+- Actively look for repeated declaration groups, repeated selectors, repeated component patterns, and theme wrappers.
+- Prefer consolidating into **one canonical rule/pattern** rather than copying:
+  - shared partials/modules via `@use` / `@forward`
+  - small mixins (parametrized) when repetition appears ≥2–3 times
+  - CSS custom properties (tokens) for repeated values (colors/space/radii/etc.)
+- Merge/reduce:
+  - duplicated properties (including same values across multiple selectors)
+  - duplicated modules that differ only slightly (make the difference a parameter/token)
+
+### 2) Logical grouping inside each stylesheet
+When touching a file, regroup rules to a consistent internal structure (keep diffs minimal, but improve locality):
+1. `@use` / `@forward`
+2. `@layer ... { ... }` blocks
+3. `@property` registrations (prefer dedicated module)
+4. tokens / custom properties (`:root`, theme scopes)
+5. base primitives (resets/base typography)
+6. layout primitives (stack/cluster/grid helpers if present)
+7. components
+8. utilities
+9. overrides/legacy (last)
+
+Within a rule block, group declarations roughly by:
+- box/layout → rendering → interaction → colorization → typography → animation → container/media → specifics
+
+### 3) Cascade layers (`@layer`) (preferred default)
+- Wrap new/edited rules into `@layer` with meaningful names.
+- Prefer a stable layer order (project-wide):
+  - `@layer tokens, base, layout, components, utilities, overrides;`
+- If the repo already has a layer order, match it.
+- Avoid specificity fights; use layers + low-specificity selectors.
+
+### 4) Modern selectors (use when it reduces bloat)
+- Prefer low specificity scoping:
+  - `:where(...)` for zero-specificity grouping
+  - `:is(...)` for selector compression
+- Use `:has(...)` carefully and intentionally (Chrome 137+ ok):
+  - Prefer anchoring to `:root`, `html`, `body`, or a known app root when it improves contextual styling.
+  - Avoid `:has()` in very hot selectors that could be performance-sensitive; keep it shallow and scoped.
+
+### 5) Nesting (SCSS)
+- Use nesting to improve readability and consolidate related selectors/states.
+- Avoid over-nesting (generally max ~3 levels) and avoid increasing specificity.
+- Prefer `&:where(...)`, `&:is(...)` patterns for compact states.
+
+### 6) Tokens / custom properties / keyframes / @property modularization
+- Proactively extract:
+  - design tokens (colors/space/typography/radii/z-index) into a tokens module
+  - keyframes into an animations module
+  - `@property` into a properties/typed-tokens module
+- Split **color logic** and **layout logic** into separate modules when feasible.
+- Prefer semantic tokens over raw values.
+
+### 7) Safety constraints (must)
+- Do NOT change HTML markup/class names/DOM structure.
+- Do NOT increase selector specificity unless unavoidable.
+- Avoid `!important`.
+- Preserve computed styles and visual output unless explicitly asked otherwise.
+- If a merge/refactor is ambiguous, stop and ask targeted questions.
+
+---
+
+## TS/JS: Proactive Merge/Unify (Always-on)
+
+### 1) Detect + consolidate similar modules
+- When editing TS/JS, proactively search for:
+  - duplicate helpers/utilities
+  - parallel implementations of same feature in different folders
+  - near-identical types/interfaces
+- Prefer merging into one **canonical** implementation:
+  - stable exported API
+  - minimal side effects
+  - best typing/readability
+- If multiple versions exist, select a canonical base (correctness + clarity + fewer deps) and adapt others behind thin compatibility wrappers only if required.
+
+### 2) Consolidation rules
+- No new dependencies.
+- Avoid changing call sites; if necessary, provide a mechanical migration (search/replace).
+- Prefer extracting shared internal helpers over copy/paste.
+- Improve type-safety (avoid `any`; use `unknown` + narrowing).
+- After fixing a bug/refactor, sweep for the same pattern across the repo and apply the same fix/unification.
+
+### 3) Structure
+- Keep modules cohesive and feature-oriented; avoid scattered micro-utils.
+- Avoid circular dependencies; move shared primitives downward in hierarchy if needed.
+
+---
+
+## Project-aware behavior (Required)
+- Infer structure from actual HTML/JSX/component code.
+- When styling, inspect the DOM/component hierarchy and align selectors to it.
+- Respect existing conventions (BEM, CSS Modules, utility-first, etc.).
+- Align imports, remove unused imports, and delete dead modules only when safe.
+
+---
+
+## Output / workflow expectations
+- Prefer small, reviewable diffs.
+- When you refactor:
+  - unify duplicates
+  - regroup logically
+  - consolidate tokens/animations/properties
+  - ensure imports are aligned
+- If asked to “refactor as you go”, do it proactively without waiting for explicit prompts.
+- If uncertain about behavior equivalence, ask before merging.
+
+---

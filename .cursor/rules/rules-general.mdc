@@ -1,0 +1,129 @@
+---
+globs: *.ts,*.tsx,*.mjs,*.js,*.scss,*.css
+alwaysApply: false
+---
+
+> NOTE: This file mirrors the repo root rules in `.cursor/rules/rules-general.mdc`.
+> Prefer editing the root copy and then syncing here if needed.
+
+# General Coding Recommendations
+
+Write or update code in the relevant programming language (or detect it automatically) according to the current task. Comments are allowed, but preferably in English.
+
+- The primary build system is Vite. Respect the existing project configuration and structure.
+- Target the latest stable Chrome (137+) and modern evergreen browsers, following current standards (WHATWG, WICG, ECMA, W3C, TC39, CSSWG) where reasonably possible.
+- Prefer modern language and platform features that are well-supported in these targets; avoid legacy patterns unless strictly necessary.
+- Fix validation issues reported by the IDE/editor where possible.
+- Normalize indentation (spaces only) and clean up inconsistent or unusual formatting.
+- Avoid overly verbose output: keep changes minimal and focused on the task. For follow-up edits, output **only** the changed or newly added code blocks.
+- Remove duplicated or dead code when it is safe to do so.
+- Write and output **only code** (no explanations, no comments outside the code, no headings, no prose).
+- Respect and use settings from:
+  - `tsconfig.json` (types, module resolution, strictness, paths, etc.)
+  - `package.json` (scripts, dependencies, engines, browserslist, etc.)
+  - `vite.config.*` (aliases, plugins, environment, base path, etc.)
+
+---
+
+## Quality Gates (Required Checks)
+
+- Prefer small, safe diffs:
+    - Avoid breaking or distorting behavior unless explicitly requested.
+    - Preserve public APIs, routing, and module contracts; refactor behind stable boundaries.
+    - If behavior must change, make it intentional, localized, and easy to review.
+- Before making changes:
+    - Confirm the “source of truth” files to edit (avoid duplicating logic in a second place).
+    - Identify the affected entrypoints and contracts (exports, routes, config keys, CSS selectors, DOM structure).
+    - Prefer improving the existing implementation over creating parallel alternatives.
+- After substantive edits, verify the project state using the appropriate script:
+    - Build main app/project: `npm run build`
+    - Build Chrome extension: `npm run build:crx`
+    - Dev/debug (where errors may appear): `npm run dev`
+- If build/dev reveals errors:
+    - Fix root causes (types, imports, missing assets, config drift) rather than patching symptoms.
+    - Prefer reducing complexity over adding new abstractions to work around an issue.
+- If the user provides error logs (console/devtools/build output):
+    - Treat them as actionable requirements and prioritize resolving them end-to-end.
+    - Use the log to locate the true source:
+        - Jump to referenced file:line:col and inspect surrounding code and recent changes.
+        - Identify whether it is a build-time, runtime, or UI/behavioral issue, and reproduce locally when possible.
+        - Fix the cause (invalid state, bad import, missing guard, incorrect env/config) instead of silencing symptoms.
+    - Add the smallest robust prevention:
+        - Add a guard/assertion with a helpful error message when invariants can be violated.
+        - Prefer making invalid states unrepresentable (types, narrowing, early returns).
+        - Avoid “catch and ignore” patterns unless explicitly desired; surface failures intentionally.
+    - After fixing one instance, do a preventive sweep for similar issues:
+        - Search for the same error string, stack trace function names, API usage, or code pattern across the repo.
+        - Fix other matches when they are clearly the same root cause; otherwise add a TODO note near the risky site.
+        - Prefer centralizing the fix into a shared helper if the same mistake repeats in multiple places.
+- Additional code health gates (when applicable):
+    - Ensure editor/IDE diagnostics are clean for touched files (types, imports, unused vars).
+    - Ensure imports are aligned and consistent (paths/aliases), and remove unused/redundant imports where safe.
+    - Avoid leaving dead code, unused exports, unused styles, or orphaned files after refactors.
+    - Prefer deterministic, minimal formatting changes; avoid reformatting unrelated code.
+    - If a change is risky or cross-cutting, add a short `.md` note capturing intent, constraints, and known edge cases.
+
+---
+
+## Architecture & Cohesion (Avoid Fragmentation, Avoid Bloat)
+
+- Prefer a unified, consolidated architecture:
+    - Keep concepts cohesive: related logic should live together (by feature/module), not scattered across many tiny files.
+    - Avoid one-off “drive-by” utilities; extract only when reused or when it clarifies a real boundary.
+- Split code by sub-modules when files become too bloated:
+    - Split by domain concept/feature, not by vague buckets like `utils1`, `helpers2`, `misc`.
+    - Keep boundaries explicit (clear public exports, minimal surface area, good names).
+    - Avoid circular dependencies; move shared primitives downward in the hierarchy when needed.
+- DRY without over-abstracting:
+    - Remove duplicates when it improves clarity and maintainability.
+    - Avoid premature generalization that adds indirection without real reuse.
+- Prefer structured mappings over repetitive conditionals when appropriate:
+    - Use `Map` / object maps / `switch` when it reduces duplication and improves readability.
+
+---
+
+## Formatting & Imports
+
+- Indentation:
+    - Prefer **4 spaces** (spaces only) unless a specific file/subproject already enforces a different style.
+    - Do not introduce mixed indentation; align surrounding file style when editing.
+- Imports and paths:
+    - Always try to fix/align import paths (TS/JS, CSS/SCSS) to match aliases and project conventions.
+    - Remove unused/redundant imports when safe; avoid leaving dead imports after refactors.
+    - Keep imports stable and deterministic; avoid unnecessary churn in ordering.
+
+---
+
+## Documentation & Context Logging (Resume-Friendly)
+
+- When the user provides ideas/proposals, or a change introduces a new concept:
+    - Prefer adding/updating a `.md` document near the feature/module (or in an appropriate docs location) that captures:
+        - Intent (“why”), constraints, key decisions
+        - Public API / usage examples
+        - Known tradeoffs and follow-ups
+- Keep a lightweight context log for ongoing work:
+    - Summarize key decisions/constraints so work can be resumed without re-discovery.
+    - Prefer short, structured notes over long narratives.
+
+---
+
+## Vite-Specific Notes
+
+- When resolving or adding imports, honor Vite’s alias configuration and supported file extensions.
+- Ensure that any changes remain compatible with Vite’s dev server and build pipeline (ESM, dynamic imports, etc.).
+- When adjusting configuration, prefer small, focused changes and keep plugin order and behavior in mind.
+
+---
+
+## Browser & Runtime Support
+
+When using newer APIs or syntax, verify compatibility with the project’s target
+environments.
+
+- General feature support:
+  - <https://caniuse.com/>
+  - <https://chromestatus.com/>
+
+- Cross‑check:
+  - Project `browserslist` config (if present).
+  - Build target options in bundler / TS config.

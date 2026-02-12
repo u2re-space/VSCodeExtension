@@ -1,0 +1,151 @@
+---
+globs: *.ts,*.tsx,*.mjs,*.js
+alwaysApply: false
+---
+
+> NOTE: This file mirrors the repo root rules in `.cursor/rules/rules-js.mdc`.
+> Prefer editing the root copy and then syncing here if needed.
+
+# JS/TS Coding & Project Navigation Guidelines
+
+Use these as *recommendations*, not strict rules. Prefer consistency with the
+existing codebase.
+
+---
+
+## TypeScript / JavaScript
+
+- Prefer TypeScript where the project already uses it.
+- Follow the strictness level defined in `tsconfig.json`; do not relax compiler options unless explicitly requested.
+- Use `const` by default, `let` when reassignment is required, and avoid `var`.
+- Prefer explicit types on public APIs (functions, exported values, React/Vue components’ props, etc.).
+- Keep functions small and focused; extract helpers when logic becomes complex or repeatedly reused.
+- Prefer native Web APIs and language features over large utility libraries if functionality overlaps.
+- When adding or updating imports, respect existing path aliases and module structure defined in Vite and `tsconfig.json`.
+
+---
+
+## Quality Gates (TS/JS)
+
+- After substantive edits, verify the project state:
+    - Build main app/project: `npm run build`
+    - Build Chrome extension: `npm run build:crx`
+    - Dev/debug (where errors may appear): `npm run dev`
+- Prefer fixing root causes:
+    - Resolve type errors by improving types and narrowing, not by weakening compiler settings.
+    - Resolve runtime issues by simplifying logic and aligning module boundaries, not by adding fragile workarounds.
+ - When the user includes runtime/devtools logs (stack traces, console errors, network errors):
+    - Locate the failure site (file:line:col) and fix the underlying cause (nullish access, race, stale state, wrong import, wrong DOM assumption).
+    - Do not “fix” by swallowing errors (blanket try/catch, empty `.catch`, ignoring rejected promises) unless explicitly requested.
+    - After fixing one instance, proactively search for the same pattern across the repo:
+        - Same API usage (e.g. unsafe `as` casts, unchecked `querySelector`, unchecked JSON parse, missing await).
+        - Same error message/function name.
+        - Same boundary violation (especially imports that break the project’s module hierarchy rules).
+    - Apply the same fix where appropriate, or introduce a shared helper/guard to prevent recurrence.
+
+---
+
+## Architecture & Cohesion (Avoid Fragmentation, Avoid Distortion)
+
+- Keep code cohesive by feature/module:
+    - Prefer a small number of well-named modules over many tiny files that scatter one concept.
+    - Split when a file becomes too bloated, but split by sub-module/domain concept (not vague `utils/*` sprawl).
+- Protect boundaries:
+    - Preserve public APIs and module contracts; refactor behind stable exports.
+    - Avoid circular dependencies; move shared primitives down the hierarchy when needed.
+- DRY with discipline:
+    - Remove duplicates when it improves clarity and maintainability.
+    - Avoid premature abstraction that adds indirection without real reuse.
+- Prefer structured mapping where it reduces repetition:
+    - Use object/`Map` tables or `switch` when it improves readability and reduces duplicated branching.
+
+---
+
+## Imports (Hygiene & Alignment)
+
+- Always try to fix/align imports to match project aliases and conventions.
+- Trim unused/redundant imports after refactors.
+- Keep side-effect imports only when required.
+    - Exception: do not remove required web-component registration/definition side-effects (e.g. `fest/icon` or similar define modules) unless you verify they are unused and safe to remove.
+
+---
+
+## Before You Start Editing
+
+1. **Inspect the file context**
+   - Scroll through the file first; understand its purpose and public API.
+   - Identify existing patterns (naming, error handling, async style, etc.).
+   - Check for nearby TODO/FIXME comments.
+
+2. **Check related imports & modules**
+   - Find and open all imported modules used in the current file.
+   - Notice:
+     - Existing utilities you can reuse (avoid re‑inventing).
+     - Existing types/interfaces you can extend instead of duplicating.
+     - Shared helpers for logging, HTTP, dates, validation, etc.
+
+3. **Understand project configuration**
+   - Read or skim:
+     - `tsconfig.json` (path aliases, strictness, module resolution).
+     - `package.json` (scripts, target environments, dependencies).
+     - Build tools (one or more of):
+       - `vite.config.*`
+       - `webpack.config.*`
+       - `rollup.config.*`
+       - `esbuild.config.*`
+   - Pay special attention to:
+     - Path aliases (`compilerOptions.paths`, `resolve.alias`, etc.).
+     - JSX runtime settings.
+     - Target environments (browsers / Node versions).
+     - Experimental flags and feature toggles.
+
+4. **Check typing & linting rules**
+   - Look for:
+     - ESLint config (`.eslintrc.*`).
+     - Prettier config (`.prettierrc.*`).
+     - Type checking scripts in `package.json` (e.g. `typecheck`).
+   - Match the existing style:
+     - Prefer existing naming conventions.
+     - Use the same import style (default vs named, path depth, etc.).
+     - Respect configured rules instead of introducing exceptions.
+
+---
+
+## Implementation Guidelines
+
+1. **TypeScript usage**
+   - Prefer **explicit types** for public APIs (exports) and function params.
+   - Let the compiler infer **local** types where it stays clear.
+   - Avoid `any`. If unavoidable, use:
+     - `unknown` + narrowing
+     - or a well‑named type alias.
+   - Use `interface` / `type` consistently with the existing codebase.
+
+2. **Runtime safety**
+   - Validate external input (network, DOM, query params, etc.).
+   - Narrow types when working with `unknown`/`any`/`JSON.parse` results.
+   - Handle async errors (try/catch or `.catch`, avoid unhandled promises).
+
+3. **Code structure**
+   - Prefer small, single‑responsibility functions.
+   - Extract repeated logic into shared utilities when it’s clearly reused.
+   - Keep modules focused: avoid files that do “everything”.
+
+4. **Performance & ergonomics**
+   - Avoid unnecessary re‑computation in hot paths (render loops, observers).
+   - Prefer lazy initialization when possible.
+   - For browser code, consider layout thrashing, timers, and DOM churn.
+
+5. **Comments & documentation**
+   - Add comments when behavior is non‑obvious or constrained by specs.
+   - Prefer **why** over **what** in comments.
+   - Add/extend JSDoc or TSDoc for exported functions and types.
+
+---
+
+## When Unsure
+
+- Prefer matching **existing patterns** in the repository over introducing a new style.
+- If a standard or spec contradicts existing code:
+  - Note the discrepancy via a short comment or TODO.
+  - Avoid silent behavior changes unless clearly intended by the task.

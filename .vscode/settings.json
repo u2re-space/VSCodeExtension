@@ -12,5 +12,11 @@
     "typescript.tsc.autoDetect": "off",
     "i18n-ally.localesPaths": [
         "../../../../Frontend/Conversion/mathml-latex"
-    ]
+    ],
+    "editor.wrappingIndent": "same",
+    "editor.wrappingStrategy": "advanced",
+    "editor.wordWrapColumn": 300,
+    "editor.wordWrap": "off",
+    "editor.scrollbar.vertical": "auto",
+    "editor.inlineSuggest.edits.allowCodeShifting": "always"
 }

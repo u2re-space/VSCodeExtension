@@ -1,0 +1,212 @@
+---
+globs: *.scss,*.css
+alwaysApply: false
+---
+
+> NOTE: This file mirrors the repo root rules in `.cursor/rules/rules-css.mdc`.
+> Prefer editing the root copy and then syncing here if needed.
+
+# Styling / CSS / SCSS Guidelines for Cursor
+
+## Primary Objectives (in order)
+
+1. Preserve computed styles, selector behavior, and specificity intent (avoid visual regressions).
+2. Proactively refactor and **dedupe** (exact + near-duplicate) styles while editing, keeping a **single canonical** implementation of repeated patterns.
+3. Keep styles cohesive, logically grouped, and easy to navigate (avoid fragmentation).
+4. Prefer modern CSS/SCSS features that are supported by target browsers (latest stable Chrome + evergreen); add fallbacks for newer/uncertain features.
+
+---
+
+## General Behavior (Proactive by Default)
+
+- Infer styling from **real code context** (HTML/JSX structure, components, frameworks, design system). Avoid generic styling suggestions.
+- While editing a file, proactively scan:
+  - nearby styles (same folder/module)
+  - related components/pages using the same UI pattern
+  - global tokens/utilities layers
+  - and consolidate repeated logic into a shared canonical pattern/module where safe.
+- Prefer **safe, reviewable diffs**:
+  - do not reformat unrelated code
+  - avoid cascading selector changes across the app unless explicitly requested
+- If a refactor/merge could change behavior and the “correct” outcome is ambiguous, stop and ask targeted questions.
+
+---
+
+## DRY / Dedupe / Consolidation (Default)
+
+- Minimize repetition of:
+  - declaration groups (spacing/typography/states)
+  - values (colors, radii, shadows)
+  - selectors that only differ by scope/theme wrapper
+- Prefer consolidation patterns (in descending priority):
+  1. Reuse existing tokens/mixins/functions already present in the repo.
+  2. Extract to a shared module (tokens/mixins/utilities/components) using `@use` / `@forward`.
+  3. Use CSS Custom Properties for shared values (prefer semantic naming).
+  4. Use small parameterized mixins for repeated patterns (avoid over-engineered abstractions).
+  5. Use `%placeholders` + `@extend` only when it won’t cause selector bloat or ordering surprises.
+
+**Hard constraints:**
+- Do NOT change HTML markup/class names/DOM structure.
+- Avoid `!important`.
+- Avoid increasing selector specificity; prefer layers + low-specificity selectors.
+- Remove unused styles only when it is safe to confirm they are not referenced.
+
+---
+
+## Architecture & Cohesion (Avoid Fragmentation, Avoid Bloat)
+
+- Keep styles feature-oriented:
+  - co-locate component styles with the component/module where possible
+  - split only when files become too large, and split by domain concept (not `misc/*`)
+- Avoid parallel “almost same” modules:
+  - if two modules implement the same pattern, consolidate into one canonical module and route usage to it.
+- Always align and clean imports:
+  - match existing aliases and folder conventions
+  - remove unused `@use` / `@forward` when safe
+
+---
+
+## SCSS Module System (`@use` / `@forward`)
+
+- Prefer `@use` for importing modules; avoid `@import` in new/edited code.
+- Prefer explicit namespaces (e.g. `@use "tokens" as t;`) unless the codebase already standardizes on `as *`.
+- Use `@forward` to define a small, stable public API for tokens/mixins/functions.
+- Use mixins/functions to reduce repetition:
+  - `@mixin` for repeated patterns (layout primitives, focus rings, states)
+  - `@function` only when it meaningfully improves clarity for computed values
+
+---
+
+## Cascade Layers (`@layer`) (Preferred / Default)
+
+- Prefer using cascade layers consistently; wrap rule sets in `@layer` at the top level of the module.
+- Use a predictable layer strategy; if the project doesn’t have one, prefer:
+  - `@layer tokens, base, layout, components, utilities, overrides;`
+- Prefer solving conflicts with **layers + low specificity**, not with more specific selectors.
+
+---
+
+## Selector Strategy (Modern, Low-Specificity)
+
+- Keep selectors as small and specific as necessary; avoid broad global leakage.
+- Prefer:
+  - `:where(...)` for zero-specificity scoping
+  - `:is(...)` for compact selector lists
+  - `:not(...)` for exclusions
+- Use modern state selectors for UX/a11y:
+  - `:focus-visible`, `:focus-within`, `:disabled`, `:user-invalid`, `:empty`
+- `:has(...)` guidance:
+  - Use when it meaningfully reduces selector bloat or enables context styling that would otherwise require markup changes.
+  - Prefer anchoring to stable roots (`:root`, `html`, `body`, app root container) or component roots.
+  - Keep it scoped and shallow; avoid performance-sensitive broad matches.
+- `:scope` guidance:
+  - Use when styles are authored relative to a component root or when mirroring DOM scoping patterns in JS.
+
+---
+
+## Nesting (SCSS)
+
+- Use nesting to improve readability and to consolidate states/variants, but avoid deep chains (generally ≤ 3 levels).
+- Prefer nested state patterns:
+  - `&:hover`, `&:focus-visible`, `&[data-state="..."]`, `&.is-active`, etc.
+- Avoid nesting that increases specificity unnecessarily or makes overrides brittle.
+
+---
+
+## Grouping & Rule Organization (Inside a File)
+
+When touching a file, prefer grouping in this order (keep changes minimal and localized):
+
+1. `@use` / `@forward`
+2. `@layer ... { ... }` blocks
+3. Meta-level: `@property`, `@keyframes`, `@mixin`, `@function`
+4. Tokens / custom properties (`:root`, theme scopes)
+5. Base rules (resets, typography defaults)
+6. Layout primitives
+7. Components
+8. Utilities
+9. Overrides / legacy patches
+
+Within a selector/rule block, group declarations roughly by:
+- properties/tokens → box/layout → rendering → decorations → interaction → colorization → typography → container/media → animations → specifics
+
+(Use this as a consistent mental model, not a rigid formatter.)
+
+---
+
+## Tokens, Themes, Animations, Typed Properties
+
+- Prefer semantic, reusable tokens:
+  - colors, typography, spacing, radii, shadows, z-index, breakpoints
+- Prefer extracting into dedicated modules when it reduces duplication:
+  - `tokens/*`, `theme/*`, `animations/*`, `properties/*` (names should match repo conventions)
+- Theming:
+  - Prefer `color-scheme` on `:root` (or app root) where relevant.
+  - Prefer `light-dark()` for dual-mode tokens when support is acceptable; otherwise use `@media (prefers-color-scheme: dark)` or existing theme attributes/classes.
+  - Keep color tokens semantic (`--color-bg-surface`, `--color-text-muted`), not raw (`--blue-500`), unless the project already uses a palette approach.
+
+### `@property` (typed custom properties)
+- Use when it improves animations/theming safety and support is acceptable.
+- Register only variables that benefit from typing (animated/interpolated or high-value theme tokens).
+- Always provide:
+  - `syntax`, `inherits`, `initial-value`
+- Provide a baseline fallback when typed properties are not supported.
+
+---
+
+## Layout, Responsiveness & Adaptivity
+
+- Follow existing responsiveness strategy; if unclear, prefer mobile-first.
+- Prefer modern layout:
+  - Flexbox/Grid + `gap`
+  - `aspect-ratio`, `object-fit`, `object-position`
+  - logical properties (`inline-size`, `block-size`, `margin-inline`, `padding-block`, `inset`)
+- Prefer `@container` when adaptation is component/container-driven; ensure container is established (`container-type`/`container-name`) and ship a robust baseline first.
+- Use `@media` for viewport/input/user-preference concerns (`prefers-reduced-motion`, `prefers-color-scheme`, `prefers-contrast`, pointer/hover).
+
+---
+
+## Performance & Maintainability
+
+- Avoid:
+  - deep selector chains
+  - broad global selectors that affect unrelated components
+  - heavy visual effects (large blurs/shadows) without a reason
+- Prefer animating `transform` and `opacity` over layout-affecting properties.
+- Respect user preferences:
+  - `@media (prefers-reduced-motion: reduce)` for reduced/disabled non-essential animations.
+
+---
+
+## Accessibility (A11y) & UX
+
+- Ensure sufficient contrast (aim for WCAG AA or better where applicable).
+- Provide clear interactive states: `:hover`, `:focus-visible`, `:active`, `:disabled`.
+- Do not remove outlines without a strong accessible replacement.
+
+---
+
+## Quality Gates (CSS / SCSS)
+
+- After substantive changes, verify project health using:
+  - Build main app/project: `npm run build`
+  - Build Chrome extension: `npm run build:crx`
+  - Dev/debug (where UI/layout issues may appear): `npm run dev`
+- If a change impacts many screens/components, add a short note (comment or `.md`) describing intent and risk areas.
+
+---
+
+## Integration with Project Configs
+
+- Use project config context:
+  - `tsconfig.*` path aliases
+  - `package.json` scripts/tooling
+  - `vite.config.*` aliases/CSS tooling/global imports/PostCSS
+- If external styling systems exist (CSS-in-JS, UI libs, design system), follow their conventions and avoid introducing conflicting patterns.
+
+---
+
+## Formatting
+
+- Indentation: prefer **4 spaces** (spaces only) unless an existing file/subproject enforces a different style.
+- Keep diffs deterministic; avoid unrelated formatting churn.
