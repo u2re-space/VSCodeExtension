@@ -26,11 +26,12 @@ export interface ManagerActionDef {
 }
 
 export const DEFAULT_PRIMARY_ACTIONS: string[] = [
-    "open-dir",
     "terminal",
     "dev",
+    "test",
     "build",
-    "install"
+    "install",
+    "push"
 ];
 
 export const MANAGER_ACTIONS: ManagerActionDef[] = [
@@ -42,7 +43,7 @@ export const MANAGER_ACTIONS: ManagerActionDef[] = [
     { id: "watch", title: "Watch", group: "run", icon: "eye", scope: "row" },
     { id: "diff", title: "Git diff", group: "git", icon: "git-diff", scope: "row" },
     { id: "install", title: "Install", group: "setup", icon: "download-simple", scope: "row", primary: true },
-    { id: "push", title: "Git push", group: "git", icon: "git-commit", scope: "row", requiresConfirm: true },
+    { id: "push", title: "Git push", group: "git", icon: "git-commit", scope: "row", primary: true, requiresConfirm: true },
     { id: "audit-fix", title: "Audit fix", group: "smart", icon: "shield-check", scope: "row", smart: true },
     { id: "install-fix", title: "Install + audit fix", group: "smart", icon: "wrench", scope: "row", smart: true },
     { id: "copy-file-content", title: "Copy active file content", group: "smart", icon: "file-text", scope: "row", smart: true },

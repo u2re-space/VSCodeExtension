@@ -74,6 +74,11 @@ function normalizeSlashes(input: string): string {
     return input.replace(/\\/g, "/");
 }
 
+function shellQuote(value: string): string {
+    const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `"${escaped}"`;
+}
+
 function quoteArg(value: string): string {
     const escaped = value.replace(/"/g, '\\"');
     return `"${escaped}"`;
@@ -130,7 +135,7 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
     const fallbackUri = vscodeAPI.window.activeTextEditor?.document?.uri;
     const targetUri = uri || fallbackUri;
     if (!targetUri) {
-        vscodeAPI.window.showErrorMessage(`Custom Action ${index}: no target file or folder selected.`);
+        vscodeAPI.window.showErrorMessage(`Custom Action ${index}: no target file or folder selected (right-click a file in Explorer or open a file in the editor).`);
         return;
     }
 
@@ -142,22 +147,40 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
 
     const filePath = targetUri.fsPath;
     const fileName = path.basename(filePath);
+    const fileExt = path.extname(filePath);
+    const fileBaseName = path.basename(filePath, fileExt);
     const fileDir = path.dirname(filePath);
     const workspaceFolder = getWorkspaceFolderPath(vscodeAPI, targetUri);
     const relativePath = workspaceFolder ? path.relative(workspaceFolder, filePath) : fileName;
     const kind = await getTargetKind(vscodeAPI, targetUri);
 
     const vars: Record<string, string> = {
+        // raw OS-native paths
         filePath,
-        filePathUnix: normalizeSlashes(filePath),
         fileName,
+        fileBaseName,
+        fileExt,
         fileDir,
-        fileDirUnix: normalizeSlashes(fileDir),
         workspaceFolder,
-        workspaceFolderUnix: normalizeSlashes(workspaceFolder),
         relativePath,
+        resourceType: kind,
+
+        // forward-slash (Unix-style) variants
+        filePathUnix: normalizeSlashes(filePath),
+        fileDirUnix: normalizeSlashes(fileDir),
+        workspaceFolderUnix: normalizeSlashes(workspaceFolder),
         relativePathUnix: normalizeSlashes(relativePath),
-        resourceType: kind
+
+        // shell-safe quoted variants (wrapped in double quotes with escaping)
+        filePathQuoted: shellQuote(filePath),
+        fileDirQuoted: shellQuote(fileDir),
+        workspaceFolderQuoted: shellQuote(workspaceFolder),
+        relativePathQuoted: shellQuote(relativePath),
+        fileNameQuoted: shellQuote(fileName),
+
+        // platform info
+        pathSep: path.sep,
+        platform: process.platform
     };
 
     const template = (config.template || "").trim();
@@ -175,7 +198,7 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
     const finalCommand = applyRuntime(runtime, rawCommand, filePath);
     const cwd = await resolveCwd(vscodeAPI, config, vars);
     const terminal = vscodeAPI.window.createTerminal({
-        name: config.title?.trim() || `Explorer Action ${index}`,
+        name: config.title?.trim() || `Custom Action ${index}`,
         cwd,
         env: config.env
     });

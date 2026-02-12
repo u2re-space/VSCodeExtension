@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.17",
+    "version": "0.0.18",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -35,11 +35,11 @@
             "explorer/context": [
                 {
                     "command": "vext.pasteAsSymlink",
-                    "group": "5_cutcopypaste"
+                    "group": "5_cutcopypaste@1"
                 },
                 {
                     "submenu": "vext.submenu.explorerCustomActions",
-                    "group": "5_cutcopypaste@9",
+                    "group": "5_cutcopypaste@2",
                     "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
                 }
             ],
@@ -59,9 +59,21 @@
                 {
                     "submenu": "vext.submenu.latex",
                     "group": "navigation@4"
+                },
+                {
+                    "submenu": "vext.submenu.explorerCustomActions",
+                    "group": "z_commands@0",
+                    "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
                 }
             ],
-            "submenu/vext.submenu.markdown": [
+            "editor/title/context": [
+                {
+                    "submenu": "vext.submenu.explorerCustomActions",
+                    "group": "3_preview@9",
+                    "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
+                }
+            ],
+            "vext.submenu.markdown": [
                 {
                     "command": "vext.htd.paste",
                     "group": "actions@1"
@@ -75,7 +87,7 @@
                     "group": "actions@3"
                 }
             ],
-            "submenu/vext.submenu.html": [
+            "vext.submenu.html": [
                 {
                     "command": "vext.dth.paste",
                     "group": "actions@1"
@@ -89,7 +101,7 @@
                     "group": "actions@3"
                 }
             ],
-            "submenu/vext.submenu.mathml": [
+            "vext.submenu.mathml": [
                 {
                     "command": "vext.ltm.paste",
                     "group": "actions@1"
@@ -103,7 +115,7 @@
                     "group": "actions@3"
                 }
             ],
-            "submenu/vext.submenu.latex": [
+            "vext.submenu.latex": [
                 {
                     "command": "vext.mtl.paste",
                     "group": "actions@1"
@@ -117,7 +129,7 @@
                     "group": "actions@3"
                 }
             ],
-            "submenu/vext.submenu.explorerCustomActions": [
+            "vext.submenu.explorerCustomActions": [
                 {
                     "command": "vext.explorer.customAction1",
                     "group": "actions@1",
@@ -158,7 +170,7 @@
             },
             {
                 "id": "vext.submenu.explorerCustomActions",
-                "label": "Explorer Custom Actions"
+                "label": "Custom Actions"
             }
         ],
         "configuration": {
@@ -210,7 +222,7 @@
                 "vext.explorer.customActions.enableSubmenu": {
                     "type": "boolean",
                     "default": true,
-                    "description": "Show Explorer Custom Actions submenu in Explorer context menu."
+                    "description": "Show Custom Actions submenu in Explorer, Editor, and Editor Tab context menus."
                 },
                 "vext.explorer.customAction1.enabled": {
                     "type": "boolean",
@@ -239,7 +251,7 @@
                 "vext.explorer.customAction1.template": {
                     "type": "string",
                     "default": "",
-                    "description": "Template command for action 1. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                    "description": "Template command for action 1. Placeholders: ${filePath}, ${fileName}, ${fileBaseName}, ${fileExt}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}, ${pathSep}, ${platform}. Path placeholders also have Unix (forward-slash) and Quoted (shell-safe) variants, e.g. ${filePathUnix}, ${filePathQuoted}."
                 },
                 "vext.explorer.customAction1.command": {
                     "type": "string",
@@ -252,7 +264,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Arguments for typed mode command of action 1."
+                    "description": "Arguments for typed mode command of action 1. Each argument supports the same placeholders as the template field."
                 },
                 "vext.explorer.customAction1.cwd": {
                     "type": "string",
@@ -299,7 +311,7 @@
                 "vext.explorer.customAction2.template": {
                     "type": "string",
                     "default": "",
-                    "description": "Template command for action 2. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                    "description": "Template command for action 2. Placeholders: ${filePath}, ${fileName}, ${fileBaseName}, ${fileExt}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}, ${pathSep}, ${platform}. Path placeholders also have Unix (forward-slash) and Quoted (shell-safe) variants, e.g. ${filePathUnix}, ${filePathQuoted}."
                 },
                 "vext.explorer.customAction2.command": {
                     "type": "string",
@@ -312,7 +324,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Arguments for typed mode command of action 2."
+                    "description": "Arguments for typed mode command of action 2. Each argument supports the same placeholders as the template field."
                 },
                 "vext.explorer.customAction2.cwd": {
                     "type": "string",
@@ -359,7 +371,7 @@
                 "vext.explorer.customAction3.template": {
                     "type": "string",
                     "default": "",
-                    "description": "Template command for action 3. Supports ${filePath}, ${fileName}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}."
+                    "description": "Template command for action 3. Placeholders: ${filePath}, ${fileName}, ${fileBaseName}, ${fileExt}, ${fileDir}, ${workspaceFolder}, ${relativePath}, ${resourceType}, ${pathSep}, ${platform}. Path placeholders also have Unix (forward-slash) and Quoted (shell-safe) variants, e.g. ${filePathUnix}, ${filePathQuoted}."
                 },
                 "vext.explorer.customAction3.command": {
                     "type": "string",
@@ -372,7 +384,7 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Arguments for typed mode command of action 3."
+                    "description": "Arguments for typed mode command of action 3. Each argument supports the same placeholders as the template field."
                 },
                 "vext.explorer.customAction3.cwd": {
                     "type": "string",
@@ -525,15 +537,15 @@
             },
             {
                 "command": "vext.explorer.customAction1",
-                "title": "Run Explorer Custom Action 1"
+                "title": "Run Custom Action 1"
             },
             {
                 "command": "vext.explorer.customAction2",
-                "title": "Run Explorer Custom Action 2"
+                "title": "Run Custom Action 2"
             },
             {
                 "command": "vext.explorer.customAction3",
-                "title": "Run Explorer Custom Action 3"
+                "title": "Run Custom Action 3"
             }
         ]
     },

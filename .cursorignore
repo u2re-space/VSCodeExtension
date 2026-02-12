@@ -44,6 +44,7 @@ externals
 *.sh
 *.cmd
 *.bat
+*.vsix
 .idea/*
 .idea
 .gigaide
@@ -82,9 +83,9 @@ externals
 ./concepts/*
 
 # Build
-./dist
-./dist/
-./dist/*
+./artifacts
+./artifacts/
+./artifacts/*
 ./build
 ./build/
 ./build/*
@@ -137,23 +138,3 @@ assets
 duotone/
 duotone/*
 duotone
-
-# but include design files
-!./design
-!./design/*
-!./design/*.png
-!./design/*.jpg
-!./design/*.pdf
-!./design/**/*
-!./design/**/*.png
-!./design/**/*.jpg
-!./design/**/*.pdf
-!design
-!design/*
-!design/*.png
-!design/*.jpg
-!design/*.pdf
-!design/**/*
-!design/**/*.png
-!design/**/*.jpg
-!design/**/*.pdf

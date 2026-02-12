@@ -5,3 +5,10 @@ node_modules
 duotone
 duotone/
 duotone/*
+dist
+dist/
+dist/*
+package-lock.json
+artifacts
+artifacts/
+artifacts/*
