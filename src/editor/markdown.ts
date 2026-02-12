@@ -6,7 +6,8 @@ import vscodePromise from '../imports/api.ts';
 
 //
 import TurndownService from 'turndown';
-import { marked } from 'marked';
+import { marked, MarkedExtension } from 'marked';
+import renderMathInElement from "katex/dist/contrib/auto-render.mjs";
 import { replaceSelectionWith, getSelection } from '../imports/utils.ts';
 import { escapeML } from "../imports/str.ts";
 import markedKatex from "marked-katex-extension";
@@ -19,10 +20,39 @@ const turndownService = new TurndownService();
 
 //
 try {
-    marked?.use?.(markedKatex?.({
+
+    // Configure marked with KaTeX extension for HTML output with proper delimiters
+    marked?.use?.(markedKatex({
         throwOnError: false,
-        nonStandard: true
-    }));
+        nonStandard: true,
+        output: "mathml",
+        strict: false,
+    }) as unknown as MarkedExtension,
+    {
+        hooks: {
+            preprocess: (markdown: string): string => {
+                if (/\\(.*\\)|\\[.*\\]/.test(markdown)) {
+                    const katexNode = document.createElement('div');
+                    katexNode.innerHTML = markdown;
+                    renderMathInElement(katexNode, {
+                        throwOnError: false,
+                        nonStandard: true,
+                        output: "mathml",
+                        strict: false,
+                        delimiters: [
+                            { left: "$$", right: "$$", display: true },
+                            { left: "\\[", right: "\\]", display: true },
+                            { left: "$", right: "$", display: false },
+                            { left: "\\(", right: "\\)", display: false }
+                        ]
+                    });
+                    return katexNode.innerHTML;
+                }
+                return markdown;
+            },
+        },
+    });
+
 } catch(e) {
     console.warn(e);
 }
