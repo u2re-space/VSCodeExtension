@@ -10,6 +10,7 @@ interface ActionConfig {
     enabled?: boolean;
     title?: string;
     runtime?: ActionRuntime;
+    runtimeArgs?: string[];
     template?: string;
     command?: string;
     args?: string[];
@@ -33,6 +34,7 @@ function getConfig(section: vscode.WorkspaceConfiguration, index: (typeof ACTION
     const enabled = section.get<boolean>(`${base}.enabled`, legacy.enabled ?? false);
     const title = section.get<string>(`${base}.title`, legacy.title ?? `Explorer Action ${index}`);
     const runtime = section.get<ActionRuntime>(`${base}.runtime`, legacy.runtime ?? "auto");
+    const runtimeArgs = section.get<string[]>(`${base}.runtimeArgs`, legacy.runtimeArgs ?? []);
     const template = section.get<string>(`${base}.template`, legacy.template ?? "");
     const command = section.get<string>(`${base}.command`, legacy.command ?? "");
     const args = section.get<string[]>(`${base}.args`, legacy.args ?? []);
@@ -44,6 +46,7 @@ function getConfig(section: vscode.WorkspaceConfiguration, index: (typeof ACTION
         enabled,
         title,
         runtime,
+        runtimeArgs,
         template,
         command,
         args,
@@ -51,11 +54,6 @@ function getConfig(section: vscode.WorkspaceConfiguration, index: (typeof ACTION
         env,
         openTerminal
     };
-}
-
-function getWorkspaceFolderPath(vscodeAPI: typeof vscode, uri: vscode.Uri): string {
-    const ws = vscodeAPI.workspace.getWorkspaceFolder(uri);
-    return ws?.uri?.fsPath || "";
 }
 
 async function getTargetKind(vscodeAPI: typeof vscode, uri: vscode.Uri): Promise<"file" | "directory" | "unknown"> {
@@ -74,6 +72,14 @@ function normalizeSlashes(input: string): string {
     return input.replace(/\\/g, "/");
 }
 
+function isRemoteUri(uri: vscode.Uri): boolean {
+    return uri.scheme !== "file";
+}
+
+function getTargetPath(uri: vscode.Uri): string {
+    return isRemoteUri(uri) ? uri.path : uri.fsPath;
+}
+
 function shellQuote(value: string): string {
     const escaped = value.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     return `"${escaped}"`;
@@ -84,21 +90,23 @@ function quoteArg(value: string): string {
     return `"${escaped}"`;
 }
 
-function applyRuntime(runtime: ActionRuntime, command: string, filePath: string): string {
+function applyRuntime(runtime: ActionRuntime, command: string, filePath: string, runtimeArgs: string[]): string {
     const trimmed = command.trim();
+    const renderedRuntimeArgs = runtimeArgs.map((arg) => quoteArg(arg)).join(" ");
+    const runtimeArgPart = renderedRuntimeArgs ? ` ${renderedRuntimeArgs}` : "";
     switch (runtime) {
         case "bash":
-            return `bash -lc ${quoteArg(trimmed)}`;
+            return `bash${runtimeArgPart} -lc ${quoteArg(trimmed)}`;
         case "pwsh":
-            return `pwsh -NoLogo -Command ${quoteArg(trimmed)}`;
+            return `pwsh -NoLogo${runtimeArgPart} -Command ${quoteArg(trimmed)}`;
         case "node":
-            return `node ${trimmed}`;
+            return `node${runtimeArgPart} ${trimmed}`;
         case "deno":
-            return `deno run ${trimmed}`;
+            return `deno run${runtimeArgPart} ${trimmed}`;
         case "js":
-            return trimmed.length > 0 ? `node ${trimmed}` : `node ${quoteArg(filePath)}`;
+            return trimmed.length > 0 ? `node${runtimeArgPart} ${trimmed}` : `node${runtimeArgPart} ${quoteArg(filePath)}`;
         case "ssh":
-            return `ssh ${trimmed}`;
+            return `ssh${runtimeArgPart} ${trimmed}`;
         case "auto":
         default:
             return trimmed;
@@ -130,6 +138,10 @@ async function resolveCwd(vscodeAPI: typeof vscode, config: ActionConfig, vars: 
     return interpolate(raw, vars);
 }
 
+function getPathApiForUri(uri: vscode.Uri): typeof path | typeof path.posix {
+    return isRemoteUri(uri) ? path.posix : path;
+}
+
 async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): Promise<void> {
     const vscodeAPI = await vscodePromise;
     const fallbackUri = vscodeAPI.window.activeTextEditor?.document?.uri;
@@ -145,13 +157,15 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
         return;
     }
 
-    const filePath = targetUri.fsPath;
-    const fileName = path.basename(filePath);
-    const fileExt = path.extname(filePath);
-    const fileBaseName = path.basename(filePath, fileExt);
-    const fileDir = path.dirname(filePath);
-    const workspaceFolder = getWorkspaceFolderPath(vscodeAPI, targetUri);
-    const relativePath = workspaceFolder ? path.relative(workspaceFolder, filePath) : fileName;
+    const pathApi = getPathApiForUri(targetUri);
+    const filePath = getTargetPath(targetUri);
+    const fileName = pathApi.basename(filePath);
+    const fileExt = pathApi.extname(filePath);
+    const fileBaseName = pathApi.basename(filePath, fileExt);
+    const fileDir = pathApi.dirname(filePath);
+    const workspaceFolderUri = vscodeAPI.workspace.getWorkspaceFolder(targetUri)?.uri;
+    const workspaceFolder = workspaceFolderUri ? getTargetPath(workspaceFolderUri) : "";
+    const relativePath = workspaceFolder ? pathApi.relative(workspaceFolder, filePath) : fileName;
     const kind = await getTargetKind(vscodeAPI, targetUri);
 
     const vars: Record<string, string> = {
@@ -179,7 +193,7 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
         fileNameQuoted: shellQuote(fileName),
 
         // platform info
-        pathSep: path.sep,
+        pathSep: isRemoteUri(targetUri) ? "/" : path.sep,
         platform: process.platform
     };
 
@@ -195,7 +209,12 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
     }
 
     const runtime: ActionRuntime = config.runtime || "auto";
-    const finalCommand = applyRuntime(runtime, rawCommand, filePath);
+    const runtimeArgs = Array.isArray(config.runtimeArgs)
+        ? config.runtimeArgs
+            .map((arg) => interpolate(String(arg), vars).trim())
+            .filter((arg) => arg.length > 0)
+        : [];
+    const finalCommand = applyRuntime(runtime, rawCommand, filePath, runtimeArgs);
     const cwd = await resolveCwd(vscodeAPI, config, vars);
     const terminal = vscodeAPI.window.createTerminal({
         name: config.title?.trim() || `Custom Action ${index}`,

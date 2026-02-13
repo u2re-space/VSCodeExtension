@@ -248,6 +248,14 @@
                     "default": "auto",
                     "description": "Runtime wrapper used for custom action 1."
                 },
+                "vext.explorer.customAction1.runtimeArgs": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for runtime wrapper of action 1 (for example, node flags like --env-file=/path/.env). Each argument supports the same placeholders as the template field."
+                },
                 "vext.explorer.customAction1.template": {
                     "type": "string",
                     "default": "",
@@ -308,6 +316,14 @@
                     "default": "auto",
                     "description": "Runtime wrapper used for custom action 2."
                 },
+                "vext.explorer.customAction2.runtimeArgs": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for runtime wrapper of action 2 (for example, node flags like --env-file=/path/.env). Each argument supports the same placeholders as the template field."
+                },
                 "vext.explorer.customAction2.template": {
                     "type": "string",
                     "default": "",
@@ -367,6 +383,14 @@
                     ],
                     "default": "auto",
                     "description": "Runtime wrapper used for custom action 3."
+                },
+                "vext.explorer.customAction3.runtimeArgs": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Arguments for runtime wrapper of action 3 (for example, node flags like --env-file=/path/.env). Each argument supports the same placeholders as the template field."
                 },
                 "vext.explorer.customAction3.template": {
                     "type": "string",
