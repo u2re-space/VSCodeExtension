@@ -12,11 +12,43 @@ import { replaceSelectionWith, getSelection } from '../imports/utils.ts';
 import { escapeML } from "../imports/str.ts";
 import markedKatex from "marked-katex-extension";
 
-//! unused
-//import mk from "@vscode/markdown-it-katex";
-
 //
 const turndownService = new TurndownService();
+
+//
+const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
+const FENCED_CODE_PATTERN = /(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2(?=\n|$)/g;
+const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
+const SANITIZE_OPTIONS = {
+    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "applet", "link", "meta", "base", "form", "noscript", "template"],
+    FORBID_CONTENTS: ["script", "style", "iframe", "object", "embed", "applet", "noscript", "template"]
+};
+
+//
+function maskCodeSegments(markdown: string): { masked: string; restore: (value: string) => string } {
+    const maskedValues: string[] = [];
+    const tokenPrefix = "__MD_MASK_";
+    const tokenSuffix = "__";
+
+    const mask = (value: string): string => value.replace(FENCED_CODE_PATTERN, (segment) => {
+        const token = `${tokenPrefix}${maskedValues.length}${tokenSuffix}`;
+        maskedValues.push(segment);
+        return token;
+    });
+
+    const maskInline = (value: string): string => value.replace(INLINE_CODE_PATTERN, (segment) => {
+        const token = `${tokenPrefix}${maskedValues.length}${tokenSuffix}`;
+        maskedValues.push(segment);
+        return token;
+    });
+
+    const masked = maskInline(mask(markdown));
+
+    return {
+        masked,
+        restore: (value: string): string => value.replace(/__MD_MASK_(\d+)__/g, (_, index) => maskedValues[Number(index)] ?? "")
+    };
+}
 
 //
 try {
@@ -31,28 +63,34 @@ try {
     {
         hooks: {
             preprocess: (markdown: string): string => {
-                if (/\\(.*\\)|\\[.*\\]/.test(markdown)) {
-                    const katexNode = document.createElement('div');
-                    katexNode.innerHTML = markdown;
-                    renderMathInElement(katexNode, {
-                        throwOnError: false,
-                        nonStandard: true,
-                        output: "mathml",
-                        strict: false,
-                        delimiters: [
-                            { left: "$$", right: "$$", display: true },
-                            { left: "\\[", right: "\\]", display: true },
-                            { left: "$", right: "$", display: false },
-                            { left: "\\(", right: "\\)", display: false }
-                        ]
-                    });
-                    return katexNode.innerHTML;
+                if (!MATH_DELIMITER_PATTERN.test(markdown)) {
+                    return markdown;
                 }
-                return markdown;
+    
+                const { masked, restore } = maskCodeSegments(markdown);
+                const katexNode = document.createElement("div");
+                // Code fragments are masked above, so HTML here is only from non-code markdown.
+                katexNode.innerHTML = masked;
+                renderMathInElement(katexNode, {
+                    throwOnError: false,
+                    nonStandard: true,
+                    output: "mathml",
+                    strict: false,
+                    delimiters: [
+                        { left: "$$", right: "$$", display: true },
+                        { left: "\\[", right: "\\]", display: true },
+                        { left: "$", right: "$", display: false },
+                        { left: "\\(", right: "\\)", display: false }
+                    ]
+                });
+    
+                return restore(katexNode.innerHTML)
+                    .replace(/&gt;/g, ">")
+                    .replace(/&lt;/g, "<")
+                    .replace(/&amp;/g, "&");
             },
         },
     });
-
 } catch(e) {
     console.warn(e);
 }
