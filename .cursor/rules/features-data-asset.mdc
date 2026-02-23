@@ -1,0 +1,29 @@
+---
+description: Unify file/blob/base64/url/uri into hash-named DataAsset with minimal metadata.
+globs: *.ts,*.tsx,*.js,*.mjs
+alwaysApply: true
+---
+
+# Unified DataAsset Rule
+
+When working with binary/text payloads, treat data sources as one concept:
+
+- `File`
+- `Blob`
+- `base64` / `data:*`
+- `URL` / URI-encoded payloads
+
+## Required behavior
+
+- Normalize inputs through a single conversion pipeline (canonical API: `normalizeDataAsset()` from `fest/lure`).
+- Prefer hash-based names (`<prefix>-<hash>.<ext>`) over timestamp/random naming.
+- Keep metadata compact and transport-friendly:
+  - required: `hash`, `name`, `type`/`mimeType`, `size`, `source`
+  - avoid carrying rich/raw platform metadata unless explicitly required.
+- Reuse shared detectors/parsers (`parseDataUrl`, base64/url detection) instead of duplicating regex/util code in app modules.
+- If a module already has local conversion logic, migrate to shared normalization rather than adding another variant.
+
+## For messaging / transport layers
+
+- Prefer compact envelope types (e.g. `DataAssetEnvelope`) for cross-context transfers.
+- Keep payload shape stable; avoid ad-hoc per-feature data contracts for the same file/blob/base64/url concept.

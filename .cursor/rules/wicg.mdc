@@ -58,12 +58,14 @@ edge‑case handling, especially for:
 ## Design concepts
 
 **Inspired by:**
+
 - <https://phosphoricons.com/>
 - <https://m3.material.io/>
 - <https://fonts.google.com/icons> (in future use)
 - <https://www.beercss.com/>
 
 **Main library:** `fest/veela`
+
 - <https://github.com/fest-live/veela.css>
 
 **Without:** contrast borders/outlines.

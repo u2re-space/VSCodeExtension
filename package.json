@@ -34,7 +34,7 @@
         "menus": {
             "explorer/context": [
                 {
-                    "command": "vext.pasteAsSymlink",
+                    "command": "vext.symlink",
                     "group": "5_cutcopypaste@1"
                 },
                 {
@@ -500,8 +500,8 @@
                 "title": "Open Manager (Panel)"
             },
             {
-                "command": "vext.pasteAsSymlink",
-                "title": "Paste as Symlink"
+                "command": "vext.symlink",
+                "title": "Symlink…"
             },
             {
                 "command": "vext.proxyUndo",

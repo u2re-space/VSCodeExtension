@@ -1,241 +1,66 @@
 ---
-globs: *.scss,*.css
+description: Canonical CSS/SCSS refactor and architecture rule
+globs: "*.scss,*.css,*.sass"
 alwaysApply: false
 ---
 
-> NOTE: This file mirrors the repo root rules in `.cursor/rules/rules-css.mdc`.
-> Prefer editing the root copy and then syncing here if needed.
+> NOTE: Canonical CSS/SCSS rule. Keep this file as the single source of truth for style actions.
 
-# Styling / CSS / SCSS Guidelines for Cursor
+# CSS/SCSS Canonical Rule
 
-## Styling (CSS / SCSS)
+## Primary goals
 
-- Follow existing naming conventions (BEM, utility-first, CSS Modules, etc.) already present in the project.
-- Prefer modern layout techniques (Flexbox, Grid) and avoid outdated patterns (e.g., table layouts) unless required.
-- Remove unused styles when it is safe to confirm they are not referenced.
-- Keep selectors as small and specific as necessary; avoid over-nesting in SCSS.
-- Use variables, mixins, or design tokens already defined in the project instead of duplicating values.
+1. Preserve computed styles and visual behavior.
+2. Proactively dedupe and consolidate repeated style logic.
+3. Keep styles cohesive, low-specificity, and easy to navigate.
 
----
+## Required refactor actions
 
-## General Behavior
+- Refactor/optimize/consolidate SCSS and CSS while editing.
+- Use 4-space indentation and normalize formatting without unrelated churn.
+- Regroup selectors, nesting, custom properties, and rule blocks logically.
+- Cleanup/optimize/reduce/merge duplicates and near-duplicates; keep one canonical implementation.
+- Use `@layer` logically and merge redundant layer definitions.
+- Consolidate `@keyframes`, `@media`, and `@container` blocks where safe.
+- Hoist/merge imports, selectors, and shared rules when it reduces duplication.
+- Fix syntax breaks and ensure styles compile/lint.
 
-- Infer styling from **actual code context** (HTML/JSX structure, components, framework, design system) and propose **realistic, context-aware** styles, not generic examples.
-- When suggesting style changes:
-  - Clarify **why** they are useful (UX, readability, responsiveness, accessibility, performance, consistency, etc.).
-  - Preserve the existing CSS architecture (BEM, utility-first, CSS Modules, CSS-in-JS, etc.) whenever it’s detectable.
-- Prefer **modern CSS** where it is supported, but:
-  - If a feature is very new or has limited support, provide **fallbacks** or safer alternatives.
-  - Clearly label experimental/low-support features and, when relevant, reference specs or support info (MDN, caniuse, chromestatus).
+## File and layer structure
 
----
+Prefer a small top-level partition:
 
-## Quality Gates (CSS / SCSS)
+1. meta (`@use`, `@forward`, `@mixin`, `@function`, `@keyframes`, `@property`)
+2. tokens
+3. base
+4. layout
+5. components
+6. utilities
+7. overrides
 
-- After substantive changes, verify project health using:
-  - Build main app/project: `npm run build`
-  - Build Chrome extension: `npm run build:crx`
-  - Dev/debug (where UI/layout issues may appear): `npm run dev`
-- Prefer safe, reviewable diffs:
-  - Avoid “style distortion” (unexpected layout shifts, new overflow, broken alignment) unless explicitly intended.
-  - Keep selectors and rules localized to the component/module where possible; avoid new global leakage.
-  - If a change impacts many screens, add a short note (comment or `.md`) describing intent and risk areas.
+Layer strategy:
 
----
+- Keep layer stack small and stable.
+- Prefer `@layer tokens, base, layout, components, utilities, overrides;` unless the repo defines another order.
+- Resolve conflicts via layers + low specificity, not selector escalation.
 
-## Modules, Imports & File Structure (Avoid Fragmentation, Avoid Bloat)
+## SCSS module and selector guidance
 
-- Prefer cohesive, feature-oriented style modules:
-  - Keep styles for a component/feature together rather than scattering across many tiny files.
-  - Split when a file becomes too bloated, but split by sub-module/domain concept (not vague `misc/*` sprawl).
-- Always try to fix/align imports (paths) of CSS/SCSS modules:
-  - Match existing aliasing and folder conventions.
-  - Remove unused imports when safe; avoid leaving dead modules after refactors.
-- Indentation:
-  - Prefer **4 spaces** (spaces only) unless an existing file/subproject enforces a different style.
+- Prefer `@use`/`@forward` over `@import`.
+- Prefer semantic tokens and reusable mixins/functions.
+- Prefer low-specificity selectors and limited nesting depth (about 3 levels max).
+- Use `:where(...)`/`:is(...)` to reduce selector bloat; use `:has(...)` carefully and scoped.
 
----
+## Hard constraints
 
-## SCSS Module System (`@use` / `@forward`)
+- Global/library SCSS mixins/functions/variables must NOT be inside `@layer`, `@media`, or `@scope`.
+- Do not increase selector specificity unless unavoidable.
+- Do not change HTML markup/class names/DOM structure.
+- Avoid `!important`.
+- Preserve visual output unless the task explicitly requires behavior changes.
 
-- Prefer the modern SCSS module system:
-  - Use `@use` for importing modules; avoid `@import` in new/edited code.
-  - Use `@forward` to define public style APIs for a module (tokens, mixins, functions).
-- Avoid name pollution:
-  - Prefer explicit namespaces (e.g. `@use "tokens" as t;`) unless the codebase already uses `as *`.
-  - Keep module public surfaces small and semantically named.
-- Use mixins/functions to prevent bloat:
-  - Use `@mixin` (with parameters) for repeated patterns (layout primitives, focus rings, states).
-  - Use `@function` only when it genuinely simplifies computed values (sizes/colors) and improves readability.
+## Quality gates
 
----
-
-## Cascade Layers (`@layer`) (Preferred / Default)
-
-- Prefer using `@layer` consistently in CSS:
-  - Always use `@layer` at the top level of a module where it implements style rules.
-  - Keep a predictable layer strategy (tokens/base/components/utilities/overrides) if the project has one.
-  - Avoid fighting specificity; use layers + low-specificity selectors as the default approach.
-
----
-
-## Container Queries (`@container`) vs Media Queries (`@media`)
-
-- Prefer `@container` queries over `@media` when component layout should adapt to its container.
-- Use `@media` for viewport-, input-, or user-preference-driven concerns:
-  - `prefers-reduced-motion`, `prefers-color-scheme`, `prefers-contrast`, pointer/hover capabilities, etc.
-- When using `@container`, ensure a container is established where needed (`container-type`, `container-name`) and provide a robust baseline layout first.
-
----
-
-## Modern CSS / SCSS Features
-
-- Actively use:
-  - `calc()`, `min()`, `max()`, `clamp()` and other supported math functions when they simplify layout and responsiveness.
-  - Logical properties and values (`inline-size`, `block-size`, `margin-inline`, `padding-block`, `inset`, etc.) instead of physical ones (`left`, `right`, `top`, `bottom`, `width`, `height`) where appropriate.
-  - Relative units (`rem`, `em`, `vh`, `vw`, `svh`, `lvh`, `dvh`, `ch`, `ex`, `lh`, `rlh`) and modern patterns for responsive typography and layout.
-- Prefer using:
-  - `@property` (typed custom properties) for safer animations and theming, when support is acceptable; otherwise suggest a robust fallback:
-    - Prefer registering only the variables that benefit from typing (animated/interpolated values, frequently-updated theme tokens).
-    - Always specify:
-      - `syntax` (e.g. `<number>`, `<length>`, `<percentage>`, `<color>`, `<angle>`, `'*'` as last resort)
-      - `inherits` (usually `false` for component-scoped tokens; `true` only when inheritance is intentional)
-      - `initial-value` (a safe default to prevent “unregistered → invalid at computed-value time” surprises)
-    - Use for:
-      - smooth animations/transitions of custom properties (avoids discrete/invalid interpolation)
-      - guarded theming tokens that should have predictable computed types
-    - Fallback strategy:
-      - Provide a non-animated baseline (static values) that works without `@property`.
-      - If animation is critical, consider animating a supported native property (`transform`, `opacity`) or use keyframes on supported properties.
-    - Prefer semantic names and consistent prefixing for registered properties (e.g. `--rs-*`), and avoid registering too many globals.
-  - Modern selectors and features:
-    - `:is()`, `:where()`, `:has()` when they reduce selector bloat and improve maintainability.
-    - `:not()` for exclusions; `:empty` for “no content” states; `:focus-visible`, `:focus-within`, `:user-invalid` for accessibility/UX.
-    - Keep selector specificity low (prefer `:where()` for zero-specificity scoping when appropriate).
-  - Advanced visual techniques (use when they materially improve UX and keep fallbacks):
-    - `clip-path` for shape masking/cropping (prefer simple shapes for performance).
-    - `mask-image` / `mask` / `-webkit-mask` for image masking (provide fallback when unsupported).
-    - `background-clip: text` (and `-webkit-background-clip: text` + `color: transparent`) for text gradients, with a plain-color fallback.
-  - Newer platform features (label support status + provide fallback/avoid if too experimental):
-    - `::picker-icon` for customizing select dropdown icons (Chromium-specific / limited support—fallback to background images / custom select UI).
-    - `corner-shape` (very new / experimental—fallback to `border-radius` and avoid relying on it for core layout).
-    - `font-variant-emoji` (newer typography control—fallback to default font rendering and avoid requiring it for correctness).
-  - Media features like `prefers-reduced-motion`, `prefers-color-scheme`, `prefers-contrast`, pointer/hover capabilities, etc.
-- SCSS usage:
-  - Feel free to wrap CSS in SCSS for simplification and clarity (variables, mixins, functions, nesting, `@use`, `@forward`, `@mixin`, `@include`, etc.).
-  - Use nesting where it improves readability, but avoid overly deep chains (generally no more than 3 levels without a strong reason).
-  - Avoid overly specific selectors that hurt maintainability and performance.
-
----
-
-## Architecture & Code Style
-
-- Respect the **existing CSS architecture**:
-  - If the project uses **BEM**, keep using it (`block__element--modifier` naming).
-  - If a **utility-first** style (Tailwind-like) is present, avoid duplicating utilities in separate style rules without clear benefit.
-  - If **CSS Modules / scoped CSS** are used, suggest class names and selector scoping consistent with that approach.
-- Aim for:
-  - Low and predictable selector specificity (prefer classes; avoid unnecessary IDs and `!important`).
-  - Minimal duplication of rules and values; suggest refactoring to variables/mixins where appropriate.
-  - Consistent naming for variables, mixins, and placeholder selectors (`%placeholder` in SCSS).
-- When introducing new variables (CSS or SCSS):
-  - Group them semantically: colors, typography, spacing, radii, z-indexes, breakpoints, etc.
-  - Prefer **semantic names** (`--color-primary`, `--space-xs`, `--radius-lg`) over raw visual names (`--blue`, `--red2`).
-
----
-
-## Grouping and decompose
-
-**I propose to decompose by mixin/group types:**
-- meta-level (`@mixin`'s, `@keyframes`, `@property`'ies, `@function`'s)
-- properties (`--var-name`'s, `var(--var-name)`'s)
-- box/layout (such as padding, margin, border, display, grid, flex, etc.)
-- rendering  (optimizations, effects, filters, smooth, etc.)
-- decorations (such as icons, images, etc.)
-- interaction (such as hover, focus, active, disabled, pointer-events, cursor, user-select, etc.)
-- colorization (such as color, background, border, etc.)
-- container/media (such as container, media, breakpoints, etc.)
-- animations (such as animation, transition, view-transition, etc.)
-- typography (such as font, size, weight, line-height, letter-spacing, etc.)
-- specifics (such as specific for components, pages, etc.)
-
-**And text render group types:**
-- wrap-able
-- semi-wrap-able
-- not-wrap-able
-- heading-specific
-
-**And colorization group types:**
-- solid (surface, contrast)
-- blurred (glossy, backdrop)
-- tinted (transparent, overlay)
-- shaded (darkened, overlay)
-- toned (colored, overlay)
-
----
-
-## Layout, Responsiveness & Adaptivity
-
-- Design with responsiveness in mind:
-  - Follow the project’s existing strategy (mobile-first or desktop-first). If unclear, prefer **mobile-first**.
-  - Reuse existing breakpoints if defined; otherwise suggest reasonable defaults and keep them DRY (variables or mixins).
-- Use modern layout tools:
-  - Flexbox and Grid for structure; `gap` for spacing between items when appropriate.
-  - `aspect-ratio`, `object-fit`, and `object-position` for images and media.
-  - Container queries (`@container`) when they are already in use and supported for the target browsers, and provide a simpler fallback layout when possible.
-- For complex layouts:
-  - First suggest a **simple, robust baseline**, then an enhanced version with more advanced features and clear notes about browser support.
-
----
-
-## Performance & Maintainability
-
-- Avoid:
-  - Excessively deep selector nesting.
-  - Broad global styles that may unintentionally affect unrelated components (especially in component-based frameworks).
-  - Overuse of heavy visual effects (large box-shadows, complex filters) and expensive animations, particularly on mobile.
-- For animations and transitions:
-  - Prefer animating `transform` and `opacity`; avoid layout-affecting properties (`width`, `height`, `top`, `left`) when possible.
-  - Consider `prefers-reduced-motion` and provide simplified or disabled animations for users who opt out of motion.
-- If a suggestion may have **performance impact** (e.g., blur filters, large shadows, many simultaneous animations), call that out explicitly and, when possible, propose a lighter alternative.
-
----
-
-## Accessibility (A11y) & UX
-
-- Always consider accessibility when styling:
-  - Ensure text and interactive elements have sufficient color contrast (aim for WCAG AA or better).
-  - Provide clear visual states for `:focus`, `:focus-visible`, `:hover`, `:active`, `:disabled` and respect non-pointer devices.
-  - Do not remove `outline` without an accessible replacement that preserves keyboard navigation clarity.
-- For motion and visual effects:
-  - Avoid strong flashing, excessive motion, or parallax that might trigger discomfort.
-  - Use `@media (prefers-reduced-motion: reduce)` to reduce or disable non-essential animations.
-
----
-
-## Theming (Light / Dark / High Contrast)
-
-- For theming:
-  - Use CSS Custom Properties (`var(--...)`) for colors, typography tokens, radii, shadows, and other reusable visual values.
-  - Prefer declaring `color-scheme` to align built-in UI (form controls, scrollbars) with the intended theme:
-    - Use `color-scheme: light dark;` when both modes are supported and the browser should pick the appropriate rendering.
-    - Use `color-scheme: light;` or `color-scheme: dark;` when the UI is intentionally fixed (rare).
-    - Prefer setting it on `:root` (or the app root container) so it applies consistently.
-  - Prefer `light-dark()` for simple dual-value tokens when supported:
-    - Example mental model: `color: light-dark(var(--text-light), var(--text-dark))`
-    - Use it primarily for colors (and color-like values) to reduce duplicated `@media (prefers-color-scheme)` blocks.
-    - Provide a fallback when support is uncertain: define light defaults, then override via `@media (prefers-color-scheme: dark)` (or via a theme attribute/class).
-  - Support dark mode via `@media (prefers-color-scheme: dark)` or via a root class/attribute (e.g. `.theme-dark` or `data-theme="dark"`), following the project’s existing pattern.
-  - Consider `prefers-contrast` (e.g. `@media (prefers-contrast: more)`) to provide higher-contrast variants when appropriate.
-- Keep theme tokens **semantic** (e.g. `--color-bg-surface`, `--color-text-muted`) rather than hard-coded color names.
-
----
-
-## Integration with Project Configs
-
-- Make use of project configuration files to better understand context:
-  - `tsconfig.*`: respect path aliases and base directories when referencing assets or modules.
-  - `package.json`: note frameworks, CSS/SCSS tooling, PostCSS, autoprefixer, linters, and formatters in use.
-  - `vite.config.*` (or other bundler configs): follow existing aliases, CSS/SCSS options, global style imports, PostCSS plugins, etc.
-- When external styling systems are in use:
-  - E.g. PostCSS plugins, CSS-in-JS, design systems, or UI libraries — follow their conventions and constraints (naming, tokens, layers, etc.) instead of inventing conflicting patterns.
+- After substantive changes, run relevant checks:
+  - `npm run build`
+  - `npm run build:crx`
+  - `npm run dev`
