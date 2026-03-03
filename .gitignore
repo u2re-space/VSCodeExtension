@@ -12,3 +12,11 @@ package-lock.json
 artifacts
 artifacts/
 artifacts/*
+*.exe
+*.msi
+*.zip
+*.dll
+*.obj
+build
+build/
+build/*
