@@ -27,6 +27,7 @@
         "package.json"
     ],
     "extensionKind": [
+        "workspace",
         "ui"
     ],
     "main": "./dist/extension.mjs",

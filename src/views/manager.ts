@@ -123,7 +123,13 @@ async function findProjectDirs(
                     const stat = await fs.promises.stat(entryUri.fsPath);
                     isDir = stat.isDirectory();
                     isFile = stat.isFile();
-                } catch { /* ignore */ }
+                } catch {
+                    try {
+                        const vStat = await vscodeAPI.workspace.fs.stat(entryUri);
+                        isDir = (vStat.type & vscodeAPI.FileType.Directory) !== 0;
+                        isFile = (vStat.type & vscodeAPI.FileType.File) !== 0;
+                    } catch { /* ignore */ }
+                }
             }
 
             // repo markers (dirs)
