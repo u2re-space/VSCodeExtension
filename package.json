@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.19",
+    "version": "0.0.20",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -207,7 +207,32 @@
                     "items": {
                         "type": "string"
                     },
-                    "description": "Primary row actions shown before More menu."
+                    "description": "Primary row actions shown before More menu. The order in this array determines the display order."
+                },
+                "vext.managerView.secondaryActions": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Secondary row actions shown in the More menu. If empty, all remaining available actions are shown. The order in this array determines the display order."
+                },
+                "vext.managerView.bulkActions": {
+                    "type": "array",
+                    "default": [
+                        "bulk_build",
+                        "bulk_install",
+                        "bulk_push"
+                    ],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Bulk actions shown in the top toolbar. The order in this array determines the display order."
+                },
+                "vext.managerView.commands": {
+                    "type": "object",
+                    "default": {},
+                    "description": "Custom commands for Manager actions. Can be global (e.g. \"build\": \"./gradlew build\") or per-module (e.g. \"./subproject\": { \"build\": [\"npm run build:crx\"] }). Supports placeholders: ${module}, ${command}, ${workspaceFolder}, ${modulePath}."
                 },
                 "vext.managerView.smartActions.enabled": {
                     "type": "boolean",

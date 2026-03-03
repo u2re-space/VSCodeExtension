@@ -10,6 +10,9 @@ export interface ManagerUiConfig {
     smartActionsEnabled: boolean;
     powerUserEnabled: boolean;
     primaryActions: string[];
+    secondaryActions: string[];
+    bulkActions: string[];
+    commands: Record<string, any>;
 }
 
 export interface ManagerActionDef {
@@ -34,6 +37,12 @@ export const DEFAULT_PRIMARY_ACTIONS: string[] = [
     "push"
 ];
 
+export const DEFAULT_BULK_ACTIONS: string[] = [
+    "bulk_build",
+    "bulk_install",
+    "bulk_push"
+];
+
 export const MANAGER_ACTIONS: ManagerActionDef[] = [
     { id: "open-dir", title: "Open", group: "navigate", icon: "folder-open", scope: "row" },
     { id: "terminal", title: "Terminal", group: "run", icon: "terminal-window", scope: "row", primary: true },
@@ -41,6 +50,8 @@ export const MANAGER_ACTIONS: ManagerActionDef[] = [
     { id: "build", title: "Build", group: "build", icon: "package", scope: "row", primary: true },
     { id: "test", title: "Test", group: "build", icon: "flask", scope: "row", primary: true },
     { id: "watch", title: "Watch", group: "run", icon: "eye", scope: "row" },
+    { id: "restart", title: "Restart", group: "run", icon: "arrow-clockwise", scope: "row" },
+    { id: "stop", title: "Stop", group: "run", icon: "stop-circle", scope: "row" },
     { id: "diff", title: "Git diff", group: "git", icon: "git-diff", scope: "row" },
     { id: "install", title: "Install", group: "setup", icon: "download-simple", scope: "row", primary: true },
     { id: "push", title: "Git push", group: "git", icon: "git-commit", scope: "row", primary: true, requiresConfirm: true },
@@ -98,12 +109,17 @@ export const MANAGER_ACTIONS: ManagerActionDef[] = [
 export const getManagerUiConfig = (vscodeAPI: typeof vscode): ManagerUiConfig => {
     const cfg = vscodeAPI.workspace.getConfiguration("vext");
     const userPrimary = cfg.get<string[]>("managerView.primaryActions", DEFAULT_PRIMARY_ACTIONS);
+    const userSecondary = cfg.get<string[]>("managerView.secondaryActions", []);
+    const userBulk = cfg.get<string[]>("managerView.bulkActions", DEFAULT_BULK_ACTIONS);
     return {
         theme: cfg.get<ManagerTheme>("managerView.theme", "auto"),
         layout: cfg.get<ManagerLayout>("managerView.layout", "compactMore"),
         smartActionsEnabled: cfg.get<boolean>("managerView.smartActions.enabled", true),
         powerUserEnabled: cfg.get<boolean>("managerView.smartActions.powerUser", true),
-        primaryActions: (Array.isArray(userPrimary) && userPrimary.length > 0) ? userPrimary : DEFAULT_PRIMARY_ACTIONS
+        primaryActions: (Array.isArray(userPrimary) && userPrimary.length > 0) ? userPrimary : DEFAULT_PRIMARY_ACTIONS,
+        secondaryActions: Array.isArray(userSecondary) ? userSecondary : [],
+        bulkActions: (Array.isArray(userBulk) && userBulk.length > 0) ? userBulk : DEFAULT_BULK_ACTIONS,
+        commands: cfg.get<Record<string, any>>("managerView.commands", {})
     };
 };
 

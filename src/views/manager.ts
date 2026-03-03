@@ -6,6 +6,9 @@ import vscodePromise from '../imports/api.ts';
 import { getWebviewContent } from "./webview.ts";
 import { getFilteredActions, getManagerUiConfig, resolveTheme } from "./managerActions.ts";
 
+import * as fs from 'fs';
+import * as path from 'path';
+
 //
 const inWatch = new Set<any>([]);
 
@@ -86,21 +89,49 @@ const getWorkspaceFolder = async (workspace, res = "") => {
 // Helper to find directories with .git or package.json
 async function findProjectDirs(
     vscodeAPI: any,
-    baseDir: vscode.Uri,
-    relPath: string = ""
+    wsdUri: vscode.Uri,
+    currentDir: vscode.Uri,
+    visitedPaths: Set<string> = new Set()
 ): Promise<string[]> {
     const result: string[] = [];
     try {
-        const entries = await vscodeAPI.workspace.fs.readDirectory(baseDir);
+        let realPath = currentDir.fsPath;
+        try {
+            realPath = await fs.promises.realpath(currentDir.fsPath);
+        } catch { /* ignore */ }
+
+        // Deduplicate by absolute path
+        const normRealPath = realPath.replace(/\\/g, '/');
+        if (visitedPaths.has(normRealPath)) {
+            return [];
+        }
+        visitedPaths.add(normRealPath);
+
+        const entries = await vscodeAPI.workspace.fs.readDirectory(currentDir);
         let hasRepo = false, hasPkg = false;
 
+        const subDirs: { name: string, uri: vscode.Uri }[] = [];
+
         for (const [name, type] of entries) {
+            let isDir = type === vscodeAPI.FileType.Directory;
+            let isFile = type === vscodeAPI.FileType.File;
+            
+            const entryUri = vscodeAPI.Uri.joinPath(currentDir, name);
+            
+            if (type === vscodeAPI.FileType.SymbolicLink || type === (vscodeAPI.FileType.Directory | vscodeAPI.FileType.SymbolicLink) || type === (vscodeAPI.FileType.File | vscodeAPI.FileType.SymbolicLink)) {
+                try {
+                    const stat = await fs.promises.stat(entryUri.fsPath);
+                    isDir = stat.isDirectory();
+                    isFile = stat.isFile();
+                } catch { /* ignore */ }
+            }
+
             // repo markers (dirs)
-            if (type === vscodeAPI.FileType.Directory) {
+            if (isDir) {
                 if (name === ".git" || name === ".hg" || name === ".svn") { hasRepo = true; }
             }
             // package/project markers (files)
-            if (type === vscodeAPI.FileType.File) {
+            if (isFile) {
                 const pkgMarkers = [
                     "package.json", "deno.json", "deno.jsonc", "jsr.json",
                     "pnpm-workspace.yaml", "pnpm-lock.yaml", "yarn.lock",
@@ -108,15 +139,24 @@ async function findProjectDirs(
                 ];
                 if (pkgMarkers.includes(name)) { hasPkg = true; }
             }
+
+            if (isDir) {
+                subDirs.push({ name, uri: entryUri });
+            }
         }
 
-        if (hasRepo || hasPkg) { result.push(relPath || "./"); }
+        if (hasRepo || hasPkg) {
+            let rel = path.relative(wsdUri.fsPath, realPath).replace(/\\/g, '/');
+            if (rel === '') { rel = './'; }
+            else if (!rel.startsWith('.') && !rel.startsWith('/')) { rel = './' + rel; }
+            result.push(rel);
+        }
 
         // Recursively traverse subdirectories (exclude node_modules and hidden dirs)
         const excludeDirs = ["node_modules", "dist", "out", "build", "coverage", "target"];
-        const subPromises = entries
-            .filter(([name, type]) => type === vscodeAPI.FileType.Directory && !excludeDirs.includes(name) && !name.startsWith("."))
-            .map(([name]) => findProjectDirs(vscodeAPI, vscodeAPI.Uri.joinPath(baseDir, name), relPath ? `${relPath}/${name}` : name));
+        const subPromises = subDirs
+            .filter(({ name }) => !excludeDirs.includes(name) && !name.startsWith("."))
+            .map(({ uri }) => findProjectDirs(vscodeAPI, wsdUri, uri, visitedPaths));
 
         const subResults = await Promise.all(subPromises);
         result.push(...subResults.flat());
@@ -149,7 +189,7 @@ const getDirs = async (extContext: vscode.ExtensionContext, force = false) => {
     }
 
     try {
-        cache.inflight = findProjectDirs(vscodeAPI, wsdUri, "");
+        cache.inflight = findProjectDirs(vscodeAPI, wsdUri, wsdUri);
         const modules = await cache.inflight;
         cache.modules = modules?.length ? modules : ["./"];
         cache.lastScanMs = Date.now();
@@ -209,6 +249,15 @@ const confirmDangerousAction = async (title: string): Promise<boolean> => {
     return answer === "Run";
 };
 
+const resolvePlaceholders = (cmd: string, ctx: Record<string, string>): string => {
+    let result = cmd;
+    for (const [key, value] of Object.entries(ctx)) {
+        // use regex to replace all occurrences
+        result = result.replace(new RegExp(`\\$\\{${key}\\}`, 'g'), value);
+    }
+    return result;
+};
+
 /** Unified message handler for webview messages */
 async function handleWebviewMessage(
     message: any,
@@ -250,6 +299,48 @@ async function handleWebviewMessage(
     const modules = await getDirs(extContext, false);
     const path = normalizePath(vscodeAPI, moduleUri);
 
+    // Check for custom command overrides (extended branching)
+    const customCommands = uiConfig.commands || {};
+    let isOverridden = false;
+    let overrideCmds: string[] = [];
+
+    // Global override
+    if (customCommands[message.command]) {
+        isOverridden = true;
+        const override = customCommands[message.command];
+        overrideCmds = Array.isArray(override) ? override : [String(override)];
+    }
+    // Per-module override (higher priority)
+    if (message.module && customCommands[message.module] && customCommands[message.module][message.command]) {
+        isOverridden = true;
+        const override = customCommands[message.module][message.command];
+        overrideCmds = Array.isArray(override) ? override : [String(override)];
+    }
+
+    if (isOverridden) {
+        const ctxVars = {
+            module: String(message.module || ''),
+            command: String(message.command || ''),
+            workspaceFolder: normalizePath(vscodeAPI, wsdUri),
+            modulePath: path
+        };
+
+        if (message.command?.startsWith?.('bulk_')) {
+            for (const m of modules) {
+                const mUri = joinModuleUri(vscodeAPI, wsdUri, m);
+                const mPath = normalizePath(vscodeAPI, mUri);
+                const mCtx = { ...ctxVars, module: m, modulePath: mPath };
+                const resolvedCmds = overrideCmds.map(c => resolvePlaceholders(c, mCtx));
+                runInTerminal(resolvedCmds, mPath);
+            }
+        } else {
+            const resolvedCmds = overrideCmds.map(c => resolvePlaceholders(c, ctxVars));
+            const openInNew = ['terminal', 'watch', 'dev', 'test', 'restart', 'stop', 'diff'];
+            runInTerminal(resolvedCmds, path, openInNew?.indexOf?.(message.command) >= 0);
+        }
+        return;
+    }
+
     // Handle bulk operations - ask for input BEFORE the loop
     if (message.command?.startsWith?.('bulk_')) {
         let commitMsg: string | undefined;
@@ -284,6 +375,8 @@ async function handleWebviewMessage(
         'watch': ['npm run watch'],
         'dev': ['npm run dev'],
         'test': ['npm run test'],
+        'restart': ['npm run restart'],
+        'stop': ['npm run stop'],
         'diff': ['git diff'],
         'install': getInstallCommands(),
         'audit-fix': ['npm audit fix'],
@@ -291,7 +384,7 @@ async function handleWebviewMessage(
     };
 
     //
-    const openInNew = ['terminal', 'watch', 'dev', 'test', 'diff'];
+    const openInNew = ['terminal', 'watch', 'dev', 'test', 'restart', 'stop', 'diff'];
 
     // Handle single module operations
     switch (message.command) {
@@ -372,7 +465,9 @@ export class ManagerViewProvider {
             actionCatalog: getFilteredActions(uiConfig),
             uiFlags: {
                 layout: uiConfig.layout,
-                primaryActions: uiConfig.primaryActions
+                primaryActions: uiConfig.primaryActions,
+                secondaryActions: uiConfig.secondaryActions,
+                bulkActions: uiConfig.bulkActions
             }
         });
     }
@@ -401,7 +496,9 @@ export class ManagerViewProvider {
             actionCatalog,
             uiFlags: {
                 layout: uiConfig.layout,
-                primaryActions: uiConfig.primaryActions
+                primaryActions: uiConfig.primaryActions,
+                secondaryActions: uiConfig.secondaryActions,
+                bulkActions: uiConfig.bulkActions
             }
         }).catch((e) => { console.warn(e); return ""; });
         if (html) { webviewView.webview.html = html; }
@@ -464,7 +561,9 @@ export async function manager(context: vscode.ExtensionContext) {
             actionCatalog,
             uiFlags: {
                 layout: uiConfig.layout,
-                primaryActions: uiConfig.primaryActions
+                primaryActions: uiConfig.primaryActions,
+                secondaryActions: uiConfig.secondaryActions,
+                bulkActions: uiConfig.bulkActions
             }
         });
 

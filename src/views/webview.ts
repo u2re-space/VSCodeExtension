@@ -12,6 +12,8 @@ type WebviewContentOpts = {
     uiFlags?: {
         layout?: string;
         primaryActions?: string[];
+        secondaryActions?: string[];
+        bulkActions?: string[];
     };
 };
 
@@ -47,6 +49,8 @@ const PHOSPHOR_SPRITE = `
   <symbol id="ph-arrows-clockwise" viewBox="0 0 256 256"><path d="M200 48h48v56M56 208H8v-56M200 80a88 88 0 1 0 8 96" fill="none" stroke="currentColor" stroke-width="16"></path></symbol>
   <symbol id="ph-folder-notch-minus" viewBox="0 0 256 256"><path d="M24 96h77l16-24h115M24 96v112a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V96M104 160h48" fill="none" stroke="currentColor" stroke-width="16"></path></symbol>
   <symbol id="ph-warning-circle" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-width="16"></circle><path d="M128 76v60m0 40h.01" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"></path></symbol>
+  <symbol id="ph-arrow-clockwise" viewBox="0 0 256 256"><path d="M224 48v56h-56M198 104a88 88 0 1 0-8 96" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+  <symbol id="ph-stop-circle" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-width="16"></circle><rect x="108" y="108" width="40" height="40" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></rect></symbol>
 </svg></span>`;
 
 export async function getWebviewContent(
@@ -71,7 +75,7 @@ export async function getWebviewContent(
     );
     const bootstrap = JSON.stringify({
         actionCatalog: opts.actionCatalog || [],
-        uiFlags: opts.uiFlags || { layout: "compactMore", primaryActions: [] },
+        uiFlags: opts.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] },
         theme: opts.theme || "dark"
     });
 
@@ -99,10 +103,7 @@ export async function getWebviewContent(
   ${PHOSPHOR_SPRITE}
   <div class="toolbar" tabindex="0">
     <span class="toolbar-label">Bulk actions:</span>
-    <div class="toolbar-actions">
-      <button data-command="bulk_build" data-icon="package" title="Build all"></button>
-      <button data-command="bulk_install" data-icon="download-simple" title="Install all"></button>
-      <button data-command="bulk_push" data-icon="git-commit" title="Git add/commit/push all"></button>
+    <div class="toolbar-actions" id="toolbarActions">
     </div>
   </div>
   <table id="modulesTable" aria-label="Modules">

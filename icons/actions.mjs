@@ -26,7 +26,7 @@ const VERSION = meta("vext-version");
 const BOOT = globalThis.__VEXT_BOOTSTRAP || {};
 
 let actionCatalog = Array.isArray(BOOT.actionCatalog) ? BOOT.actionCatalog : [];
-let uiFlags = BOOT.uiFlags || { layout: "compactMore", primaryActions: [] };
+let uiFlags = BOOT.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] };
 
 const report = (payload) => {
     try {
@@ -72,23 +72,31 @@ function getRowActions() {
     return actionCatalog.filter((a) => a.scope === "row");
 }
 
-function isPrimaryAction(actionId) {
-    const explicit = Array.isArray(uiFlags.primaryActions) ? uiFlags.primaryActions : [];
-    if (explicit.length > 0) { return explicit.includes(actionId); }
-    const def = actionCatalog.find((a) => a.id === actionId);
-    return !!def?.primary;
-}
+function renderToolbar() {
+    const container = document.getElementById("toolbarActions");
+    if (!container) return;
+    container.textContent = "";
+    
+    const bulkIds = Array.isArray(uiFlags.bulkActions) && uiFlags.bulkActions.length > 0 
+        ? uiFlags.bulkActions 
+        : [];
+        
+    const bulkActions = actionCatalog.filter(a => a.scope === "bulk");
+    
+    if (bulkIds.length > 0) {
+        bulkIds.forEach(id => {
+            const action = bulkActions.find(a => a.id === id);
+            if (action) {
+                container.appendChild(mkBtn(action.id, "", action.title, action.icon, !!action.dangerous));
+            }
+        });
+    } else {
+        bulkActions.forEach(action => {
+            container.appendChild(mkBtn(action.id, "", action.title, action.icon, !!action.dangerous));
+        });
+    }
 
-function decorateToolbarIcons() {
-    const allToolbarButtons = Array.from(document.querySelectorAll(".toolbar-actions button[data-command]"));
-    allToolbarButtons.forEach((btn) => {
-        const cmd = btn.dataset.command;
-        const action = actionCatalog.find((a) => a.id === cmd);
-        const icon = action?.icon || btn.dataset.icon || "dots-three";
-        btn.title = action?.title || btn.title || cmd;
-        btn.textContent = "";
-        btn.appendChild(makePhosphorIcon(icon));
-    });
+    toolbarButtons = Array.from(document.querySelectorAll(".toolbar-actions button[data-command]"));
 }
 
 function renderMoreMenu(secondary, moduleName) {
@@ -132,8 +140,30 @@ function renderModules(modules = []) {
         const wrap = document.createElement("div");
         wrap.className = "actions-container";
 
-        const primary = rowActions.filter((a) => isPrimaryAction(a.id));
-        const secondary = rowActions.filter((a) => !isPrimaryAction(a.id));
+        let primary = [];
+        let secondary = [];
+
+        const explicitPrimary = Array.isArray(uiFlags.primaryActions) && uiFlags.primaryActions.length > 0 ? uiFlags.primaryActions : null;
+        const explicitSecondary = Array.isArray(uiFlags.secondaryActions) && uiFlags.secondaryActions.length > 0 ? uiFlags.secondaryActions : null;
+
+        if (explicitPrimary) {
+            explicitPrimary.forEach(id => {
+                const act = rowActions.find(a => a.id === id);
+                if (act) primary.push(act);
+            });
+        } else {
+            primary = rowActions.filter((a) => a.primary);
+        }
+
+        if (explicitSecondary) {
+            explicitSecondary.forEach(id => {
+                const act = rowActions.find(a => a.id === id);
+                if (act) secondary.push(act);
+            });
+        } else {
+            const primaryIds = new Set(primary.map(a => a.id));
+            secondary = rowActions.filter(a => !primaryIds.has(a.id));
+        }
 
         primary.forEach((action) => {
             wrap.appendChild(mkBtn(action.id, m, action.title, action.icon, !!action.dangerous));
@@ -263,16 +293,15 @@ window.addEventListener("message", (event) => {
         uiFlags = msg.uiFlags;
     }
     if (msg?.type === "modules") {
+        renderToolbar();
         renderModules(msg.modules || []);
-        decorateToolbarIcons();
     }
 });
 
 window.addEventListener("DOMContentLoaded", () => {
     applyTheme(BOOT.theme || "dark");
     toolbar = document.querySelector(".toolbar");
-    toolbarButtons = Array.from(toolbar?.querySelectorAll?.("button[data-command]") || []);
+    renderToolbar();
     rows = Array.from(document.querySelectorAll("tr"));
-    decorateToolbarIcons();
     send("ready", "");
 });
