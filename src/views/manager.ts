@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 //
-const inWatch = new Set<any>([]);
+const inWatch = new Set<(force?: boolean) => void>();
 
 // Initialize vscode API asynchronously
 let vscodeAPI: any = null;
@@ -57,11 +57,11 @@ async function initVscodeAPI() {
 
         // Set up watchers and event listeners
         const watcher = vscodeAPI?.workspace?.createFileSystemWatcher?.('./**');
-        watcher?.onDidCreate?.(() => inWatch.forEach((cb: any) => cb?.()));
-        watcher?.onDidDelete?.(() => inWatch.forEach((cb: any) => cb?.()));
-        watcher?.onDidChange?.(() => inWatch.forEach((cb: any) => cb?.()));
-        vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => inWatch.forEach((cb: any) => cb?.()));
-        vscodeAPI?.window?.onDidChangeActiveTextEditor?.(() => inWatch.forEach((cb: any) => cb?.()));
+        watcher?.onDidCreate?.(() => inWatch.forEach((cb) => cb?.(true)));
+        watcher?.onDidDelete?.(() => inWatch.forEach((cb) => cb?.(true)));
+        // Content changes are noisy: keep a soft refresh path to avoid full rescans.
+        watcher?.onDidChange?.(() => inWatch.forEach((cb) => cb?.(false)));
+        vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => inWatch.forEach((cb) => cb?.(true)));
         vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
             for (const [cwd, obj] of terminalMap.entries()) {
                 if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; }
@@ -91,8 +91,12 @@ async function findProjectDirs(
     vscodeAPI: any,
     wsdUri: vscode.Uri,
     currentDir: vscode.Uri,
-    visitedPaths: Set<string> = new Set()
+    visitedPaths: Set<string> = new Set(),
+    deadlineMs: number = Date.now() + 2500
 ): Promise<string[]> {
+    if (Date.now() > deadlineMs) {
+        return [];
+    }
     const result: string[] = [];
     try {
         let realPath = currentDir.fsPath;
@@ -162,13 +166,13 @@ async function findProjectDirs(
         const excludeDirs = ["node_modules", "dist", "out", "build", "coverage", "target"];
         const subPromises = subDirs
             .filter(({ name }) => !excludeDirs.includes(name) && !name.startsWith("."))
-            .map(({ uri }) => findProjectDirs(vscodeAPI, wsdUri, uri, visitedPaths));
+            .map(({ uri }) => findProjectDirs(vscodeAPI, wsdUri, uri, visitedPaths, deadlineMs));
 
         const subResults = await Promise.all(subPromises);
         result.push(...subResults.flat());
     } catch { /* ignore */ }
 
-    return result.sort((a, b) => a.localeCompare(b));
+    return result;
 }
 
 // getDirs (cached per ExtensionContext)
@@ -197,7 +201,7 @@ const getDirs = async (extContext: vscode.ExtensionContext, force = false) => {
     try {
         cache.inflight = findProjectDirs(vscodeAPI, wsdUri, wsdUri);
         const modules = await cache.inflight;
-        cache.modules = modules?.length ? modules : ["./"];
+        cache.modules = modules?.length ? Array.from(new Set(modules)).sort((a, b) => a.localeCompare(b)) : ["./"];
         cache.lastScanMs = Date.now();
     } catch { /* ignore */ }
     cache.inflight = undefined;
@@ -492,6 +496,19 @@ export class ManagerViewProvider {
                 await this.updateView(webviewView, _resolveContext, mods);
             } catch (e) { console.warn(e); }
         };
+        let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+        let pendingForce = false;
+        const scheduleRefresh = (force = false) => {
+            pendingForce = pendingForce || force;
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+            }
+            refreshTimer = setTimeout(() => {
+                const shouldForce = pendingForce;
+                pendingForce = false;
+                refreshModules(shouldForce).catch(console.warn);
+            }, 250);
+        };
 
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
         const html = await getWebviewContent(webviewView.webview, this._extensionUri, {
@@ -509,10 +526,13 @@ export class ManagerViewProvider {
         }).catch((e) => { console.warn(e); return ""; });
         if (html) { webviewView.webview.html = html; }
 
-        const watchCb = () => refreshModules(true);
+        const watchCb = (force = false) => scheduleRefresh(force);
         inWatch?.add?.(watchCb);
-        webviewView?.onDidDispose?.(() => inWatch?.delete?.(watchCb));
-        webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) { refreshModules(false); } });
+        webviewView?.onDidDispose?.(() => {
+            inWatch?.delete?.(watchCb);
+            if (refreshTimer) { clearTimeout(refreshTimer); }
+        });
+        webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) { scheduleRefresh(false); } });
         this._extContext.subscriptions.push(
             vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
                 if (event.affectsConfiguration("vext.managerView")) {
@@ -589,10 +609,26 @@ export async function manager(context: vscode.ExtensionContext) {
                 });
             } catch (e) { console.warn(e); }
         };
+        let refreshTimer: ReturnType<typeof setTimeout> | undefined;
+        let pendingForce = false;
+        const scheduleRefresh = (force = false) => {
+            pendingForce = pendingForce || force;
+            if (refreshTimer) {
+                clearTimeout(refreshTimer);
+            }
+            refreshTimer = setTimeout(() => {
+                const shouldForce = pendingForce;
+                pendingForce = false;
+                refreshModules(shouldForce).catch(console.warn);
+            }, 250);
+        };
 
-        const watchCb = () => refreshModules(true);
+        const watchCb = (force = false) => scheduleRefresh(force);
         inWatch.add(watchCb);
-        panel.onDidDispose(() => inWatch.delete(watchCb));
+        panel.onDidDispose(() => {
+            inWatch.delete(watchCb);
+            if (refreshTimer) { clearTimeout(refreshTimer); }
+        });
         refreshModules(false);
         context.subscriptions.push(
             vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
