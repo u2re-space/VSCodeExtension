@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.21",
+    "version": "0.0.24",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -34,6 +34,10 @@
     "contributes": {
         "menus": {
             "explorer/context": [
+                {
+                    "command": "vext.symlink.pickSources",
+                    "group": "5_cutcopypaste@0"
+                },
                 {
                     "command": "vext.symlink",
                     "group": "5_cutcopypaste@1"
@@ -526,8 +530,14 @@
                 "title": "Open Manager (Panel)"
             },
             {
+                "command": "vext.symlink.pickSources",
+                "title": "Pick paths to link (for Symlink…)",
+                "icon": "$(file-symlink-file)"
+            },
+            {
                 "command": "vext.symlink",
-                "title": "Symlink…"
+                "title": "Symlink…",
+                "icon": "$(link-external)"
             },
             {
                 "command": "vext.proxyUndo",
@@ -633,6 +643,7 @@
         "@vscode/markdown-it-katex": "^1.1.2",
         "@vscode/test-cli": "^0.0.10",
         "@vscode/test-electron": "^2.5.2",
+        "@vscode/vsce": "^3.9.1",
         "esbuild": "^0.25.5",
         "eslint": "^9.25.1",
         "marked": "^15.0.12",

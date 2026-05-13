@@ -47,13 +47,37 @@ function applyTheme(theme) {
     document.body?.setAttribute?.("data-theme", t);
 }
 
+/** Icon slugs must match <symbol id="ph-…"> in the webview sprite (kebab-case). */
+function resolveSymbolId(name) {
+    const raw = String(name || "").trim() || "dots-three";
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(raw)) {
+        return "ph-dots-three";
+    }
+    const id = `ph-${raw}`;
+    try {
+        if (document.querySelector(`svg.ph-sprite-svg symbol#${id}`)) {
+            return id;
+        }
+    } catch {
+        /* invalid selector */
+    }
+    return "ph-dots-three";
+}
+
 function makePhosphorIcon(name) {
+    const id = resolveSymbolId(name);
     const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     svg.setAttribute("class", "ph-icon");
     svg.setAttribute("viewBox", "0 0 256 256");
     svg.setAttribute("aria-hidden", "true");
     const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
-    use.setAttribute("href", `#ph-${name}`);
+    const href = `#${id}`;
+    use.setAttribute("href", href);
+    try {
+        use.setAttributeNS("http://www.w3.org/1999/xlink", "xlink:href", href);
+    } catch {
+        /* ignore */
+    }
     svg.appendChild(use);
     return svg;
 }

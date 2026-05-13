@@ -313,7 +313,7 @@ td.actions {
 }
 
 button {
-    overflow: hidden;
+    overflow: visible;
     background: var(--button-bg);
     color: var(--button-fg);
     border: none;
@@ -369,23 +369,29 @@ td.actions .actions-container {
 }
 
 .ph-icon {
-    inline-size: 1rem;
-    block-size: 1rem;
-    fill: currentColor;
+    inline-size: 1.125rem;
+    block-size: 1.125rem;
+    display: block;
+    flex-shrink: 0;
+    overflow: visible;
+    color: inherit;
+    pointer-events: none;
+}
+
+.ph-icon use {
     pointer-events: none;
 }
 
 .ph-sprite {
     position: absolute;
-    inset: 0;
     inline-size: 0;
     block-size: 0;
     overflow: hidden;
-    opacity: 0;
     pointer-events: none;
 }
 
 .ph-sprite-svg {
+    display: block;
     inline-size: 0;
     block-size: 0;
 }
@@ -437,17 +443,17 @@ button.danger:focus {
     min-block-size: 3rem;
     inline-size: 100%;
     margin: 0px;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .toolbar-actions {
     display: flex;
     flex-direction: row;
     inline-size: max-content;
-    overflow: hidden;
+    overflow: visible;
     block-size: max-content;
     border-radius: 0.5rem;
-    clip-path: inset(0 round 0.5rem);
+    clip-path: none;
 }
 
 .more-menu {
@@ -481,7 +487,7 @@ button.danger:focus {
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     box-shadow: var(--button-shadow);
-    overflow: hidden;
+    overflow: visible;
     z-index: 5;
     flex-direction: row;
 }
