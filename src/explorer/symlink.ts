@@ -211,7 +211,9 @@ async function createSymlinksFromSources(
 async function doPasteAsSymlink(vscodeAPI: any, uri?: vscode.Uri) {
     const clipboardContent = await getClipboardContent();
     if (!clipboardContent?.trim()) {
-        vscodeAPI.window.showErrorMessage('No path copied for symlink. Use “Pick paths to link” or Copy Path (multiple lines / JSON array).');
+        vscodeAPI.window.showErrorMessage(
+            'No paths for symlink. Use “Link targets” on selected Explorer items, or Copy Path (multi-line / JSON).'
+        );
         return;
     }
 
@@ -294,10 +296,47 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     }
 }
 
+function isExplorerUri(x: unknown): x is vscode.Uri {
+    return Boolean(x && typeof (x as vscode.Uri).fsPath === 'string');
+}
+
+function dedupeExplorerUris(uris: vscode.Uri[]): vscode.Uri[] {
+    const seen = new Set<string>();
+    const out: vscode.Uri[] = [];
+    for (const u of uris) {
+        if (!isExplorerUri(u)) { continue; }
+        const key = u.fsPath.replace(/\\/g, '/').toLowerCase();
+        if (seen.has(key)) { continue; }
+        seen.add(key);
+        out.push(u);
+    }
+    return out;
+}
+
 function explorerUriList(first?: vscode.Uri | vscode.Uri[]): vscode.Uri[] {
     if (!first) { return []; }
-    if (Array.isArray(first)) { return first.filter(Boolean); }
+    if (Array.isArray(first)) { return first.filter(isExplorerUri); }
     return [first];
+}
+
+/**
+ * Explorer context: VS Code passes the right-clicked resource first, then often a second argument
+ * `Uri[]` with **all** selected items (see https://github.com/microsoft/vscode/issues/175103 ).
+ * Without reading that array, only one path is received.
+ */
+function collectExplorerUris(first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]): vscode.Uri[] {
+    for (const item of rest) {
+        if (Array.isArray(item) && item.length > 0 && item.every(isExplorerUri)) {
+            return dedupeExplorerUris(item as vscode.Uri[]);
+        }
+    }
+
+    let list = explorerUriList(first);
+    const more = rest.filter(isExplorerUri);
+    if (list.length === 1 && more.length) {
+        list = [list[0], ...more];
+    }
+    return dedupeExplorerUris(list);
 }
 
 async function symlinkPathsFromUris(vscodeAPI: any, uris: vscode.Uri[], uri?: vscode.Uri): Promise<void> {
@@ -319,20 +358,18 @@ async function symlinkPathsFromUris(vscodeAPI: any, uris: vscode.Uri[], uri?: vs
     );
 }
 
-async function pickSourcesForSymlink(vscodeAPI: any): Promise<void> {
-    const picked = await vscodeAPI.window.showOpenDialog({
-        canSelectFiles: true,
-        canSelectFolders: true,
-        canSelectMany: true,
-        openLabel: 'Pick to link',
-        title: 'Pick paths to link — copies to clipboard for Symlink…',
-    });
-    if (!picked?.length) { return; }
+async function pickSourcesFromExplorerSelection(vscodeAPI: any, uris: vscode.Uri[]): Promise<void> {
+    if (uris.length === 0) {
+        vscodeAPI.window.showErrorMessage(
+            'Link targets: select file(s) in Explorer, then run this from the context menu (needs multi-select).'
+        );
+        return;
+    }
 
-    const text = picked.map((u: vscode.Uri) => toPosixSegments(u.fsPath)).join('\n');
+    const text = uris.map((u) => toPosixSegments(u.fsPath)).join('\n');
     await vscodeAPI.env.clipboard.writeText(text);
     vscodeAPI.window.showInformationMessage(
-        `Copied ${picked.length} path(s). Run “Symlink…” on a folder (or file) to create relative symlinks.`
+        `Copied ${uris.length} path(s). Use “Symlink here” on the destination.`
     );
 }
 
@@ -343,12 +380,7 @@ export async function symlink(context: vscode.ExtensionContext) {
         vscodeAPI.commands.registerCommand(
             'vext.symlink',
             async (first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]) => {
-                let list = explorerUriList(first);
-                const more = rest.filter((u): u is vscode.Uri => Boolean(u && typeof (u as vscode.Uri).fsPath === 'string'));
-                if (list.length === 1 && more.length) {
-                    list = [list[0], ...more];
-                }
-
+                const list = collectExplorerUris(first, ...rest);
                 const primary = Array.isArray(first) ? undefined : first;
 
                 if (list.length > 1) {
@@ -397,9 +429,12 @@ export async function symlink(context: vscode.ExtensionContext) {
             }
         ),
 
-        vscodeAPI.commands.registerCommand('vext.symlink.pickSources', async () => {
-            await pickSourcesForSymlink(vscodeAPI);
-        })
+        vscodeAPI.commands.registerCommand(
+            'vext.symlink.pickSources',
+            async (first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]) => {
+                await pickSourcesFromExplorerSelection(vscodeAPI, collectExplorerUris(first, ...rest));
+            }
+        )
     );
 }
 
