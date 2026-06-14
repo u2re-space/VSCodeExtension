@@ -132,14 +132,52 @@ function getBaseName(filePath: string): string {
     return filePath.replace(/\\/g, '/').split('/').pop() || '';
 }
 
-function uniqueLinkPath(dirToFs: string, baseName: string): string {
+function uniqueLinkPath(dirToFs: string, baseName: string, existsPath: ExistsPathFn = pathExistsOrSymlink): string {
     let candidate = path.join(dirToFs, baseName);
-    if (!fs.existsSync(candidate)) { return candidate; }
+    if (!existsPath(candidate)) { return candidate; }
     const ext = path.extname(baseName);
     const stem = ext ? baseName.slice(0, -ext.length) : baseName;
     for (let i = 2; ; i++) {
         candidate = path.join(dirToFs, `${stem} (${i})${ext}`);
-        if (!fs.existsSync(candidate)) { return candidate; }
+        if (!existsPath(candidate)) { return candidate; }
+    }
+}
+
+function linkPathForName(
+    dirToFs: string,
+    linkName: string,
+    autoDeduplicate: boolean,
+    existsPath: ExistsPathFn = pathExistsOrSymlink
+): string {
+    return autoDeduplicate
+        ? uniqueLinkPath(dirToFs, linkName, existsPath)
+        : path.join(dirToFs, linkName);
+}
+
+async function askSingleLinkName(vscodeAPI: any, dirToFs: string, defaultName: string): Promise<string | undefined> {
+    let value = defaultName;
+    for (;;) {
+        const input = await vscodeAPI.window.showInputBox({
+            prompt: 'Enter symlink name (leave empty to use original name)',
+            value,
+        });
+        if (input === undefined) { return undefined; }
+
+        const linkName = input.trim() || defaultName;
+        const linkPath = linkPathForName(dirToFs, linkName, false);
+        if (!pathExistsOrSymlink(linkPath)) {
+            return linkName;
+        }
+
+        const answer = await vscodeAPI.window.showWarningMessage(
+            `Symlink name already exists: ${linkName}`,
+            'Choose another name',
+            'Cancel'
+        );
+        if (answer !== 'Choose another name') {
+            return undefined;
+        }
+        value = linkName;
     }
 }
 
@@ -215,12 +253,8 @@ async function createSymlinksFromSources(
     if (wantNamePrompt) {
         const src = resolved[0];
         const defaultName = getBaseName(src);
-        const input = await vscodeAPI.window.showInputBox({
-            prompt: 'Enter symlink name (leave empty to use original name)',
-            value: defaultName,
-        });
-        if (input === undefined) { return; }
-        singleCustomName = input.trim() || defaultName;
+        singleCustomName = await askSingleLinkName(vscodeAPI, dirToFs, defaultName);
+        if (singleCustomName === undefined) { return; }
     }
 
     let ok = 0;
@@ -234,7 +268,7 @@ async function createSymlinksFromSources(
             wantNamePrompt && singleCustomName !== undefined
                 ? singleCustomName
                 : getBaseName(srcAbs);
-        const linkPathFs = uniqueLinkPath(dirToFs, base);
+        const linkPathFs = linkPathForName(dirToFs, base, !wantNamePrompt);
         const relTarget = relativeSymlinkTarget(dirToFs, srcAbs);
         const linkType: fs.symlink.Type = fs.statSync(srcAbs).isDirectory() ? 'dir' : 'file';
         const r = tryCreateSymlinkWithRetry(vscodeAPI, dirToFs, linkPathFs, relTarget, linkType);
@@ -489,6 +523,7 @@ export const __symlinkTest = {
     resolveSourcePath,
     relativeSymlinkTarget,
     normalizeSymlinkTarget,
+    linkPathForName,
 };
 
 //

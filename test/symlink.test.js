@@ -74,4 +74,38 @@ suite('Symlink path helpers', () => {
             relTarget: '../shared/target',
         });
     });
+
+    test('uses exact user-provided name for a single symlink instead of pre-deduping', () => {
+        const helpers = symlinkModule.__symlinkTest;
+        assert.ok(helpers, 'expected symlink test helpers to be exported');
+
+        const dir = path.resolve('/repo/app');
+        const existing = new Set([path.join(dir, 'source')]);
+
+        const linkPath = helpers.linkPathForName(
+            dir,
+            'custom-link',
+            false,
+            (p) => existing.has(path.resolve(p))
+        );
+
+        assert.strictEqual(linkPath, path.join(dir, 'custom-link'));
+    });
+
+    test('auto-deduplicates batch symlink names', () => {
+        const helpers = symlinkModule.__symlinkTest;
+        assert.ok(helpers, 'expected symlink test helpers to be exported');
+
+        const dir = path.resolve('/repo/app');
+        const existing = new Set([path.join(dir, 'source')]);
+
+        const linkPath = helpers.linkPathForName(
+            dir,
+            'source',
+            true,
+            (p) => existing.has(path.resolve(p))
+        );
+
+        assert.strictEqual(linkPath, path.join(dir, 'source (2)'));
+    });
 });
