@@ -15,11 +15,62 @@ function toPosixSegments(p: string): string {
     return p.replace(/\\/g, '/');
 }
 
+type ExistsPathFn = (p: string) => boolean;
+type RealpathFn = (p: string) => string;
+
+function pathExistsOrSymlink(p: string): boolean {
+    try {
+        fs.lstatSync(toFs(p));
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function safeRealpathDir(dirFs: string, realpathFn: RealpathFn = fs.realpathSync.native): string {
+    try {
+        return path.resolve(realpathFn(dirFs));
+    } catch {
+        return path.resolve(dirFs);
+    }
+}
+
 /** Relative symlink target: POSIX-style slashes, `.` when link and target are the same path. */
 function posixRelativeTarget(fromDirFs: string, absoluteTargetFs: string): string {
     let rel = path.relative(fromDirFs, absoluteTargetFs).replace(/\\/g, '/');
     if (!rel) { rel = '.'; }
     return rel;
+}
+
+function relativeSymlinkTarget(
+    fromDirFs: string,
+    targetFs: string,
+    realpathFn?: RealpathFn
+): string {
+    const anchorDirFs = safeRealpathDir(fromDirFs, realpathFn);
+    const absoluteTargetFs = path.resolve(targetFs);
+    const rel = posixRelativeTarget(anchorDirFs, absoluteTargetFs);
+    return path.isAbsolute(rel) ? toPosixSegments(absoluteTargetFs) : rel;
+}
+
+function normalizeSymlinkTarget(
+    linkPath: string,
+    target: string,
+    realpathFn?: RealpathFn
+): { changed: boolean; resolvedTargetFs: string; relTarget: string } {
+    const linkDirFs = path.dirname(linkPath);
+    const anchorDirFs = safeRealpathDir(linkDirFs, realpathFn);
+    const targetFs = toFs(target);
+    const resolvedTargetFs = path.isAbsolute(targetFs)
+        ? path.resolve(targetFs)
+        : path.resolve(anchorDirFs, targetFs);
+    const relTarget = posixRelativeTarget(anchorDirFs, resolvedTargetFs);
+    const currentTarget = toPosixSegments(target);
+    return {
+        changed: path.isAbsolute(targetFs) || currentTarget !== relTarget,
+        resolvedTargetFs,
+        relTarget,
+    };
 }
 
 function workspaceRoots(vscodeAPI: typeof vscode): string[] {
@@ -51,17 +102,18 @@ function parsePathList(raw: string): string[] {
 function resolveSourcePath(
     raw: string,
     dirToFs: string,
-    roots: string[]
+    roots: string[],
+    existsPath: ExistsPathFn = pathExistsOrSymlink
 ): string | undefined {
     const trimmed = raw.trim();
     if (!trimmed) { return undefined; }
     const direct = path.normalize(trimmed);
-    if (path.isAbsolute(direct) && fs.existsSync(direct)) {
+    if (path.isAbsolute(direct) && existsPath(direct)) {
         return path.resolve(direct);
     }
     const candidates = [...roots.map((r) => path.resolve(r, trimmed)), path.resolve(dirToFs, trimmed)];
     for (const c of candidates) {
-        if (fs.existsSync(c)) { return path.resolve(c); }
+        if (existsPath(c)) { return path.resolve(c); }
     }
     return undefined;
 }
@@ -148,7 +200,7 @@ async function createSymlinksFromSources(
     const roots = workspaceRoots(vscodeAPI);
     const multiSourceInput = sourceAbsList.filter((s) => s.trim()).length > 1;
     const resolved = sourceAbsList
-        .map((raw) => resolveSourcePath(raw, dirToFs, roots) ?? (fs.existsSync(toFs(raw.trim())) ? path.resolve(toFs(raw.trim())) : undefined))
+        .map((raw) => resolveSourcePath(raw, dirToFs, roots) ?? (pathExistsOrSymlink(toFs(raw.trim())) ? path.resolve(toFs(raw.trim())) : undefined))
         .filter((x): x is string => Boolean(x));
 
     if (resolved.length === 0) {
@@ -183,7 +235,7 @@ async function createSymlinksFromSources(
                 ? singleCustomName
                 : getBaseName(srcAbs);
         const linkPathFs = uniqueLinkPath(dirToFs, base);
-        const relTarget = posixRelativeTarget(dirToFs, srcAbs);
+        const relTarget = relativeSymlinkTarget(dirToFs, srcAbs);
         const linkType: fs.symlink.Type = fs.statSync(srcAbs).isDirectory() ? 'dir' : 'file';
         const r = tryCreateSymlinkWithRetry(vscodeAPI, dirToFs, linkPathFs, relTarget, linkType);
         if (r === 'ok' || r === 'elevated') {
@@ -252,17 +304,12 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
         return;
     }
 
-    const linkDirFs = path.dirname(linkPath);
-    const resolvedTargetFs = path.resolve(linkDirFs, target);
-    const relTarget = posixRelativeTarget(linkDirFs, resolvedTargetFs);
-    const wasAbsolute = path.isAbsolute(target);
+    const normalized = normalizeSymlinkTarget(linkPath, target);
+    const { resolvedTargetFs, relTarget } = normalized;
 
-    if (!wasAbsolute) {
-        const normalizedRel = path.posix.normalize(toPosixSegments(target));
-        if (normalizedRel === relTarget) {
-            vscodeAPI.window.showInformationMessage('abs2rel: symlink target is already normalized (relative).');
-            return;
-        }
+    if (!normalized.changed) {
+        vscodeAPI.window.showInformationMessage('abs2rel: symlink target is already normalized (relative).');
+        return;
     }
 
     const linkType: fs.symlink.Type = (() => {
@@ -437,6 +484,12 @@ export async function symlink(context: vscode.ExtensionContext) {
         )
     );
 }
+
+export const __symlinkTest = {
+    resolveSourcePath,
+    relativeSymlinkTarget,
+    normalizeSymlinkTarget,
+};
 
 //
 export function deactivate() {}
