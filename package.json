@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.29",
+    "version": "0.0.33",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -209,6 +209,14 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Watch workspace for new/removed project markers and refresh Manager. Off by default — a broad watcher can conflict with AI agents and heavy workspaces."
+                },
+                "vext.managerView.extraModules": {
+                    "type": "array",
+                    "default": [],
+                    "items": {
+                        "type": "string"
+                    },
+                    "description": "Extra module paths always shown in Manager (e.g. ./modules/projects/core.ts). Useful when remote scan is slow or incomplete."
                 },
                 "vext.managerView.layout": {
                     "type": "string",

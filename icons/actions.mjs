@@ -27,6 +27,7 @@ const BOOT = globalThis.__VEXT_BOOTSTRAP || {};
 
 let actionCatalog = Array.isArray(BOOT.actionCatalog) ? BOOT.actionCatalog : [];
 let uiFlags = BOOT.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] };
+const initialModules = Array.isArray(BOOT.initialModules) ? BOOT.initialModules : ["./"];
 
 const report = (payload) => {
     try {
@@ -94,6 +95,17 @@ function mkBtn(cmd, mod, title, icon, dangerous = false) {
 
 function getRowActions() {
     return actionCatalog.filter((a) => a.scope === "row");
+}
+
+function setScanStatus(scanning) {
+    const el = document.getElementById("scanStatus");
+    if (!el) { return; }
+    if (scanning) {
+        el.hidden = false;
+        el.textContent = "Scanning…";
+    } else {
+        el.hidden = true;
+    }
 }
 
 function renderToolbar() {
@@ -319,6 +331,7 @@ window.addEventListener("message", (event) => {
     if (msg?.type === "modules") {
         renderToolbar();
         renderModules(msg.modules || []);
+        setScanStatus(Boolean(msg.scanning));
     }
 });
 
@@ -326,6 +339,11 @@ window.addEventListener("DOMContentLoaded", () => {
     applyTheme(BOOT.theme || "dark");
     toolbar = document.querySelector(".toolbar");
     renderToolbar();
+    renderModules(initialModules);
     rows = Array.from(document.querySelectorAll("tr"));
+    document.getElementById("refreshModules")?.addEventListener("click", () => {
+        setScanStatus(true);
+        send("refresh-modules", "");
+    });
     send("ready", "");
 });

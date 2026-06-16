@@ -435,8 +435,10 @@ button.danger:focus {
     position: sticky;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(0px, 1fr) minmax(0px, max-content);
+    grid-template-columns: minmax(0px, max-content) minmax(0px, 1fr) minmax(0px, max-content) minmax(0px, max-content);
     grid-template-rows: minmax(0px, max-content);
+    gap: 0.5rem;
+    align-items: center;
     text-align: start;
     justify-content: start;
     block-size: max-content;
@@ -444,6 +446,30 @@ button.danger:focus {
     inline-size: 100%;
     margin: 0px;
     overflow: visible;
+}
+
+.refresh-modules {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.5rem;
+    background: var(--button-bg);
+    color: var(--foreground);
+    cursor: pointer;
+}
+
+.refresh-modules:hover {
+    background: var(--button-hover);
+}
+
+.scan-status {
+    font-size: 0.75rem;
+    opacity: 0.75;
+    white-space: nowrap;
 }
 
 .toolbar-actions {

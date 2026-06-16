@@ -9,6 +9,7 @@ type WebviewContentOpts = {
     version: string;
     theme?: string;
     actionCatalog?: unknown[];
+    initialModules?: string[];
     uiFlags?: {
         layout?: string;
         primaryActions?: string[];
@@ -77,6 +78,7 @@ export async function getWebviewContent(
     );
     const bootstrap = JSON.stringify({
         actionCatalog: opts.actionCatalog || [],
+        initialModules: Array.isArray(opts.initialModules) && opts.initialModules.length ? opts.initialModules : ["./"],
         uiFlags: opts.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] },
         theme: opts.theme || "dark"
     });
@@ -107,13 +109,13 @@ export async function getWebviewContent(
     <span class="toolbar-label">Bulk actions:</span>
     <div class="toolbar-actions" id="toolbarActions">
     </div>
+    <button type="button" class="refresh-modules" id="refreshModules" title="Refresh module list" aria-label="Refresh module list">
+      <svg class="ph-icon" viewBox="0 0 256 256" aria-hidden="true"><use href="#ph-arrow-clockwise"></use></svg>
+    </button>
+    <span class="scan-status" id="scanStatus" hidden>Scanning…</span>
   </div>
   <table id="modulesTable" aria-label="Modules">
     <tbody id="modulesTbody">
-      <tr tabindex="0" data-module="./">
-        <td class="name">Loading…</td>
-        <td class="actions"><div class="actions-container"></div></td>
-      </tr>
     </tbody>
   </table>
   <script nonce="${nonce}">window.__VEXT_BOOTSTRAP = ${bootstrap};</script>
