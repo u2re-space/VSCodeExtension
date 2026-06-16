@@ -334,7 +334,7 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     try {
         target = fs.readlinkSync(linkPath);
     } catch (e) {
-        vscodeAPI.window.showErrorMessage(`abs2rel: cannot read symlink — ${e}`);
+        vscodeAPI.window.showErrorMessage(`Normalize link: cannot read symlink — ${e}`);
         return;
     }
 
@@ -342,7 +342,6 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     const { resolvedTargetFs, relTarget } = normalized;
 
     if (!normalized.changed) {
-        vscodeAPI.window.showInformationMessage('abs2rel: symlink target is already normalized (relative).');
         return;
     }
 
@@ -357,8 +356,8 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     try {
         fs.unlinkSync(linkPath);
         fs.symlinkSync(toFs(relTarget), linkPath, linkType);
-        vscodeAPI.window.showInformationMessage(`abs2rel: ${toPosixSegments(target)}  →  ${relTarget}`);
-        console.log(`[abs2rel] ${linkPath}: ${target} → ${relTarget}`);
+        vscodeAPI.window.showInformationMessage(`Normalize link: ${toPosixSegments(target)}  →  ${relTarget}`);
+        console.log(`[normalize-link] ${linkPath}: ${target} → ${relTarget}`);
     } catch (e: any) {
         if (e?.code === 'EPERM' || e?.code === 'EACCES') {
             const fwd = (s: string) => s.replace(/\\/g, '/');
@@ -372,7 +371,7 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
                 `rm -f "${fl}" && ln -s "${fr}" "${fl}"`
             );
         } else {
-            vscodeAPI.window.showErrorMessage(`abs2rel: failed to rewrite symlink — ${e}`);
+            vscodeAPI.window.showErrorMessage(`Normalize link: failed to rewrite symlink — ${e}`);
         }
     }
 }
@@ -454,6 +453,34 @@ async function pickSourcesFromExplorerSelection(vscodeAPI: any, uris: vscode.Uri
     );
 }
 
+async function normalizeSymlinksFromExplorer(vscodeAPI: any, uris: vscode.Uri[]): Promise<void> {
+    if (uris.length === 0) {
+        vscodeAPI.window.showErrorMessage('Normalize link: select symbolic link(s) in Explorer.');
+        return;
+    }
+
+    const symlinkPaths: string[] = [];
+    for (const u of uris) {
+        try {
+            const stat = await vscodeAPI.workspace.fs.stat(u);
+            if (stat.type & vscodeAPI.FileType.SymbolicLink) {
+                symlinkPaths.push(u.fsPath);
+            }
+        } catch {
+            /* skip */
+        }
+    }
+
+    if (symlinkPaths.length === 0) {
+        vscodeAPI.window.showErrorMessage('Normalize link: no symbolic links in selection.');
+        return;
+    }
+
+    for (const linkPath of symlinkPaths) {
+        normalizeSymlinkTargetRebase(vscodeAPI, linkPath);
+    }
+}
+
 export async function symlink(context: vscode.ExtensionContext) {
     const vscodeAPI = await vscodePromise;
 
@@ -465,48 +492,18 @@ export async function symlink(context: vscode.ExtensionContext) {
                 const primary = Array.isArray(first) ? undefined : first;
 
                 if (list.length > 1) {
-                    const stats = await Promise.all(
-                        list.map(async (u) => {
-                            try {
-                                return { u, stat: await vscodeAPI.workspace.fs.stat(u) };
-                            } catch {
-                                return { u, stat: null as vscode.FileStat | null };
-                            }
-                        })
-                    );
-                    const isSymlink = (s: (typeof stats)[number]) =>
-                        Boolean(s.stat && s.stat.type & vscodeAPI.FileType.SymbolicLink);
-                    const linkCount = stats.filter(isSymlink).length;
-                    if (linkCount === stats.length) {
-                        for (const { u } of stats) {
-                            normalizeSymlinkTargetRebase(vscodeAPI, u.fsPath);
-                        }
-                        return;
-                    }
-                    if (linkCount > 0) {
-                        vscodeAPI.window.showErrorMessage(
-                            'Symlink: multi-select mixes symlinks with other items. Select only symlinks (normalize targets) or only files/folders (create links).'
-                        );
-                        return;
-                    }
-                    await symlinkPathsFromUris(
-                        vscodeAPI,
-                        stats.map((s) => s.u),
-                        primary
-                    );
+                    await symlinkPathsFromUris(vscodeAPI, list, primary);
                     return;
                 }
 
-                const only = list[0];
-                if (only) {
-                    const stat = await vscodeAPI.workspace.fs.stat(only);
-                    if (stat.type & vscodeAPI.FileType.SymbolicLink) {
-                        normalizeSymlinkTargetRebase(vscodeAPI, only.fsPath);
-                        return;
-                    }
-                }
+                await doPasteAsSymlink(vscodeAPI, primary ?? list[0]);
+            }
+        ),
 
-                await doPasteAsSymlink(vscodeAPI, primary ?? only);
+        vscodeAPI.commands.registerCommand(
+            'vext.symlink.abs2rel',
+            async (first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]) => {
+                await normalizeSymlinksFromExplorer(vscodeAPI, collectExplorerUris(first, ...rest));
             }
         ),
 

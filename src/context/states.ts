@@ -107,8 +107,7 @@ export async function contexts(context: vscode.ExtensionContext) {
     //
     context?.subscriptions?.push?.(
         vscode?.window?.onDidChangeTextEditorSelection?.(updateLineContext),
-        vscode?.window?.onDidChangeActiveTextEditor?.(updateLineContext),
-        vscode?.workspace?.onDidChangeTextDocument?.(updateLineContext)
+        vscode?.window?.onDidChangeActiveTextEditor?.(updateLineContext)
     );
 
     //

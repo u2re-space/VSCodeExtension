@@ -11,6 +11,50 @@ import * as path from 'path';
 
 //
 const inWatch = new Set<(force?: boolean) => void>();
+let managerWatcherRefs = 0;
+let managerWatchers: { dispose(): void }[] = [];
+let workspaceFolderListener: { dispose(): void } | undefined;
+
+const WATCH_PATTERNS = [
+    '**/package.json',
+    '**/pnpm-workspace.yaml',
+    '**/Cargo.toml',
+    '**/go.mod',
+    '**/pyproject.toml',
+];
+
+function notifyManagerWatchers(force = true) {
+    inWatch.forEach((cb) => cb?.(force));
+}
+
+function isManagerFileWatchEnabled(vscodeAPI: any): boolean {
+    return Boolean(vscodeAPI.workspace.getConfiguration('vext').get('managerView.fileWatch', false));
+}
+
+function acquireManagerFileWatch(vscodeAPI: any) {
+    managerWatcherRefs++;
+    if (!isManagerFileWatchEnabled(vscodeAPI) || managerWatchers.length > 0) {
+        return;
+    }
+    for (const pattern of WATCH_PATTERNS) {
+        const w = vscodeAPI.workspace.createFileSystemWatcher(pattern);
+        w.onDidCreate(() => notifyManagerWatchers(true));
+        w.onDidDelete(() => notifyManagerWatchers(true));
+        managerWatchers.push(w);
+    }
+    workspaceFolderListener = vscodeAPI.workspace.onDidChangeWorkspaceFolders(() => notifyManagerWatchers(true));
+}
+
+function releaseManagerFileWatch() {
+    managerWatcherRefs = Math.max(0, managerWatcherRefs - 1);
+    if (managerWatcherRefs > 0) { return; }
+    for (const w of managerWatchers) {
+        try { w.dispose(); } catch { /* ignore */ }
+    }
+    managerWatchers = [];
+    workspaceFolderListener?.dispose();
+    workspaceFolderListener = undefined;
+}
 
 // Initialize vscode API asynchronously
 let vscodeAPI: any = null;
@@ -55,13 +99,6 @@ async function initVscodeAPI() {
     if (!vscodeAPI) {
         vscodeAPI = await vscodePromise;
 
-        // Set up watchers and event listeners
-        const watcher = vscodeAPI?.workspace?.createFileSystemWatcher?.('./**');
-        watcher?.onDidCreate?.(() => inWatch.forEach((cb) => cb?.(true)));
-        watcher?.onDidDelete?.(() => inWatch.forEach((cb) => cb?.(true)));
-        // Content changes are noisy: keep a soft refresh path to avoid full rescans.
-        watcher?.onDidChange?.(() => inWatch.forEach((cb) => cb?.(false)));
-        vscodeAPI?.workspace?.onDidChangeWorkspaceFolders?.(() => inWatch.forEach((cb) => cb?.(true)));
         vscodeAPI?.window?.onDidCloseTerminal?.((closedTerminal) => {
             for (const [cwd, obj] of terminalMap.entries()) {
                 if (obj.terminal === closedTerminal) { terminalMap.delete(cwd); break; }
@@ -86,91 +123,95 @@ const getWorkspaceFolder = async (workspace, res = "") => {
 };
 
 
-// Helper to find directories with .git or package.json
+const SCAN_DEADLINE_MS = 3000;
+const SCAN_HARD_TIMEOUT_MS = 4500;
+const SCAN_MAX_DIRS = 500;
+const SCAN_CACHE_TTL_MS = 15000;
+const REFRESH_DEBOUNCE_MS = 1500;
+
+const EXCLUDE_DIRS = new Set([
+    "node_modules", "dist", "out", "build", "coverage", "target",
+    ".git", ".hg", ".svn", ".turbo", ".next", ".nuxt", ".cache",
+    "vendor", "__pycache__", ".pnpm-store", ".vscode-test", ".yarn",
+]);
+
+const PKG_MARKERS = new Set([
+    "package.json", "deno.json", "deno.jsonc", "jsr.json",
+    "pnpm-workspace.yaml", "pnpm-lock.yaml", "yarn.lock",
+    "Cargo.toml", "go.mod", "pyproject.toml", "requirements.txt", "composer.json",
+]);
+
+// Helper to find directories with .git or package.json (bounded BFS — no unbounded Promise.all fan-out)
 async function findProjectDirs(
     vscodeAPI: any,
     wsdUri: vscode.Uri,
-    currentDir: vscode.Uri,
-    visitedPaths: Set<string> = new Set(),
-    deadlineMs: number = Date.now() + 2500
+    deadlineMs: number = Date.now() + SCAN_DEADLINE_MS
 ): Promise<string[]> {
-    if (Date.now() > deadlineMs) {
-        return [];
-    }
     const result: string[] = [];
-    try {
-        let realPath = currentDir.fsPath;
+    const visited = new Set<string>();
+    const queue: vscode.Uri[] = [wsdUri];
+    const wsdRoot = wsdUri.fsPath;
+
+    while (queue.length > 0 && Date.now() < deadlineMs && visited.size < SCAN_MAX_DIRS) {
+        const currentDir = queue.shift()!;
+        let visitKey = currentDir.fsPath.replace(/\\/g, '/');
         try {
-            realPath = await fs.promises.realpath(currentDir.fsPath);
-        } catch { /* ignore */ }
+            visitKey = (await fs.promises.realpath(currentDir.fsPath)).replace(/\\/g, '/');
+        } catch { /* use fsPath */ }
 
-        // Deduplicate by absolute path
-        const normRealPath = realPath.replace(/\\/g, '/');
-        if (visitedPaths.has(normRealPath)) {
-            return [];
+        if (visited.has(visitKey)) { continue; }
+        visited.add(visitKey);
+
+        let entries: [string, number][];
+        try {
+            entries = await vscodeAPI.workspace.fs.readDirectory(currentDir);
+        } catch {
+            continue;
         }
-        visitedPaths.add(normRealPath);
 
-        const entries = await vscodeAPI.workspace.fs.readDirectory(currentDir);
-        let hasRepo = false, hasPkg = false;
-
-        const subDirs: { name: string, uri: vscode.Uri }[] = [];
+        let hasRepo = false;
+        let hasPkg = false;
+        const subDirs: vscode.Uri[] = [];
 
         for (const [name, type] of entries) {
             let isDir = type === vscodeAPI.FileType.Directory;
             let isFile = type === vscodeAPI.FileType.File;
-            
             const entryUri = vscodeAPI.Uri.joinPath(currentDir, name);
-            
-            if (type === vscodeAPI.FileType.SymbolicLink || type === (vscodeAPI.FileType.Directory | vscodeAPI.FileType.SymbolicLink) || type === (vscodeAPI.FileType.File | vscodeAPI.FileType.SymbolicLink)) {
+
+            if (
+                type === vscodeAPI.FileType.SymbolicLink
+                || type === (vscodeAPI.FileType.Directory | vscodeAPI.FileType.SymbolicLink)
+                || type === (vscodeAPI.FileType.File | vscodeAPI.FileType.SymbolicLink)
+            ) {
                 try {
-                    const stat = await fs.promises.stat(entryUri.fsPath);
+                    const stat = await fs.promises.lstat(entryUri.fsPath);
                     isDir = stat.isDirectory();
                     isFile = stat.isFile();
                 } catch {
-                    try {
-                        const vStat = await vscodeAPI.workspace.fs.stat(entryUri);
-                        isDir = (vStat.type & vscodeAPI.FileType.Directory) !== 0;
-                        isFile = (vStat.type & vscodeAPI.FileType.File) !== 0;
-                    } catch { /* ignore */ }
+                    continue;
                 }
             }
 
-            // repo markers (dirs)
-            if (isDir) {
-                if (name === ".git" || name === ".hg" || name === ".svn") { hasRepo = true; }
+            if (isDir && (name === ".git" || name === ".hg" || name === ".svn")) {
+                hasRepo = true;
             }
-            // package/project markers (files)
-            if (isFile) {
-                const pkgMarkers = [
-                    "package.json", "deno.json", "deno.jsonc", "jsr.json",
-                    "pnpm-workspace.yaml", "pnpm-lock.yaml", "yarn.lock",
-                    "Cargo.toml", "go.mod", "pyproject.toml", "requirements.txt", "composer.json"
-                ];
-                if (pkgMarkers.includes(name)) { hasPkg = true; }
+            if (isFile && PKG_MARKERS.has(name)) {
+                hasPkg = true;
             }
-
-            if (isDir) {
-                subDirs.push({ name, uri: entryUri });
+            if (isDir && !EXCLUDE_DIRS.has(name) && !name.startsWith(".")) {
+                subDirs.push(entryUri);
             }
         }
 
         if (hasRepo || hasPkg) {
-            let rel = path.relative(wsdUri.fsPath, realPath).replace(/\\/g, '/');
+            let rel = path.relative(wsdRoot, visitKey).replace(/\\/g, '/');
             if (rel === '') { rel = './'; }
             else if (!rel.startsWith('.') && !rel.startsWith('/')) { rel = './' + rel; }
             result.push(rel);
         }
 
-        // Recursively traverse subdirectories (exclude node_modules and hidden dirs)
-        const excludeDirs = ["node_modules", "dist", "out", "build", "coverage", "target"];
-        const subPromises = subDirs
-            .filter(({ name }) => !excludeDirs.includes(name) && !name.startsWith("."))
-            .map(({ uri }) => findProjectDirs(vscodeAPI, wsdUri, uri, visitedPaths, deadlineMs));
-
-        const subResults = await Promise.all(subPromises);
-        result.push(...subResults.flat());
-    } catch { /* ignore */ }
+        queue.push(...subDirs);
+    }
 
     return result;
 }
@@ -188,23 +229,45 @@ const getDirs = async (extContext: vscode.ExtensionContext, force = false) => {
         ctxMap.set(extContext, cache);
     }
 
-    const TTL_MS = 5000;
-    if (!force && cache.modules?.length && (now - cache.lastScanMs) < TTL_MS) {
+    if (!force && cache.modules?.length && (now - cache.lastScanMs) < SCAN_CACHE_TTL_MS) {
         return Array.from(new Set(["./", ...cache.modules]));
     }
 
     if (!force && cache.inflight) {
-        const mods = await cache.inflight.catch(() => cache?.modules || ["./"]);
-        return Array.from(new Set(["./", ...mods]));
+        try {
+            const mods = await Promise.race([
+                cache.inflight,
+                new Promise<string[]>((resolve) => {
+                    setTimeout(() => resolve(cache?.modules?.length ? cache.modules : ["./"]), SCAN_HARD_TIMEOUT_MS);
+                }),
+            ]);
+            return Array.from(new Set(["./", ...mods]));
+        } catch {
+            return Array.from(new Set(["./", ...(cache.modules || ["./"])]));
+        }
     }
 
+    const stale = cache.modules?.length ? cache.modules : ["./"];
+    const runScan = (): Promise<string[]> => {
+        const scanPromise = findProjectDirs(vscodeAPI, wsdUri);
+        const hardTimeout = new Promise<string[]>((resolve) => {
+            setTimeout(() => resolve(stale), SCAN_HARD_TIMEOUT_MS);
+        });
+        return Promise.race([scanPromise, hardTimeout]);
+    };
+
     try {
-        cache.inflight = findProjectDirs(vscodeAPI, wsdUri, wsdUri);
+        cache.inflight = runScan();
         const modules = await cache.inflight;
-        cache.modules = modules?.length ? Array.from(new Set(modules)).sort((a, b) => a.localeCompare(b)) : ["./"];
+        cache.modules = modules?.length
+            ? Array.from(new Set(modules)).sort((a, b) => a.localeCompare(b))
+            : stale;
         cache.lastScanMs = Date.now();
-    } catch { /* ignore */ }
-    cache.inflight = undefined;
+    } catch {
+        cache.modules = stale;
+    } finally {
+        cache.inflight = undefined;
+    }
 
     return Array.from(new Set(["./", ...cache.modules]));
 };
@@ -491,10 +554,17 @@ export class ManagerViewProvider {
         const actionCatalog = getFilteredActions(uiConfig);
 
         const refreshModules = async (force = false) => {
+            let mods: string[] = ["./"];
             try {
-                const mods = await getDirs(this._extContext, force) || ["./"];
+                mods = await getDirs(this._extContext, force) || ["./"];
+            } catch (e) {
+                console.warn('[vext:manager] module scan failed', e);
+            }
+            try {
                 await this.updateView(webviewView, _resolveContext, mods);
-            } catch (e) { console.warn(e); }
+            } catch (e) {
+                console.warn('[vext:manager] updateView failed', e);
+            }
         };
         let refreshTimer: ReturnType<typeof setTimeout> | undefined;
         let pendingForce = false;
@@ -507,7 +577,7 @@ export class ManagerViewProvider {
                 const shouldForce = pendingForce;
                 pendingForce = false;
                 refreshModules(shouldForce).catch(console.warn);
-            }, 250);
+            }, REFRESH_DEBOUNCE_MS);
         };
 
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
@@ -526,10 +596,14 @@ export class ManagerViewProvider {
         }).catch((e) => { console.warn(e); return ""; });
         if (html) { webviewView.webview.html = html; }
 
+        acquireManagerFileWatch(vscodeAPI);
+        refreshModules(false).catch(console.warn);
+
         const watchCb = (force = false) => scheduleRefresh(force);
         inWatch?.add?.(watchCb);
         webviewView?.onDidDispose?.(() => {
             inWatch?.delete?.(watchCb);
+            releaseManagerFileWatch();
             if (refreshTimer) { clearTimeout(refreshTimer); }
         });
         webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) { scheduleRefresh(false); } });
@@ -594,8 +668,13 @@ export async function manager(context: vscode.ExtensionContext) {
         });
 
         const refreshModules = async (force = false) => {
+            let mods: string[] = ["./"];
             try {
-                const mods = await getDirs(context, force);
+                mods = await getDirs(context, force) || ["./"];
+            } catch (e) {
+                console.warn('[vext:manager] module scan failed', e);
+            }
+            try {
                 const liveConfig = getManagerUiConfig(vscodeAPI);
                 panel?.webview?.postMessage?.({
                     type: "modules",
@@ -607,7 +686,9 @@ export async function manager(context: vscode.ExtensionContext) {
                         primaryActions: liveConfig.primaryActions
                     }
                 });
-            } catch (e) { console.warn(e); }
+            } catch (e) {
+                console.warn('[vext:manager] panel update failed', e);
+            }
         };
         let refreshTimer: ReturnType<typeof setTimeout> | undefined;
         let pendingForce = false;
@@ -620,13 +701,15 @@ export async function manager(context: vscode.ExtensionContext) {
                 const shouldForce = pendingForce;
                 pendingForce = false;
                 refreshModules(shouldForce).catch(console.warn);
-            }, 250);
+            }, REFRESH_DEBOUNCE_MS);
         };
 
         const watchCb = (force = false) => scheduleRefresh(force);
+        acquireManagerFileWatch(vscodeAPI);
         inWatch.add(watchCb);
         panel.onDidDispose(() => {
             inWatch.delete(watchCb);
+            releaseManagerFileWatch();
             if (refreshTimer) { clearTimeout(refreshTimer); }
         });
         refreshModules(false);

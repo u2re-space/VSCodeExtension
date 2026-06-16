@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.28",
+    "version": "0.0.29",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -31,6 +31,15 @@
         "ui"
     ],
     "main": "./dist/extension.mjs",
+    "activationEvents": [
+        "onStartupFinished",
+        "onCommand:vext.symlink",
+        "onCommand:vext.symlink.pickSources",
+        "onCommand:vext.symlink.abs2rel",
+        "onView:vext.managerView",
+        "onView:vext.managerPanelView",
+        "onCommand:vext.openManagerPanel"
+    ],
     "contributes": {
         "menus": {
             "explorer/context": [
@@ -43,8 +52,12 @@
                     "group": "5_cutcopypaste@1"
                 },
                 {
+                    "command": "vext.symlink.abs2rel",
+                    "group": "5_cutcopypaste@2"
+                },
+                {
                     "submenu": "vext.submenu.explorerCustomActions",
-                    "group": "5_cutcopypaste@2",
+                    "group": "5_cutcopypaste@3",
                     "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
                 }
             ],
@@ -191,6 +204,11 @@
                     ],
                     "default": "auto",
                     "description": "Manager view theme. Auto follows current workbench theme."
+                },
+                "vext.managerView.fileWatch": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Watch workspace for new/removed project markers and refresh Manager. Off by default — a broad watcher can conflict with AI agents and heavy workspaces."
                 },
                 "vext.managerView.layout": {
                     "type": "string",
@@ -538,6 +556,11 @@
                 "command": "vext.symlink",
                 "title": "Symlink here",
                 "icon": "$(link-external)"
+            },
+            {
+                "command": "vext.symlink.abs2rel",
+                "title": "Normalize link",
+                "icon": "$(file-symlink-file)"
             },
             {
                 "command": "vext.proxyUndo",
