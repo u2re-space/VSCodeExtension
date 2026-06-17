@@ -28,6 +28,8 @@ const BOOT = globalThis.__VEXT_BOOTSTRAP || {};
 let actionCatalog = Array.isArray(BOOT.actionCatalog) ? BOOT.actionCatalog : [];
 let uiFlags = BOOT.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] };
 const initialModules = Array.isArray(BOOT.initialModules) ? BOOT.initialModules : ["./"];
+const autoWideWhenCramped = BOOT.autoWideWhenCramped !== false;
+let wideOpenRequested = false;
 
 const report = (payload) => {
     try {
@@ -335,6 +337,15 @@ window.addEventListener("message", (event) => {
     }
 });
 
+function requestWideViewIfCramped() {
+    const w = document.documentElement.clientWidth || document.body.clientWidth || 0;
+    document.body.classList.toggle("is-narrow", w < 420);
+    if (!autoWideWhenCramped || wideOpenRequested) { return; }
+    if (w >= 360) { return; }
+    wideOpenRequested = true;
+    send("open-wide-manager", "");
+}
+
 window.addEventListener("DOMContentLoaded", () => {
     applyTheme(BOOT.theme || "dark");
     toolbar = document.querySelector(".toolbar");
@@ -345,5 +356,14 @@ window.addEventListener("DOMContentLoaded", () => {
         setScanStatus(true);
         send("refresh-modules", "");
     });
+    document.getElementById("openWideManager")?.addEventListener("click", () => {
+        wideOpenRequested = true;
+        send("open-wide-manager", "");
+    });
+    if (typeof ResizeObserver !== "undefined") {
+        const ro = new ResizeObserver(() => requestWideViewIfCramped());
+        ro.observe(document.documentElement);
+    }
+    setTimeout(requestWideViewIfCramped, 300);
     send("ready", "");
 });

@@ -100,6 +100,8 @@ html {
     margin: 0px;
     min-block-size: max(max(100dvh, 100cqh), 100%);
     inline-size: max(max(100dvi, 100cqi), 100%);
+    overflow-x: hidden;
+    overflow-y: auto;
 }
 
 body {
@@ -107,41 +109,103 @@ body {
     color: var(--foreground);
     font-family: "Segoe UI", "Fira Code", "Consolas", monospace;
     margin: 0;
-    padding: 0.5em 1em;
-    min-block-size: max(max(100dvh, 100cqh), 100%);
-    inline-size: max(max(100dvi, 100cqi), 100%);
-    block-size: max(max(100dvh, 100cqh), 100%);
-    overflow: visible;
+    padding: 0.5em 0.75em;
+    min-block-size: 100%;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
+    block-size: max-content;
+    overflow: auto;
     box-sizing: border-box;
-    container-type: size;
-    position: fixed;
-    max-inline-size: max(100dvi, 100cqi);
     display: flex;
     flex-direction: column;
-    place-content: center;
-    place-items: center;
-
-    font-display: swap;
-    justify-content: start;
-    justify-items: start;
+    align-items: stretch;
+    justify-content: flex-start;
     gap: 0.25rem;
+    overflow-y: hidden;
+    overflow-x: hidden;
+}
 
-    transform: translateZ(0);
-    perspective: 1000;
+.manager-root {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.25rem;
+    flex: 1 1 auto;
+    box-sizing: border-box;
 }
 
 /* Manager view toolbar */
 .toolbar {
     inline-size: 100%;
-    display: flex;
+    min-inline-size: 0;
+    display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) minmax(0, max-content);
+    grid-template-rows: minmax(0, max-content);
+    gap: 0.35rem;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
+    padding: 0.25rem 0.35rem;
+    background: var(--background);
+    border-radius: 0.5rem;
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 2;
+    overflow: visible;
+}
+
+.scan-status {
+    grid-column: 3;
 }
 
 .toolbar-label {
-    flex: 1 1 auto;
+    font-weight: bold;
+    font-size: 0.95em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-inline-size: 0;
+    grid-column: 4;
+    text-align: start;
+    justify-self: start;
 }
+
+.open-wide-manager,
+.refresh-modules {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    inline-size: 2rem;
+    block-size: 2rem;
+    padding: 0;
+    border: none;
+    border-radius: 0.5rem;
+    background: var(--button-bg);
+    color: var(--foreground);
+    cursor: pointer;
+    flex: 0 0 auto;
+}
+
+.open-wide-manager:hover,
+.refresh-modules:hover {
+    background: var(--button-hover);
+}
+
+body.is-narrow .toolbar-label,
+body.is-narrow .scan-status {
+    display: none;
+}
+
+body.is-narrow .toolbar {
+    grid-template-columns: minmax(0, 1fr) max-content max-content;
+}
+
+body.is-narrow #modulesTable {
+    font-size: 0.92em;
+}
+
 
 body, body * {
     font-display: swap;
@@ -151,10 +215,30 @@ body, body * {
     -ms-user-select: none;;
     -webkit-user-drag: none;
     box-sizing: border-box;
+    scrollbar-width: thin;
+    overflow-x: visible;
+    box-sizing: border-box;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
+}
+
+
+html {
+    padding: 0px;
+    margin: 0px;
+    overflow-x: hidden;
+}
+
+body {
+    padding: 0px;
+    margin: 0px;
+    overflow-x: hidden;
 }
 
 table {
     inline-size: 100%;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
 
     border-radius: 0.5rem;
     border-collapse: collapse;
@@ -191,6 +275,8 @@ table {
 
     transform: translateZ(0);
     perspective: 1000;
+    scrollbar-width: thin;
+    overflow-x: visible;
 }
 
 thead {
@@ -200,6 +286,10 @@ thead {
     overflow: visible;
     inline-size: -webkit-fill-available;
     inline-size: stretch;
+    scrollbar-width: thin;
+    overflow-x: visible;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
 }
 
 tbody {
@@ -209,6 +299,10 @@ tbody {
     overflow: visible;
     inline-size: -webkit-fill-available;
     inline-size: stretch;
+    scrollbar-width: thin;
+    overflow-x: visible;
+    max-inline-size: 100%;
+    max-inline-size: stretch;
 }
 
 tr {
@@ -236,11 +330,12 @@ tr {
     justify-content: start;
     justify-items: start;
 
-
     padding-inline: 0.5rem;
     box-sizing: border-box;
 
     inline-size: max(100%, 100cqi);
+    scrollbar-width: thin;
+    overflow-x: visible;
 }
 
 tr:hover {
@@ -273,6 +368,9 @@ td {
     min-inline-size: fit-content;
     inline-size: -webkit-fill-available;
     inline-size: stretch;
+
+    scrollbar-width: thin;
+    overflow-x: visible;
 }
 
 td.name {
@@ -426,8 +524,9 @@ button.danger:focus {
 }
 
 .toolbar {
-    place-content: center; place-items: center;
-    padding: 0.25rem 1rem 0.25rem 1rem;
+    place-content: start;
+    place-items: center;
+    padding: 0.25rem 0.35rem;
     background: var(--background);
     border-radius: 0.5rem;
     inset-inline-start: 0px;
@@ -435,15 +534,16 @@ button.danger:focus {
     position: sticky;
     z-index: 2;
     display: grid;
-    grid-template-columns: minmax(0px, max-content) minmax(0px, 1fr) minmax(0px, max-content) minmax(0px, max-content);
+    grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(0, 1fr) minmax(0, max-content) minmax(0, max-content);
     grid-template-rows: minmax(0px, max-content);
-    gap: 0.5rem;
+    gap: 0.35rem;
     align-items: center;
     text-align: start;
     justify-content: start;
     block-size: max-content;
-    min-block-size: 3rem;
+    min-block-size: 2.5rem;
     inline-size: 100%;
+    min-inline-size: 0;
     margin: 0px;
     overflow: visible;
 }
@@ -480,6 +580,7 @@ button.danger:focus {
     block-size: max-content;
     border-radius: 0.5rem;
     clip-path: none;
+    grid-column: 5;
 }
 
 .more-menu {
@@ -530,18 +631,6 @@ button:first-child, .actions-container button:first-child {
 button:last-child, .actions-container button:last-child {
     border-start-end-radius: 0.5rem;
     border-end-end-radius: 0.5rem;
-}
-
-.toolbar-label {
-    font-weight: bold;
-    font-size: 1.1em;
-    block-size: max-content;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-block-size: max-content;
-    inline-size: -webkit-fill-available;
-    inline-size: stretch;
 }
 
 :where(.toolbar, tr):has(button:focus) {

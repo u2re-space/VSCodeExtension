@@ -3,7 +3,7 @@ import type * as vscode from "vscode";
 
 //
 import vscodePromise from '../imports/api.ts';
-import { getWebviewContent } from "./webview.ts";
+import { getWebviewContent, getMinimalManagerFallbackHtml } from "./webview.ts";
 import { getFilteredActions, getManagerUiConfig, resolveTheme } from "./managerActions.ts";
 
 //
@@ -127,26 +127,18 @@ const SCAN_HARD_TIMEOUT_REMOTE_MS = 35000;
 const SCAN_CACHE_TTL_MS = 15000;
 const SCAN_CACHE_TTL_REMOTE_MS = 120000;
 const REFRESH_DEBOUNCE_MS = 1500;
-const SCAN_MAX_DIRS = 500;
-const SCAN_BFS_BATCH_LOCAL = 6;
-const SCAN_BFS_BATCH_REMOTE = 2;
-const PERSIST_KEY = 'vext.managerModulesCache';
+const PERSIST_KEY = 'vext.managerModulesCacheV2';
 
-const FIND_EXCLUDE = '{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**/coverage/**,**/target/**,**/.git/**,**/.turbo/**,**/.next/**,**/.nuxt/**,**/.cache/**,**/vendor/**,**/__pycache__/**,**/.pnpm-store/**,**/.vscode-test/**,**/.yarn/**}';
+const FIND_EXCLUDE = '**/{node_modules,dist,out,build,coverage,target,.git,.turbo,.next,.nuxt,.cache,vendor,__pycache__,.pnpm-store,.vscode-test,.yarn}/**';
 
-const FIND_MARKER_PATTERNS = [
-    '**/package.json',
-    '**/pnpm-workspace.yaml',
-    '**/Cargo.toml',
-    '**/go.mod',
-    '**/pyproject.toml',
-    '**/.git/HEAD',
-];
+const FIND_PACKAGE_JSON = '**/package.json';
 
-const FIND_MARKER_PATTERNS_REST = FIND_MARKER_PATTERNS.filter((p) => p !== '**/package.json');
-
-/** Shallow readDirectory probes — fast on SSH vs full findFiles */
+/** Shallow readDirectory probes — monorepo roots only */
 const QUICK_PROBE_ROOTS = ['modules/projects', 'modules', 'apps', 'packages', 'externals'];
+
+const MAX_MODULE_DEPTH = 7;
+const MAX_FIND_RESULTS_REMOTE = 64;
+const MAX_FIND_RESULTS_LOCAL = 128;
 
 type PersistedModulesCache = Record<string, { modules: string[]; savedAt: number }>;
 
@@ -157,8 +149,7 @@ function scanTiming(vscodeAPI: any) {
         deadlineMs: Date.now() + (remote ? SCAN_DEADLINE_REMOTE_MS : SCAN_DEADLINE_MS),
         hardTimeoutMs: remote ? SCAN_HARD_TIMEOUT_REMOTE_MS : SCAN_HARD_TIMEOUT_MS,
         cacheTtlMs: remote ? SCAN_CACHE_TTL_REMOTE_MS : SCAN_CACHE_TTL_MS,
-        findMaxResults: remote ? 400 : 200,
-        bfsBatch: remote ? SCAN_BFS_BATCH_REMOTE : SCAN_BFS_BATCH_LOCAL,
+        findMaxResults: remote ? MAX_FIND_RESULTS_REMOTE : MAX_FIND_RESULTS_LOCAL,
     };
 }
 
@@ -177,6 +168,32 @@ function normalizeUriPath(uri: vscode.Uri): string {
     return p;
 }
 
+const EXCLUDE_DIRS = new Set([
+    "node_modules", "dist", "out", "build", "coverage", "target",
+    ".git", ".hg", ".svn", ".turbo", ".next", ".nuxt", ".cache",
+    "vendor", "__pycache__", ".pnpm-store", ".vscode-test", ".yarn",
+    ".pnpm", "bower_components",
+]);
+
+function relPathIsExcluded(rel: string): boolean {
+    if (!rel || rel === './' || rel === '.') { return false; }
+    const segs = normalizeModuleSegments(rel);
+    for (const seg of segs) {
+        if (EXCLUDE_DIRS.has(seg)) { return true; }
+    }
+    const lower = rel.replace(/\\/g, '/').toLowerCase();
+    if (lower.includes('/node_modules/') || lower.startsWith('node_modules/')) { return true; }
+    return segs.length > MAX_MODULE_DEPTH;
+}
+
+function uriPathIsExcluded(uri: vscode.Uri): boolean {
+    const parts = normalizeUriPath(uri).split('/').filter(Boolean);
+    for (const seg of parts) {
+        if (EXCLUDE_DIRS.has(seg)) { return true; }
+    }
+    return false;
+}
+
 function isValidModulePath(modulePath: string): boolean {
     const s = String(modulePath || '').trim().replace(/\\/g, '/');
     if (s === './' || s === '.') { return true; }
@@ -193,6 +210,7 @@ function isValidModulePath(modulePath: string): boolean {
 }
 
 function moduleRelFromUri(vscodeAPI: any, wsdUri: vscode.Uri, dirUri: vscode.Uri): string | null {
+    if (uriPathIsExcluded(dirUri)) { return null; }
     const folder = vscodeAPI.workspace.getWorkspaceFolder(dirUri);
     if (!folder) {
         if (uriPathKey(dirUri) === uriPathKey(wsdUri)) { return './'; }
@@ -207,12 +225,84 @@ function moduleRelFromUri(vscodeAPI: any, wsdUri: vscode.Uri, dirUri: vscode.Uri
     }
 
     if (!rel.startsWith('.') && !rel.startsWith('/')) { rel = './' + rel; }
-    return isValidModulePath(rel) ? rel : null;
+    return isValidModulePath(rel) && !relPathIsExcluded(rel) ? rel : null;
 }
 
-function addModuleDir(dirs: Set<string>, vscodeAPI: any, wsdUri: vscode.Uri, dirUri: vscode.Uri) {
-    const rel = moduleRelFromUri(vscodeAPI, wsdUri, dirUri);
-    if (rel) { dirs.add(rel); }
+class ModuleCollector {
+    private display = new Map<string, string>();
+    private identityMap = new Map<string, { rel: string; pathKey: string }>();
+    private pathKeys = new Set<string>();
+    private identityCache = new Map<string, string>();
+
+    constructor(
+        private vscodeAPI: any,
+        private wsdUri: vscode.Uri
+    ) {}
+
+    private relKey(rel: string): string {
+        return rel.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+    }
+
+    addRoot(): void {
+        this.display.set('./', './');
+        this.pathKeys.add(uriPathKey(this.wsdUri));
+    }
+
+    async addRelative(rel: string): Promise<boolean> {
+        if (rel === './' || rel === '.') {
+            this.addRoot();
+            return true;
+        }
+        if (relPathIsExcluded(rel) || !isValidModulePath(rel)) { return false; }
+        return this.addDirUri(joinModuleUri(this.vscodeAPI, this.wsdUri, rel));
+    }
+
+    async addDirUri(dirUri: vscode.Uri): Promise<boolean> {
+        if (uriPathIsExcluded(dirUri)) { return false; }
+
+        const rel = moduleRelFromUri(this.vscodeAPI, this.wsdUri, dirUri);
+        if (!rel) { return false; }
+
+        const pathKey = uriPathKey(dirUri);
+        if (this.pathKeys.has(pathKey)) { return false; }
+
+        const identity = await this.dirIdentity(dirUri);
+        const prev = this.identityMap.get(identity);
+        if (prev) {
+            if (rel.length >= prev.rel.length) { return false; }
+            this.display.delete(this.relKey(prev.rel));
+            this.pathKeys.delete(prev.pathKey);
+        }
+
+        this.pathKeys.add(pathKey);
+        this.identityMap.set(identity, { rel, pathKey });
+        this.display.set(this.relKey(rel), rel);
+        return true;
+    }
+
+    private async dirIdentity(dirUri: vscode.Uri): Promise<string> {
+        const key = uriPathKey(dirUri);
+        const cached = this.identityCache.get(key);
+        if (cached) { return cached; }
+
+        let id = `path:${key}`;
+        try {
+            const bytes = await this.vscodeAPI.workspace.fs.readFile(
+                this.vscodeAPI.Uri.joinPath(dirUri, 'package.json')
+            );
+            const json = JSON.parse(Buffer.from(bytes).toString('utf8'));
+            if (json?.name) { id = `npm:${String(json.name)}`; }
+        } catch { /* not a package dir */ }
+
+        this.identityCache.set(key, id);
+        return id;
+    }
+
+    toList(): string[] {
+        const items = Array.from(this.display.values());
+        if (!items.some((m) => m === './')) { items.unshift('./'); }
+        return items.sort((a, b) => a.localeCompare(b));
+    }
 }
 
 function mergeModuleLists(...lists: (string[] | undefined)[]): string[] {
@@ -222,11 +312,17 @@ function mergeModuleLists(...lists: (string[] | undefined)[]): string[] {
             const m = String(item || '').trim();
             if (!m) { continue; }
             const normalized = m === '.' ? './' : m;
-            if (isValidModulePath(normalized)) { out.add(normalized); }
+            if (isValidModulePath(normalized) && !relPathIsExcluded(normalized)) {
+                out.add(normalized);
+            }
         }
     }
     out.add('./');
     return Array.from(out).sort((a, b) => a.localeCompare(b));
+}
+
+function uriPathKey(uri: vscode.Uri): string {
+    return normalizeUriPath(uri).toLowerCase();
 }
 
 async function loadPersistedModules(extContext: vscode.ExtensionContext, wsdUri: vscode.Uri): Promise<string[] | undefined> {
@@ -266,16 +362,32 @@ function peekModules(extContext: vscode.ExtensionContext, extra: string[] = []):
 
 async function moduleHasGit(vscodeAPI: any, moduleUri: vscode.Uri): Promise<boolean> {
     try {
-        await vscodeAPI.workspace.fs.stat(vscodeAPI.Uri.joinPath(moduleUri, '.git'));
-        return true;
+        const gitUri = vscodeAPI.Uri.joinPath(moduleUri, '.git');
+        const stat = await vscodeAPI.workspace.fs.stat(gitUri);
+        if (stat.type === vscodeAPI.FileType.Directory) {
+            await vscodeAPI.workspace.fs.stat(vscodeAPI.Uri.joinPath(gitUri, 'HEAD'));
+            return true;
+        }
+        if (stat.type === vscodeAPI.FileType.File) {
+            const bytes = await vscodeAPI.workspace.fs.readFile(gitUri);
+            const text = Buffer.from(bytes).toString('utf8').trim();
+            return text.startsWith('gitdir:');
+        }
     } catch {
-        return false;
+        /* no local .git at this module root */
     }
+    return false;
 }
 
 async function filterModulesWithGit(vscodeAPI: any, wsdUri: vscode.Uri, modules: string[]): Promise<string[]> {
     const out: string[] = [];
-    for (const m of modules) {
+    for (const m of mergeModuleLists(modules)) {
+        if (m === './' || m === '.') {
+            if (await moduleHasGit(vscodeAPI, wsdUri)) {
+                out.push('./');
+            }
+            continue;
+        }
         if (await moduleHasGit(vscodeAPI, joinModuleUri(vscodeAPI, wsdUri, m))) {
             out.push(m);
         }
@@ -283,33 +395,56 @@ async function filterModulesWithGit(vscodeAPI: any, wsdUri: vscode.Uri, modules:
     return out;
 }
 
-const EXCLUDE_DIRS = new Set([
-    "node_modules", "dist", "out", "build", "coverage", "target",
-    ".git", ".hg", ".svn", ".turbo", ".next", ".nuxt", ".cache",
-    "vendor", "__pycache__", ".pnpm-store", ".vscode-test", ".yarn",
-]);
-
-const PKG_MARKERS = new Set([
-    "package.json", "deno.json", "deno.jsonc", "jsr.json",
-    "pnpm-workspace.yaml", "pnpm-lock.yaml", "yarn.lock",
-    "Cargo.toml", "go.mod", "pyproject.toml", "requirements.txt", "composer.json",
-]);
-
-function uriPathKey(uri: vscode.Uri): string {
-    return normalizeUriPath(uri).toLowerCase();
+async function resolveBulkModules(
+    vscodeAPI: any,
+    wsdUri: vscode.Uri,
+    command: string,
+    modules: string[]
+): Promise<string[] | null> {
+    if (command !== 'bulk_push') {
+        return mergeModuleLists(modules);
+    }
+    const withGit = await filterModulesWithGit(vscodeAPI, wsdUri, modules);
+    if (!withGit.length) {
+        vscodeAPI.window.showWarningMessage('Bulk push: no modules with .git found.');
+        return null;
+    }
+    const skipped = mergeModuleLists(modules).filter((m) => !withGit.includes(m)).length;
+    if (skipped > 0) {
+        vscodeAPI.window.showInformationMessage(
+            `Bulk push: ${withGit.length} repo(s), ${skipped} skipped (no local .git).`
+        );
+    }
+    return withGit;
 }
 
-function moduleUriFromMarkerFile(vscodeAPI: any, fileUri: vscode.Uri, pattern: string): vscode.Uri {
-    return pattern.includes('.git/HEAD')
-        ? vscodeAPI.Uri.joinPath(fileUri, '../..')
-        : vscodeAPI.Uri.joinPath(fileUri, '..');
+function gitPushGuardShellCmd(vscodeAPI: any): string {
+    const remote = Boolean(vscodeAPI.env?.remoteName);
+    const win = !remote && process.platform === 'win32';
+    if (win) {
+        return 'if (-not (Test-Path -LiteralPath .git)) { Write-Host "[vext] skip: no .git"; exit 0 }';
+    }
+    return 'test -e .git || test -f .git || { echo "[vext] skip: no .git"; exit 0; }';
+}
+
+function createThrottledCallback<T extends (...args: never[]) => void>(fn: T, ms: number): T {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let latestArgs: Parameters<T> | undefined;
+    const flush = () => {
+        timer = undefined;
+        if (latestArgs) { fn(...latestArgs); }
+    };
+    return ((...args: Parameters<T>) => {
+        latestArgs = args;
+        if (!timer) { timer = setTimeout(flush, ms); }
+    }) as T;
 }
 
 async function expandWorkspaceGlobPath(
+    collector: ModuleCollector,
     vscodeAPI: any,
     wsdUri: vscode.Uri,
-    rawPath: string,
-    dirs: Set<string>
+    rawPath: string
 ): Promise<void> {
     let p = String(rawPath || '').trim().replace(/\\/g, '/');
     if (!p) { return; }
@@ -317,6 +452,7 @@ async function expandWorkspaceGlobPath(
         const base = p.replace(/^\.\//, '').replace(/\/?\*+.*$/, '');
         const segs = normalizeModuleSegments(base);
         const baseUri = segs.length ? vscodeAPI.Uri.joinPath(wsdUri, ...segs) : wsdUri;
+        if (uriPathIsExcluded(baseUri)) { return; }
         let entries: [string, number][];
         try {
             entries = await vscodeAPI.workspace.fs.readDirectory(baseUri);
@@ -326,26 +462,23 @@ async function expandWorkspaceGlobPath(
         for (const [name, type] of entries) {
             if (name.startsWith('.') || EXCLUDE_DIRS.has(name)) { continue; }
             if (type !== vscodeAPI.FileType.Directory) { continue; }
-            addModuleDir(dirs, vscodeAPI, wsdUri, vscodeAPI.Uri.joinPath(baseUri, name));
+            await collector.addDirUri(vscodeAPI.Uri.joinPath(baseUri, name));
         }
         return;
     }
-    const rel = p.startsWith('./') ? p : './' + p;
-    if (isValidModulePath(rel)) { dirs.add(rel); }
+    await collector.addRelative(p.startsWith('./') ? p : './' + p);
 }
 
 async function findModulesFromManifests(
+    collector: ModuleCollector,
     vscodeAPI: any,
-    wsdUri: vscode.Uri,
-    onPartial?: (modules: string[]) => void
-): Promise<string[]> {
-    const dirs = new Set<string>();
-
+    wsdUri: vscode.Uri
+): Promise<void> {
     try {
         const bytes = await vscodeAPI.workspace.fs.readFile(vscodeAPI.Uri.joinPath(wsdUri, 'pnpm-workspace.yaml'));
         const text = Buffer.from(bytes).toString('utf8');
         for (const match of text.matchAll(/^\s*-\s*['"]?([^'"\n#]+)['"]?\s*$/gm)) {
-            await expandWorkspaceGlobPath(vscodeAPI, wsdUri, match[1].trim(), dirs);
+            await expandWorkspaceGlobPath(collector, vscodeAPI, wsdUri, match[1].trim());
         }
     } catch { /* no pnpm workspace */ }
 
@@ -356,7 +489,7 @@ async function findModulesFromManifests(
         const list = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
         if (Array.isArray(list)) {
             for (const ws of list) {
-                await expandWorkspaceGlobPath(vscodeAPI, wsdUri, String(ws), dirs);
+                await expandWorkspaceGlobPath(collector, vscodeAPI, wsdUri, String(ws));
             }
         }
     } catch { /* no root package.json workspaces */ }
@@ -365,26 +498,21 @@ async function findModulesFromManifests(
         const bytes = await vscodeAPI.workspace.fs.readFile(vscodeAPI.Uri.joinPath(wsdUri, '.gitmodules'));
         const text = Buffer.from(bytes).toString('utf8');
         for (const match of text.matchAll(/^\s*path\s*=\s*(.+)\s*$/gm)) {
-            const rel = './' + match[1].trim().replace(/\\/g, '/');
-            if (isValidModulePath(rel)) { dirs.add(rel); }
+            await collector.addRelative('./' + match[1].trim().replace(/\\/g, '/'));
         }
     } catch { /* no gitmodules */ }
-
-    const found = Array.from(dirs).sort((a, b) => a.localeCompare(b));
-    if (found.length) { onPartial?.(found); }
-    return found;
 }
 
 async function findModulesByQuickProbe(
+    collector: ModuleCollector,
     vscodeAPI: any,
-    wsdUri: vscode.Uri,
-    onPartial?: (modules: string[]) => void
-): Promise<string[]> {
-    const dirs = new Set<string>();
-
+    wsdUri: vscode.Uri
+): Promise<void> {
     for (const rootSeg of QUICK_PROBE_ROOTS) {
         const segs = normalizeModuleSegments(rootSeg);
         const rootUri = vscodeAPI.Uri.joinPath(wsdUri, ...segs);
+        if (uriPathIsExcluded(rootUri)) { continue; }
+
         let entries: [string, number][];
         try {
             entries = await vscodeAPI.workspace.fs.readDirectory(rootUri);
@@ -394,34 +522,28 @@ async function findModulesByQuickProbe(
 
         try {
             await vscodeAPI.workspace.fs.stat(vscodeAPI.Uri.joinPath(rootUri, 'package.json'));
-            addModuleDir(dirs, vscodeAPI, wsdUri, rootUri);
+            await collector.addDirUri(rootUri);
         } catch { /* root has no package.json */ }
 
         for (const [name, type] of entries) {
             if (name.startsWith('.') || EXCLUDE_DIRS.has(name)) { continue; }
             if (type !== vscodeAPI.FileType.Directory) { continue; }
             const childUri = vscodeAPI.Uri.joinPath(rootUri, name);
+            if (uriPathIsExcluded(childUri)) { continue; }
             try {
                 await vscodeAPI.workspace.fs.stat(vscodeAPI.Uri.joinPath(childUri, 'package.json'));
-                addModuleDir(dirs, vscodeAPI, wsdUri, childUri);
+                await collector.addDirUri(childUri);
             } catch { /* not a package dir */ }
         }
     }
-
-    const found = Array.from(dirs).sort((a, b) => a.localeCompare(b));
-    if (found.length) { onPartial?.(found); }
-    return found;
 }
 
-async function findModulesByPattern(
+async function findModulesByPackageJson(
+    collector: ModuleCollector,
     vscodeAPI: any,
     wsdUri: vscode.Uri,
-    pattern: string,
     deadlineMs: number,
-    maxResults: number,
-    dirs: Set<string>,
-    onPartial?: (modules: string[]) => void,
-    streamPartial = false
+    maxResults: number
 ): Promise<void> {
     if (Date.now() >= deadlineMs) { return; }
     const remaining = Math.max(400, deadlineMs - Date.now());
@@ -429,19 +551,16 @@ async function findModulesByPattern(
     const timer = setTimeout(() => source.cancel(), remaining);
     try {
         const files = await vscodeAPI.workspace.findFiles(
-            new vscodeAPI.RelativePattern(wsdUri, pattern),
+            new vscodeAPI.RelativePattern(wsdUri, FIND_PACKAGE_JSON),
             FIND_EXCLUDE,
             maxResults,
             source.token
         );
         for (const fileUri of files) {
-            addModuleDir(dirs, vscodeAPI, wsdUri, moduleUriFromMarkerFile(vscodeAPI, fileUri, pattern));
-            if (streamPartial && dirs.size > 0) {
-                onPartial?.(Array.from(dirs).sort((a, b) => a.localeCompare(b)));
-            }
-        }
-        if (dirs.size > 0) {
-            onPartial?.(Array.from(dirs).sort((a, b) => a.localeCompare(b)));
+            if (uriPathIsExcluded(fileUri)) { continue; }
+            const moduleUri = vscodeAPI.Uri.joinPath(fileUri, '..');
+            if (uriPathIsExcluded(moduleUri)) { continue; }
+            await collector.addDirUri(moduleUri);
         }
     } catch {
         /* cancelled or remote overload */
@@ -451,147 +570,32 @@ async function findModulesByPattern(
     }
 }
 
-async function findModulesByMarkers(
-    vscodeAPI: any,
-    wsdUri: vscode.Uri,
-    deadlineMs: number,
-    maxResults: number,
-    onPartial?: (modules: string[]) => void
-): Promise<string[]> {
-    const dirs = new Set<string>();
-
-    await findModulesByPattern(
-        vscodeAPI, wsdUri, '**/package.json', deadlineMs, maxResults, dirs, onPartial, true
-    );
-
-    await Promise.allSettled(FIND_MARKER_PATTERNS_REST.map(async (pattern) => {
-        await findModulesByPattern(vscodeAPI, wsdUri, pattern, deadlineMs, maxResults, dirs, onPartial, false);
-    }));
-
-    return Array.from(dirs).sort((a, b) => a.localeCompare(b));
-}
-
-// Bounded BFS fallback when findFiles is slow or incomplete on remote
-async function findProjectDirsBfs(
-    vscodeAPI: any,
-    wsdUri: vscode.Uri,
-    deadlineMs: number,
-    remote: boolean,
-    batchSize: number,
-    onPartial?: (modules: string[]) => void
-): Promise<string[]> {
-    const result = new Set<string>();
-    const visited = new Set<string>();
-    const queue: vscode.Uri[] = [wsdUri];
-
-    while (queue.length > 0 && Date.now() < deadlineMs && visited.size < SCAN_MAX_DIRS) {
-        const batch = queue.splice(0, batchSize);
-        await Promise.allSettled(batch.map(async (currentDir) => {
-            if (Date.now() >= deadlineMs || visited.size >= SCAN_MAX_DIRS) { return; }
-            const visitKey = uriPathKey(currentDir);
-            if (visited.has(visitKey)) { return; }
-            visited.add(visitKey);
-
-            let entries: [string, number][];
-            try {
-                entries = await vscodeAPI.workspace.fs.readDirectory(currentDir);
-            } catch {
-                return;
-            }
-
-            let hasRepo = false;
-            let hasPkg = false;
-            const subDirs: vscode.Uri[] = [];
-
-            for (const [name, type] of entries) {
-                let isDir = type === vscodeAPI.FileType.Directory;
-                let isFile = type === vscodeAPI.FileType.File;
-
-                if (
-                    !remote
-                    && (
-                        type === vscodeAPI.FileType.SymbolicLink
-                        || type === (vscodeAPI.FileType.Directory | vscodeAPI.FileType.SymbolicLink)
-                        || type === (vscodeAPI.FileType.File | vscodeAPI.FileType.SymbolicLink)
-                    )
-                ) {
-                    const entryUri = vscodeAPI.Uri.joinPath(currentDir, name);
-                    try {
-                        const vStat = await vscodeAPI.workspace.fs.stat(entryUri);
-                        isDir = (vStat.type & vscodeAPI.FileType.Directory) !== 0;
-                        isFile = (vStat.type & vscodeAPI.FileType.File) !== 0;
-                    } catch {
-                        continue;
-                    }
-                } else if (
-                    remote
-                    && (
-                        type === vscodeAPI.FileType.SymbolicLink
-                        || type === (vscodeAPI.FileType.Directory | vscodeAPI.FileType.SymbolicLink)
-                    )
-                ) {
-                    continue;
-                }
-
-                if (name === '.git' || name === '.hg' || name === '.svn') {
-                    hasRepo = true;
-                }
-                if (isFile && PKG_MARKERS.has(name)) {
-                    hasPkg = true;
-                }
-                if (isDir && !EXCLUDE_DIRS.has(name) && !name.startsWith('.')) {
-                    subDirs.push(vscodeAPI.Uri.joinPath(currentDir, name));
-                }
-            }
-
-            if (hasRepo || hasPkg) {
-                addModuleDir(result, vscodeAPI, wsdUri, currentDir);
-                onPartial?.(Array.from(result).sort((a, b) => a.localeCompare(b)));
-            }
-
-            queue.push(...subDirs);
-        }));
-    }
-
-    return Array.from(result).sort((a, b) => a.localeCompare(b));
-}
-
 async function runModuleScan(
     vscodeAPI: any,
     wsdUri: vscode.Uri,
     stale: string[],
     onPartial?: (modules: string[]) => void
 ): Promise<string[]> {
-    const { remote, deadlineMs, hardTimeoutMs, findMaxResults, bfsBatch } = scanTiming(vscodeAPI);
+    const { deadlineMs, hardTimeoutMs, findMaxResults } = scanTiming(vscodeAPI);
 
     const scanWork = async (): Promise<string[]> => {
-        const partialMerge = (partial: string[]) => {
-            onPartial?.(mergeModuleLists(stale, partial));
+        const collector = new ModuleCollector(vscodeAPI, wsdUri);
+        collector.addRoot();
+
+        const publish = () => {
+            onPartial?.(mergeModuleLists(stale, collector.toList()));
         };
 
-        const [fromManifest, fromProbe] = await Promise.all([
-            findModulesFromManifests(vscodeAPI, wsdUri, partialMerge),
-            findModulesByQuickProbe(vscodeAPI, wsdUri, partialMerge),
-        ]);
-        let merged = mergeModuleLists(stale, fromManifest, fromProbe);
-        partialMerge(merged);
+        await findModulesFromManifests(collector, vscodeAPI, wsdUri);
+        await findModulesByQuickProbe(collector, vscodeAPI, wsdUri);
+        publish();
 
-        if (remote) {
-            const [fromFind, fromBfs] = await Promise.all([
-                findModulesByMarkers(vscodeAPI, wsdUri, deadlineMs, findMaxResults, partialMerge),
-                findProjectDirsBfs(vscodeAPI, wsdUri, deadlineMs, remote, bfsBatch, partialMerge),
-            ]);
-            merged = mergeModuleLists(merged, fromFind, fromBfs);
-        } else {
-            const fromFind = await findModulesByMarkers(vscodeAPI, wsdUri, deadlineMs, findMaxResults, partialMerge);
-            merged = mergeModuleLists(merged, fromFind);
-            if (merged.length <= 1 && Date.now() < deadlineMs) {
-                const fromBfs = await findProjectDirsBfs(vscodeAPI, wsdUri, deadlineMs, remote, bfsBatch, partialMerge);
-                merged = mergeModuleLists(merged, fromBfs);
-            }
+        if (collector.toList().length <= 1 && Date.now() < deadlineMs) {
+            await findModulesByPackageJson(collector, vscodeAPI, wsdUri, deadlineMs, findMaxResults);
+            publish();
         }
 
-        return merged;
+        return mergeModuleLists(stale, collector.toList());
     };
 
     return Promise.race([
@@ -667,13 +671,19 @@ const getDirs = async (extContext: vscode.ExtensionContext, force = false) => {
 };
 
 // Git commands for push operations
-const getGitPushCommands = (commitMsg: string) => [
-    'git rm -r --cached .',
-    'git add .', 'git add *',
-    `git commit -m "${commitMsg}"`,
-    'git pull --rebase --ff',
-    'git push --all'
-];
+const getGitPushCommands = (commitMsg: string, vscodeAPI?: any, requireLocalDotGit = false) => {
+    const cmds = [
+        'git rm -r --cached .',
+        'git add .', 'git add *',
+        `git commit -m "${commitMsg}"`,
+        'git pull --rebase --ff',
+        'git push --all'
+    ];
+    if (requireLocalDotGit && vscodeAPI) {
+        cmds.unshift(gitPushGuardShellCmd(vscodeAPI));
+    }
+    return cmds;
+};
 
 // Install commands
 const getInstallCommands = () => [
@@ -750,6 +760,10 @@ async function handleWebviewMessage(
         return refreshModules(true);
     }
 
+    if (message?.command === 'open-wide-manager') {
+        return vscodeAPI.commands.executeCommand('vext.openManagerPanel');
+    }
+
     const uiConfig = getManagerUiConfig(vscodeAPI);
     const actionCatalog = getFilteredActions(uiConfig);
     const actionIds = new Set(actionCatalog.map((a) => a.id));
@@ -797,19 +811,19 @@ async function handleWebviewMessage(
         };
 
         if (message.command?.startsWith?.('bulk_')) {
-            let bulkModules = modules;
-            if (message.command === 'bulk_push') {
-                bulkModules = await filterModulesWithGit(vscodeAPI, wsdUri, modules);
-                if (!bulkModules.length) {
-                    vscodeAPI.window.showWarningMessage('Bulk push: no modules with .git found.');
-                    return;
-                }
-            }
+            const bulkModules = await resolveBulkModules(vscodeAPI, wsdUri, message.command, modules);
+            if (!bulkModules) { return; }
             for (const m of bulkModules) {
                 const mUri = joinModuleUri(vscodeAPI, wsdUri, m);
+                if (message.command === 'bulk_push' && !(await moduleHasGit(vscodeAPI, mUri))) {
+                    continue;
+                }
                 const mPath = normalizePath(vscodeAPI, mUri);
                 const mCtx = { ...ctxVars, module: m, modulePath: mPath };
-                const resolvedCmds = overrideCmds.map(c => resolvePlaceholders(c, mCtx));
+                let resolvedCmds = overrideCmds.map(c => resolvePlaceholders(c, mCtx));
+                if (message.command === 'bulk_push') {
+                    resolvedCmds = [gitPushGuardShellCmd(vscodeAPI), ...resolvedCmds];
+                }
                 runInTerminal(resolvedCmds, mPath);
             }
         } else {
@@ -833,22 +847,19 @@ async function handleWebviewMessage(
         }
 
         const commandMap = {
-            'bulk_push': getGitPushCommands(escapeDoubleQuoted(commitMsg!)),
+            'bulk_push': getGitPushCommands(escapeDoubleQuoted(commitMsg!), vscodeAPI, true),
             'bulk_install': ['git pull --rebase --ff', 'npm install -D', 'npm audit fix'],
             'bulk_build': ['npm run build']
         };
 
-        let bulkModules = modules;
-        if (message.command === 'bulk_push') {
-            bulkModules = await filterModulesWithGit(vscodeAPI, wsdUri, modules);
-            if (!bulkModules.length) {
-                vscodeAPI.window.showWarningMessage('Bulk push: no modules with .git found.');
-                return;
-            }
-        }
+        const bulkModules = await resolveBulkModules(vscodeAPI, wsdUri, message.command, modules);
+        if (!bulkModules) { return; }
 
         for (const m of bulkModules) {
             const mUri = joinModuleUri(vscodeAPI, wsdUri, m);
+            if (message.command === 'bulk_push' && !(await moduleHasGit(vscodeAPI, mUri))) {
+                continue;
+            }
             const mPath = normalizePath(vscodeAPI, mUri);
             runInTerminal(commandMap?.[message.command] || [], mPath);
         }
@@ -890,7 +901,7 @@ async function handleWebviewMessage(
                 default: 'No Description'
             });
             if (!commitMsg) { return; }
-            runInTerminal(getGitPushCommands(escapeDoubleQuoted(commitMsg)), path);
+            runInTerminal(getGitPushCommands(escapeDoubleQuoted(commitMsg), vscodeAPI, true), path);
         } break;
         case 'copy-file-content': {
             const text = await readActiveFileText();
@@ -936,6 +947,10 @@ function buildRefreshModules(
     publish: (modules: string[], scanning?: boolean) => Promise<void>
 ) {
     let scanGen = 0;
+    const throttledPublish = createThrottledCallback(
+        (mods: string[], scanning?: boolean) => { publish(mods, scanning).catch(console.warn); },
+        400
+    );
 
     return async (force = false) => {
         const gen = ++scanGen;
@@ -949,7 +964,7 @@ function buildRefreshModules(
         try {
             const mods = await scanWorkspaceModules(extContext, force, (partial) => {
                 if (gen !== scanGen) { return; }
-                publish(partial, true).catch(console.warn);
+                throttledPublish(partial, true);
             });
             if (gen !== scanGen) { return; }
             await publish(mods, false);
@@ -962,15 +977,6 @@ function buildRefreshModules(
     };
 }
 
-async function prefetchManagerModules(extContext: vscode.ExtensionContext) {
-    const vscodeAPI = await initVscodeAPI();
-    if (!vscodeAPI.env?.remoteName) { return; }
-    const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
-    if (!wsdUri) { return; }
-    await ensureCacheHydrated(extContext, wsdUri);
-    scanWorkspaceModules(extContext, false).catch(console.warn);
-}
-
 //
 export class ManagerViewProvider {
     _extensionUri: any;
@@ -978,7 +984,6 @@ export class ManagerViewProvider {
     _extContext: vscode.ExtensionContext;
 
     static viewType = "vext.managerView";
-    static panelViewType = "vext.managerPanelView";
 
     constructor(extContext: vscode.ExtensionContext, extensionUri, viewType: string) {
         this._extContext = extContext;
@@ -1008,14 +1013,38 @@ export class ManagerViewProvider {
 
     async resolveWebviewView(webviewView, _resolveContext) {
         const vscodeAPI = await initVscodeAPI();
+        webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
+
         const extVersion = String(this._extContext?.extension?.packageJSON?.version ?? "0.0.0");
         const instanceId = (globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`).toString();
         const uiConfig = getManagerUiConfig(vscodeAPI);
         const theme = resolveTheme(vscodeAPI, uiConfig.theme);
         const actionCatalog = getFilteredActions(uiConfig);
-        const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
-        if (wsdUri) { await ensureCacheHydrated(this._extContext, wsdUri); }
-        const initialModules = peekModules(this._extContext, getExtraModules(vscodeAPI));
+        const autoWideWhenCramped = Boolean(
+            vscodeAPI.workspace.getConfiguration('vext').get('managerView.autoWideWhenCramped', true)
+        );
+
+        let html = "";
+        try {
+            html = await getWebviewContent(webviewView.webview, this._extensionUri, {
+                instanceId,
+                viewType: this._viewType,
+                version: extVersion,
+                theme,
+                actionCatalog,
+                initialModules: ['./'],
+                autoWideWhenCramped,
+                uiFlags: {
+                    layout: uiConfig.layout,
+                    primaryActions: uiConfig.primaryActions,
+                    secondaryActions: uiConfig.secondaryActions,
+                    bulkActions: uiConfig.bulkActions
+                }
+            });
+        } catch (e) {
+            console.warn('[vext:manager] webview html failed', e);
+        }
+        webviewView.webview.html = html || getMinimalManagerFallbackHtml(theme);
 
         const refreshModules = buildRefreshModules(this._extContext, (mods, scanning) =>
             this.updateView(webviewView, _resolveContext, mods, scanning)
@@ -1034,35 +1063,39 @@ export class ManagerViewProvider {
             }, REFRESH_DEBOUNCE_MS);
         };
 
-        webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
-        const html = await getWebviewContent(webviewView.webview, this._extensionUri, {
-            instanceId,
-            viewType: this._viewType,
-            version: extVersion,
-            theme,
-            actionCatalog,
-            initialModules,
-            uiFlags: {
-                layout: uiConfig.layout,
-                primaryActions: uiConfig.primaryActions,
-                secondaryActions: uiConfig.secondaryActions,
-                bulkActions: uiConfig.bulkActions
-            }
-        }).catch((e) => { console.warn(e); return ""; });
-        if (html) { webviewView.webview.html = html; }
+        const startBackgroundWork = () => {
+            getWorkspaceFolder(vscodeAPI?.workspace).then((wsdUri) => {
+                if (!wsdUri) {
+                    refreshModules(false).catch(console.warn);
+                    return;
+                }
+                ensureCacheHydrated(this._extContext, wsdUri)
+                    .then(() => refreshModules(false))
+                    .catch((e) => {
+                        console.warn('[vext:manager] hydrate failed', e);
+                        refreshModules(false).catch(console.warn);
+                    });
+            }).catch(console.warn);
+        };
 
         acquireManagerFileWatch(vscodeAPI);
-        refreshModules(false).catch(console.warn);
+        setTimeout(startBackgroundWork, 100);
 
         const watchCb = (force = false) => scheduleRefresh(force);
         inWatch?.add?.(watchCb);
+        const disposables: { dispose(): void }[] = [];
         webviewView?.onDidDispose?.(() => {
             inWatch?.delete?.(watchCb);
             releaseManagerFileWatch();
             if (refreshTimer) { clearTimeout(refreshTimer); }
+            for (const d of disposables) {
+                try { d.dispose(); } catch { /* ignore */ }
+            }
         });
-        webviewView?.onDidChangeVisibility?.(() => { if (webviewView?.visible) { scheduleRefresh(false); } });
-        this._extContext.subscriptions.push(
+        webviewView?.onDidChangeVisibility?.(() => {
+            if (webviewView?.visible) { scheduleRefresh(false); }
+        });
+        disposables.push(
             vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
                 if (event.affectsConfiguration("vext.managerView")) {
                     this.updateView(webviewView, _resolveContext).catch(console.warn);
@@ -1086,14 +1119,13 @@ export class ManagerViewProvider {
 //
 export async function manager(context: vscode.ExtensionContext) {
     const vscodeAPI = await initVscodeAPI();
-    prefetchManagerModules(context).catch(console.warn);
     const providerSidebar = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.viewType);
-    const providerPanel = new ManagerViewProvider(context, context?.extensionUri, ManagerViewProvider.panelViewType);
 
-    const prov1 = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.viewType, providerSidebar);
-    const prov2 = vscodeAPI?.window?.registerWebviewViewProvider?.(ManagerViewProvider.panelViewType, providerPanel);
+    const webviewOptions = { retainContextWhenHidden: true };
+    const prov1 = vscodeAPI?.window?.registerWebviewViewProvider?.(
+        ManagerViewProvider.viewType, providerSidebar, { webviewOptions }
+    );
     if (prov1) { context?.subscriptions?.push?.(prov1); }
-    if (prov2) { context?.subscriptions?.push?.(prov2); }
 
     // Multi-instance support: open Manager as a standalone WebviewPanel
     const openPanelCmd = vscodeAPI?.commands?.registerCommand?.("vext.openManagerPanel", async () => {
@@ -1102,30 +1134,37 @@ export async function manager(context: vscode.ExtensionContext) {
         const uiConfig = getManagerUiConfig(vscodeAPI);
         const theme = resolveTheme(vscodeAPI, uiConfig.theme);
         const actionCatalog = getFilteredActions(uiConfig);
-        const wsdUri = await getWorkspaceFolder(vscodeAPI?.workspace);
-        if (wsdUri) { await ensureCacheHydrated(context, wsdUri); }
-        const initialModules = peekModules(context, getExtraModules(vscodeAPI));
+        const autoWideWhenCramped = Boolean(
+            vscodeAPI.workspace.getConfiguration('vext').get('managerView.autoWideWhenCramped', true)
+        );
         const panel = vscodeAPI.window.createWebviewPanel(
             "vext.managerPanel",
             `Manager (${extVersion})`,
             vscodeAPI.ViewColumn.One,
-            { enableScripts: true, localResourceRoots: [context.extensionUri] }
+            { enableScripts: true, localResourceRoots: [context.extensionUri], retainContextWhenHidden: true }
         );
 
-        panel.webview.html = await getWebviewContent(panel.webview, context.extensionUri, {
-            instanceId,
-            viewType: "vext.managerPanel",
-            version: extVersion,
-            theme,
-            actionCatalog,
-            initialModules,
-            uiFlags: {
-                layout: uiConfig.layout,
-                primaryActions: uiConfig.primaryActions,
-                secondaryActions: uiConfig.secondaryActions,
-                bulkActions: uiConfig.bulkActions
-            }
-        });
+        let panelHtml = "";
+        try {
+            panelHtml = await getWebviewContent(panel.webview, context.extensionUri, {
+                instanceId,
+                viewType: "vext.managerPanel",
+                version: extVersion,
+                theme,
+                actionCatalog,
+                initialModules: peekModules(context, getExtraModules(vscodeAPI)),
+                autoWideWhenCramped: false,
+                uiFlags: {
+                    layout: uiConfig.layout,
+                    primaryActions: uiConfig.primaryActions,
+                    secondaryActions: uiConfig.secondaryActions,
+                    bulkActions: uiConfig.bulkActions
+                }
+            });
+        } catch (e) {
+            console.warn('[vext:manager] panel html failed', e);
+        }
+        panel.webview.html = panelHtml || getMinimalManagerFallbackHtml(theme);
 
         const publishPanelModules = async (mods: string[], scanning = false) => {
             const liveConfig = getManagerUiConfig(vscodeAPI);
@@ -1166,7 +1205,17 @@ export async function manager(context: vscode.ExtensionContext) {
             releaseManagerFileWatch();
             if (refreshTimer) { clearTimeout(refreshTimer); }
         });
-        refreshModules(false);
+        setTimeout(() => {
+            getWorkspaceFolder(vscodeAPI?.workspace).then((wsdUri) => {
+                if (!wsdUri) {
+                    refreshModules(false).catch(console.warn);
+                    return;
+                }
+                ensureCacheHydrated(context, wsdUri)
+                    .then(() => refreshModules(false))
+                    .catch(() => refreshModules(false).catch(console.warn));
+            }).catch(console.warn);
+        }, 100);
         context.subscriptions.push(
             vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
                 if (event.affectsConfiguration("vext.managerView")) {

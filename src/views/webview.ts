@@ -10,6 +10,7 @@ type WebviewContentOpts = {
     theme?: string;
     actionCatalog?: unknown[];
     initialModules?: string[];
+    autoWideWhenCramped?: boolean;
     uiFlags?: {
         layout?: string;
         primaryActions?: string[];
@@ -29,6 +30,35 @@ const nonce32 = () => {
     for (let i = 0; i < 32; i++) { text += possible.charAt(Math.floor(Math.random() * possible.length)); }
     return text;
 };
+
+const escapeHtml = (value: string) => String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
+function renderInitialModuleRows(modules: string[] | undefined): string {
+    const list = Array.from(new Set(["./", ...(modules || [])].filter(Boolean)));
+    return list.map((m) => (
+        `<tr tabindex="0" data-module="${escapeHtml(m)}">`
+        + `<td class="name">${escapeHtml(m)}</td>`
+        + `<td class="actions"><div class="actions-container"></div></td></tr>`
+    )).join("\n");
+}
+
+/** Shown when getWebviewContent fails — keeps the view usable over SSH */
+export function getMinimalManagerFallbackHtml(theme = "dark"): string {
+    return `<!doctype html>
+<html data-theme="${theme}">
+<head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
+<body data-theme="${theme}">
+  <div class="toolbar"><span class="toolbar-label">Bulk actions:</span></div>
+  <table id="modulesTable" aria-label="Modules"><tbody id="modulesTbody">
+    <tr tabindex="0" data-module="./"><td class="name">./</td><td class="actions"></td></tr>
+  </tbody></table>
+  <p style="opacity:0.7;font-size:12px;padding:8px;">Manager UI loading…</p>
+</body></html>`;
+}
 
 const PHOSPHOR_SPRITE = `
 <span class="ph-sprite" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="ph-sprite-svg" aria-hidden="true" focusable="false" width="0" height="0">
@@ -52,6 +82,7 @@ const PHOSPHOR_SPRITE = `
   <symbol id="ph-folder-notch-minus" viewBox="0 0 256 256"><path d="M24 96h77l16-24h115M24 96v112a16 16 0 0 0 16 16h176a16 16 0 0 0 16-16V96M104 160h48" fill="none" stroke="currentColor" stroke-width="16"></path></symbol>
   <symbol id="ph-warning-circle" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-width="16"></circle><path d="M128 76v60m0 40h.01" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"></path></symbol>
   <symbol id="ph-arrow-clockwise" viewBox="0 0 256 256"><path d="M224 48v56h-56M198 104a88 88 0 1 0-8 96" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></path></symbol>
+  <symbol id="ph-arrows-out" viewBox="0 0 256 256"><path d="M128 40v56M128 160v56M40 128h56M160 128h56M73 73l40 40M143 143l40 40M183 73l-40 40M113 143l-40 40" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"></path></symbol>
   <symbol id="ph-stop-circle" viewBox="0 0 256 256"><circle cx="128" cy="128" r="96" fill="none" stroke="currentColor" stroke-width="16"></circle><rect x="108" y="108" width="40" height="40" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"></rect></symbol>
 </defs>
 </svg></span>`;
@@ -79,6 +110,7 @@ export async function getWebviewContent(
     const bootstrap = JSON.stringify({
         actionCatalog: opts.actionCatalog || [],
         initialModules: Array.isArray(opts.initialModules) && opts.initialModules.length ? opts.initialModules : ["./"],
+        autoWideWhenCramped: opts.autoWideWhenCramped !== false,
         uiFlags: opts.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] },
         theme: opts.theme || "dark"
     });
@@ -105,19 +137,24 @@ export async function getWebviewContent(
 </head>
 <body data-theme="${opts.theme || "dark"}">
   ${PHOSPHOR_SPRITE}
+  <div class="manager-root">
   <div class="toolbar" tabindex="0">
-    <span class="toolbar-label">Bulk actions:</span>
-    <div class="toolbar-actions" id="toolbarActions">
-    </div>
+    <button type="button" class="open-wide-manager" id="openWideManager" title="Open wide view in editor area" aria-label="Open wide view">
+      <svg class="ph-icon" viewBox="0 0 256 256" aria-hidden="true"><use href="#ph-arrows-out"></use></svg>
+    </button>
     <button type="button" class="refresh-modules" id="refreshModules" title="Refresh module list" aria-label="Refresh module list">
       <svg class="ph-icon" viewBox="0 0 256 256" aria-hidden="true"><use href="#ph-arrow-clockwise"></use></svg>
     </button>
     <span class="scan-status" id="scanStatus" hidden>Scanning…</span>
+    <span class="toolbar-label">Bulk actions:</span>
+    <div class="toolbar-actions" id="toolbarActions"></div>
   </div>
   <table id="modulesTable" aria-label="Modules">
     <tbody id="modulesTbody">
+      ${renderInitialModuleRows(opts.initialModules)}
     </tbody>
   </table>
+  </div>
   <script nonce="${nonce}">window.__VEXT_BOOTSTRAP = ${bootstrap};</script>
   <script nonce="${nonce}" type="module" src="${actionsJS}"></script>
 </body>

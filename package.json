@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.33",
+    "version": "0.0.49",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -37,7 +37,6 @@
         "onCommand:vext.symlink.pickSources",
         "onCommand:vext.symlink.abs2rel",
         "onView:vext.managerView",
-        "onView:vext.managerPanelView",
         "onCommand:vext.openManagerPanel"
     ],
     "contributes": {
@@ -217,6 +216,11 @@
                         "type": "string"
                     },
                     "description": "Extra module paths always shown in Manager (e.g. ./modules/projects/core.ts). Useful when remote scan is slow or incomplete."
+                },
+                "vext.managerView.autoWideWhenCramped": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "When Manager is in a narrow panel slot (<360px), open the wide editor view automatically."
                 },
                 "vext.managerView.layout": {
                     "type": "string",
@@ -501,11 +505,6 @@
             ],
             "panel": [
                 {
-                    "id": "managerPanel",
-                    "title": "Manager",
-                    "icon": "assets/folder.svg"
-                },
-                {
                     "id": "gptPanel",
                     "title": "GPTunnel",
                     "icon": "assets/openai.svg"
@@ -520,15 +519,6 @@
                     "id": "vext.managerView",
                     "name": "Manager View",
                     "contextualTitle": "Manager View"
-                }
-            ],
-            "managerPanel": [
-                {
-                    "icon": "assets/folder.svg",
-                    "type": "webview",
-                    "id": "vext.managerPanelView",
-                    "name": "Manager (Panel)",
-                    "contextualTitle": "Manager"
                 }
             ],
             "gptView": [
@@ -553,7 +543,8 @@
         "commands": [
             {
                 "command": "vext.openManagerPanel",
-                "title": "Open Manager (Panel)"
+                "title": "Open Manager (Wide View)",
+                "icon": "$(layout-panel)"
             },
             {
                 "command": "vext.symlink.pickSources",
