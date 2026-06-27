@@ -1020,9 +1020,6 @@ export class ManagerViewProvider {
         const uiConfig = getManagerUiConfig(vscodeAPI);
         const theme = resolveTheme(vscodeAPI, uiConfig.theme);
         const actionCatalog = getFilteredActions(uiConfig);
-        const autoWideWhenCramped = Boolean(
-            vscodeAPI.workspace.getConfiguration('vext').get('managerView.autoWideWhenCramped', true)
-        );
 
         let html = "";
         try {
@@ -1033,7 +1030,6 @@ export class ManagerViewProvider {
                 theme,
                 actionCatalog,
                 initialModules: ['./'],
-                autoWideWhenCramped,
                 uiFlags: {
                     layout: uiConfig.layout,
                     primaryActions: uiConfig.primaryActions,
@@ -1134,9 +1130,6 @@ export async function manager(context: vscode.ExtensionContext) {
         const uiConfig = getManagerUiConfig(vscodeAPI);
         const theme = resolveTheme(vscodeAPI, uiConfig.theme);
         const actionCatalog = getFilteredActions(uiConfig);
-        const autoWideWhenCramped = Boolean(
-            vscodeAPI.workspace.getConfiguration('vext').get('managerView.autoWideWhenCramped', true)
-        );
         const panel = vscodeAPI.window.createWebviewPanel(
             "vext.managerPanel",
             `Manager (${extVersion})`,
@@ -1153,7 +1146,6 @@ export async function manager(context: vscode.ExtensionContext) {
                 theme,
                 actionCatalog,
                 initialModules: peekModules(context, getExtraModules(vscodeAPI)),
-                autoWideWhenCramped: false,
                 uiFlags: {
                     layout: uiConfig.layout,
                     primaryActions: uiConfig.primaryActions,
@@ -1238,21 +1230,63 @@ export async function manager(context: vscode.ExtensionContext) {
 
 //
 type TerminalStatus = 'free' | 'busy';
-const terminalMap = new Map<string, { terminal: vscode.Terminal, status: TerminalStatus }>();
+type TerminalEntry = { terminal: vscode.Terminal, status: TerminalStatus, preambleSent?: boolean };
+const terminalMap = new Map<string, TerminalEntry>();
+
+type TerminalHistoryMode = 'suppress' | 'persist';
+
+function getManagerTerminalHistoryMode(vscodeAPI: any): TerminalHistoryMode {
+    const v = String(vscodeAPI?.workspace?.getConfiguration?.('vext')?.get?.('managerView.terminal.history', 'suppress') || 'suppress');
+    return v === 'persist' ? 'persist' : 'suppress';
+}
+
+/** Best-effort shell family detection for history-suppression preamble. */
+function detectManagerShellFamily(vscodeAPI: any): 'bash' | 'pwsh' {
+    if (Boolean(vscodeAPI?.env?.remoteName)) { return 'bash'; }
+    if (process.platform !== 'win32') { return 'bash'; }
+    const def = String(
+        vscodeAPI?.workspace?.getConfiguration?.('terminal.integrated')?.get?.('defaultProfile.windows', 'PowerShell')
+        || 'PowerShell'
+    );
+    const s = def.toLowerCase();
+    if (s.includes('bash') || s.includes('wsl') || s.includes('zsh') || s.includes('fish')) { return 'bash'; }
+    return 'pwsh';
+}
+
+/**
+ * One-time preamble enabling leading-space history suppression for the detected shell.
+ * Bash/zsh honor `HISTCONTROL=ignorespace` / `HIST_IGNORE_SPACE`; PowerShell uses a
+ * PSReadLine `AddToHistoryHandler` that rejects lines starting with whitespace.
+ */
+function shellHistoryPreamble(family: 'bash' | 'pwsh'): string {
+    if (family === 'pwsh') {
+        return ` Set-PSReadLineOption -AddToHistoryHandler { param($line) -not ($line -match '^\\s') } # vext`;
+    }
+    return ` export HISTCONTROL=ignorespace:erasedups 2>/dev/null; setopt HIST_IGNORE_SPACE 2>/dev/null # vext`;
+}
 
 async function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
     const vscodeAPI = await initVscodeAPI();
+    const suppress = getManagerTerminalHistoryMode(vscodeAPI) === 'suppress';
+
     let entry = !longRunning ? Array.from(terminalMap.entries()).find(([dir, obj]) => dir === cwd && obj.status === 'free') : null;
     let termObj = entry?.[1];
 
     if (!termObj) {
-        const terminal = vscodeAPI?.window.createTerminal({ cwd });
-        termObj = { terminal, status: longRunning ? 'busy' : 'free' };
+        const terminal = vscodeAPI?.window.createTerminal({ cwd, isTransient: suppress });
+        termObj = { terminal, status: longRunning ? 'busy' : 'free', preambleSent: false };
         if (!longRunning) { terminalMap.set(cwd, termObj); }
     } else if (longRunning) {
         termObj.status = 'busy';
     }
 
     termObj?.terminal?.show();
-    cmds.forEach(cmd => termObj?.terminal?.sendText?.(cmd));
+
+    if (suppress && termObj && !termObj.preambleSent) {
+        termObj.preambleSent = true;
+        termObj.terminal?.sendText?.(shellHistoryPreamble(detectManagerShellFamily(vscodeAPI)));
+    }
+
+    const prefix = suppress ? ' ' : '';
+    cmds.forEach(cmd => termObj?.terminal?.sendText?.(`${prefix}${cmd}`));
 }

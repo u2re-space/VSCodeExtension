@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.49",
+    "version": "0.0.50",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -217,10 +217,18 @@
                     },
                     "description": "Extra module paths always shown in Manager (e.g. ./modules/projects/core.ts). Useful when remote scan is slow or incomplete."
                 },
-                "vext.managerView.autoWideWhenCramped": {
-                    "type": "boolean",
-                    "default": true,
-                    "description": "When Manager is in a narrow panel slot (<360px), open the wide editor view automatically."
+                "vext.managerView.terminal.history": {
+                    "type": "string",
+                    "enum": [
+                        "suppress",
+                        "persist"
+                    ],
+                    "enumDescriptions": [
+                        "Manager-launched commands are not saved in shell history. Commands are sent with a leading-space prefix and a one-time preamble enables ignore-space history (bash/zsh HIST_IGNORE_SPACE, PowerShell PSReadLine AddToHistoryHandler). Terminals are created as transient so VS Code does not persist them across reloads.",
+                        "Manager-launched commands are saved normally (original behavior)."
+                    ],
+                    "default": "suppress",
+                    "description": "Controls whether commands launched from Manager View buttons are saved in terminal history (including SSH remotes)."
                 },
                 "vext.managerView.layout": {
                     "type": "string",

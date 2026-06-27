@@ -28,8 +28,6 @@ const BOOT = globalThis.__VEXT_BOOTSTRAP || {};
 let actionCatalog = Array.isArray(BOOT.actionCatalog) ? BOOT.actionCatalog : [];
 let uiFlags = BOOT.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] };
 const initialModules = Array.isArray(BOOT.initialModules) ? BOOT.initialModules : ["./"];
-const autoWideWhenCramped = BOOT.autoWideWhenCramped !== false;
-let wideOpenRequested = false;
 
 const report = (payload) => {
     try {
@@ -337,13 +335,9 @@ window.addEventListener("message", (event) => {
     }
 });
 
-function requestWideViewIfCramped() {
+function updateNarrowClass() {
     const w = document.documentElement.clientWidth || document.body.clientWidth || 0;
     document.body.classList.toggle("is-narrow", w < 420);
-    if (!autoWideWhenCramped || wideOpenRequested) { return; }
-    if (w >= 360) { return; }
-    wideOpenRequested = true;
-    send("open-wide-manager", "");
 }
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -357,13 +351,12 @@ window.addEventListener("DOMContentLoaded", () => {
         send("refresh-modules", "");
     });
     document.getElementById("openWideManager")?.addEventListener("click", () => {
-        wideOpenRequested = true;
         send("open-wide-manager", "");
     });
     if (typeof ResizeObserver !== "undefined") {
-        const ro = new ResizeObserver(() => requestWideViewIfCramped());
+        const ro = new ResizeObserver(() => updateNarrowClass());
         ro.observe(document.documentElement);
     }
-    setTimeout(requestWideViewIfCramped, 300);
+    setTimeout(updateNarrowClass, 300);
     send("ready", "");
 });

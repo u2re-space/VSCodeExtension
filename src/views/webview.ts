@@ -10,7 +10,6 @@ type WebviewContentOpts = {
     theme?: string;
     actionCatalog?: unknown[];
     initialModules?: string[];
-    autoWideWhenCramped?: boolean;
     uiFlags?: {
         layout?: string;
         primaryActions?: string[];
@@ -110,7 +109,6 @@ export async function getWebviewContent(
     const bootstrap = JSON.stringify({
         actionCatalog: opts.actionCatalog || [],
         initialModules: Array.isArray(opts.initialModules) && opts.initialModules.length ? opts.initialModules : ["./"],
-        autoWideWhenCramped: opts.autoWideWhenCramped !== false,
         uiFlags: opts.uiFlags || { layout: "compactMore", primaryActions: [], secondaryActions: [], bulkActions: [] },
         theme: opts.theme || "dark"
     });
