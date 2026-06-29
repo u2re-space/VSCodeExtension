@@ -1,6 +1,3 @@
-// web-view instruments
-import { webview }  from './web/webview.mjs';
-
 // project management
 import { manager }  from './views/manager.ts';
 
@@ -15,9 +12,9 @@ import { contexts } from "./context/states.ts";
 import { symlink } from './explorer/symlink.ts';
 import { customActions } from './explorer/customActions.ts';
 
-//
+// polyfill for Promise.try
 if (Promise.try === undefined || Promise.try === null || !("try" in Promise)) {
-    Promise.try = (fn, ...args)=>{
+    Promise.try ??= (fn, ...args)=>{
         return new Promise((resolve, reject)=>{
             try {
                 resolve(fn(...args));
@@ -36,7 +33,6 @@ export function activate(context) {
     Promise.try(mathml, context)?.catch?.(e=>console.error(e));
     Promise.try(markdown, context)?.catch?.(e=>console.error(e));
     Promise.try(manager, context)?.catch?.(e=>console.error(e));
-    Promise.try(webview, context)?.catch?.(e=>console.error(e));
     Promise.try(contexts, context)?.catch?.(e=>console.error(e));
 }
 

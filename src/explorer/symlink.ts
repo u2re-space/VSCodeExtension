@@ -73,6 +73,46 @@ function normalizeSymlinkTarget(
     };
 }
 
+/**
+ * Detects a "stub" file: a regular file whose entire content is a single path that resolves
+ * to an existing directory. Such files appear when a symlink is committed/copied through a
+ * system that doesn't preserve symlinks (the link target text becomes the file content).
+ * Returns the raw target string from the file, or undefined when the file is not a stub.
+ */
+function readStubLinkTarget(filePath: string, maxSize = 4096): string | undefined {
+    let lstat: fs.Stats;
+    try {
+        lstat = fs.lstatSync(filePath);
+    } catch {
+        return undefined;
+    }
+    if (!lstat.isFile() || lstat.size > maxSize) { return undefined; }
+
+    let content: string;
+    try {
+        content = fs.readFileSync(filePath, 'utf8');
+    } catch {
+        return undefined;
+    }
+
+    const lines = content.split(/\r?\n/);
+    // tolerate a single trailing newline
+    if (lines.length > 0 && lines[lines.length - 1] === '') { lines.pop(); }
+    if (lines.length !== 1) { return undefined; }
+
+    const raw = lines[0].trim();
+    if (!raw) { return undefined; }
+
+    const fileDirFs = path.dirname(filePath);
+    const targetFs = path.isAbsolute(raw) ? path.resolve(toFs(raw)) : path.resolve(fileDirFs, toFs(raw));
+    try {
+        if (!fs.statSync(targetFs).isDirectory()) { return undefined; }
+    } catch {
+        return undefined;
+    }
+    return raw;
+}
+
 function workspaceRoots(vscodeAPI: typeof vscode): string[] {
     const folders = vscodeAPI.workspace.workspaceFolders ?? [];
     return folders.map((f) => path.resolve(f.uri.fsPath));
@@ -376,6 +416,44 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     }
 }
 
+function restoreSymlinkFromStub(
+    vscodeAPI: any,
+    filePath: string
+): 'restored' | 'elevated' | 'fail' | 'not-stub' {
+    const rawTarget = readStubLinkTarget(filePath);
+    if (rawTarget === undefined) { return 'not-stub'; }
+
+    const { relTarget } = normalizeSymlinkTarget(filePath, rawTarget);
+    // readStubLinkTarget already verified the target is an existing directory.
+    const linkType: fs.symlink.Type = 'dir';
+
+    try {
+        fs.unlinkSync(filePath);
+        fs.symlinkSync(toFs(relTarget), filePath, linkType);
+        vscodeAPI.window.showInformationMessage(
+            `Normalize link: restored symlink from stub → ${relTarget}`
+        );
+        console.log(`[normalize-link:restore] ${filePath}: stub "${rawTarget}" → ${relTarget}`);
+        return 'restored';
+    } catch (e: any) {
+        if (e?.code === 'EPERM' || e?.code === 'EACCES') {
+            const fwd = (s: string) => s.replace(/\\/g, '/');
+            const q = (s: string) => s.replace(/'/g, "''");
+            const fl = fwd(filePath);
+            const fr = relTarget;
+            runElevated(
+                vscodeAPI,
+                path.dirname(filePath),
+                `Remove-Item -Force '${q(fl)}'; New-Item -ItemType SymbolicLink -Path '${q(fl)}' -Target '${q(fr)}'`,
+                `rm -f "${fl}" && ln -s "${fr}" "${fl}"`
+            );
+            return 'elevated';
+        }
+        vscodeAPI.window.showErrorMessage(`Normalize link: failed to restore symlink from stub — ${e}`);
+        return 'fail';
+    }
+}
+
 function isExplorerUri(x: unknown): x is vscode.Uri {
     return Boolean(x && typeof (x as vscode.Uri).fsPath === 'string');
 }
@@ -460,24 +538,47 @@ async function normalizeSymlinksFromExplorer(vscodeAPI: any, uris: vscode.Uri[])
     }
 
     const symlinkPaths: string[] = [];
+    const candidateStubPaths: string[] = [];
     for (const u of uris) {
         try {
             const stat = await vscodeAPI.workspace.fs.stat(u);
             if (stat.type & vscodeAPI.FileType.SymbolicLink) {
                 symlinkPaths.push(u.fsPath);
+            } else if (stat.type & vscodeAPI.FileType.File) {
+                candidateStubPaths.push(u.fsPath);
             }
         } catch {
             /* skip */
         }
     }
 
-    if (symlinkPaths.length === 0) {
-        vscodeAPI.window.showErrorMessage('Normalize link: no symbolic links in selection.');
-        return;
+    let stubsRestored = 0;
+    let stubsElevated = 0;
+    let stubsFailed = 0;
+    let stubsNotCandidate = 0;
+    for (const stubPath of candidateStubPaths) {
+        const r = restoreSymlinkFromStub(vscodeAPI, stubPath);
+        switch (r) {
+            case 'restored': stubsRestored++; break;
+            case 'elevated': stubsElevated++; break;
+            case 'fail': stubsFailed++; break;
+            default: stubsNotCandidate++; break;
+        }
     }
 
     for (const linkPath of symlinkPaths) {
         normalizeSymlinkTargetRebase(vscodeAPI, linkPath);
+    }
+
+    if (
+        symlinkPaths.length === 0 &&
+        stubsRestored === 0 &&
+        stubsElevated === 0 &&
+        candidateStubPaths.length === stubsNotCandidate + stubsFailed
+    ) {
+        vscodeAPI.window.showErrorMessage(
+            'Normalize link: no symbolic links (or stub files) in selection.'
+        );
     }
 }
 
@@ -521,6 +622,7 @@ export const __symlinkTest = {
     relativeSymlinkTarget,
     normalizeSymlinkTarget,
     linkPathForName,
+    readStubLinkTarget,
 };
 
 //

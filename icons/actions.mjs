@@ -337,7 +337,7 @@ window.addEventListener("message", (event) => {
 
 function updateNarrowClass() {
     const w = document.documentElement.clientWidth || document.body.clientWidth || 0;
-    document.body.classList.toggle("is-narrow", w < 420);
+    //document.body.classList.toggle("is-narrow", w < 420);
 }
 
 window.addEventListener("DOMContentLoaded", () => {

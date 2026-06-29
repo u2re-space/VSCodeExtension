@@ -1,5 +1,7 @@
 import assert from 'assert';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 import * as symlinkModule from '../src/explorer/symlink.ts';
 
@@ -107,5 +109,47 @@ suite('Symlink path helpers', () => {
         );
 
         assert.strictEqual(linkPath, path.join(dir, 'source (2)'));
+    });
+
+    test('readStubLinkTarget restores a stub file whose content is a directory path', () => {
+        const helpers = symlinkModule.__symlinkTest;
+        assert.ok(helpers, 'expected symlink test helpers to be exported');
+
+        const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'vext-stub-'));
+        try {
+            const targetDir = path.join(tmp, 'target');
+            fs.mkdirSync(targetDir);
+
+            const stubAbs = path.join(tmp, 'link-abs');
+            fs.writeFileSync(stubAbs, targetDir + '\n');
+            assert.strictEqual(helpers.readStubLinkTarget(stubAbs), targetDir);
+
+            const stubRel = path.join(tmp, 'link-rel');
+            fs.writeFileSync(stubRel, './target');
+            assert.strictEqual(helpers.readStubLinkTarget(stubRel), './target');
+
+            const stubNoNewline = path.join(tmp, 'link-plain');
+            fs.writeFileSync(stubNoNewline, 'target');
+            assert.strictEqual(helpers.readStubLinkTarget(stubNoNewline), 'target');
+
+            // Multi-line content is not a stub.
+            const stubMulti = path.join(tmp, 'link-multi');
+            fs.writeFileSync(stubMulti, 'target\nextra');
+            assert.strictEqual(helpers.readStubLinkTarget(stubMulti), undefined);
+
+            // Target pointing to a non-directory is not a stub.
+            const filePath = path.join(tmp, 'a-file');
+            fs.writeFileSync(filePath, 'x');
+            const stubToFile = path.join(tmp, 'link-to-file');
+            fs.writeFileSync(stubToFile, filePath);
+            assert.strictEqual(helpers.readStubLinkTarget(stubToFile), undefined);
+
+            // Target that does not exist is not a stub.
+            const stubMissing = path.join(tmp, 'link-missing');
+            fs.writeFileSync(stubMissing, path.join(tmp, 'nope'));
+            assert.strictEqual(helpers.readStubLinkTarget(stubMissing), undefined);
+        } finally {
+            fs.rmSync(tmp, { recursive: true, force: true });
+        }
     });
 });

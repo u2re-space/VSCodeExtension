@@ -418,13 +418,33 @@ async function resolveBulkModules(
     return withGit;
 }
 
-function gitPushGuardShellCmd(vscodeAPI: any): string {
+/** Shell family used for manager-launched git command lines. Mirrors gitPushGuardShellCmd's platform rule. */
+function managerGitShellFamily(vscodeAPI: any): 'bash' | 'pwsh' {
     const remote = Boolean(vscodeAPI.env?.remoteName);
     const win = !remote && process.platform === 'win32';
-    if (win) {
+    return win ? 'pwsh' : 'bash';
+}
+
+function gitPushGuardShellCmd(vscodeAPI: any): string {
+    if (managerGitShellFamily(vscodeAPI) === 'pwsh') {
         return 'if (-not (Test-Path -LiteralPath .git)) { Write-Host "[vext] skip: no .git"; exit 0 }';
     }
     return 'test -e .git || test -f .git || { echo "[vext] skip: no .git"; exit 0; }';
+}
+
+/** Delay (seconds) before auto-closing a manager terminal after a successful git pull/push. */
+const GIT_AUTO_CLOSE_DELAY_SEC = 2;
+
+/**
+ * Trailing command appended after git pull/push commands. Closes the terminal only when the
+ * preceding command succeeded (exit 0); on failure the shell stays open so the user can read
+ * the error. Bash uses `$?`, PowerShell uses `$LASTEXITCODE` (set by native `git` calls).
+ */
+function gitAutoCloseTrailerCmd(vscodeAPI: any, delaySec = GIT_AUTO_CLOSE_DELAY_SEC): string {
+    if (managerGitShellFamily(vscodeAPI) === 'pwsh') {
+        return `if ($LASTEXITCODE -eq 0) { Start-Sleep -Seconds ${delaySec}; exit 0 }`;
+    }
+    return `__vext_rc=$?; if [ "$__vext_rc" -eq 0 ]; then sleep ${delaySec}; exit 0; fi`;
 }
 
 function createThrottledCallback<T extends (...args: never[]) => void>(fn: T, ms: number): T {
@@ -824,12 +844,12 @@ async function handleWebviewMessage(
                 if (message.command === 'bulk_push') {
                     resolvedCmds = [gitPushGuardShellCmd(vscodeAPI), ...resolvedCmds];
                 }
-                runInTerminal(resolvedCmds, mPath);
+                runInTerminal(resolvedCmds, mPath, false, message.command === 'bulk_push');
             }
         } else {
             const resolvedCmds = overrideCmds.map(c => resolvePlaceholders(c, ctxVars));
             const openInNew = ['terminal', 'watch', 'dev', 'test', 'restart', 'stop', 'diff'];
-            runInTerminal(resolvedCmds, path, openInNew?.indexOf?.(message.command) >= 0);
+            runInTerminal(resolvedCmds, path, openInNew?.indexOf?.(message.command) >= 0, message.command === 'push');
         }
         return;
     }
@@ -861,7 +881,7 @@ async function handleWebviewMessage(
                 continue;
             }
             const mPath = normalizePath(vscodeAPI, mUri);
-            runInTerminal(commandMap?.[message.command] || [], mPath);
+            runInTerminal(commandMap?.[message.command] || [], mPath, false, message.command === 'bulk_push');
         }
 
         return;
@@ -901,7 +921,7 @@ async function handleWebviewMessage(
                 default: 'No Description'
             });
             if (!commitMsg) { return; }
-            runInTerminal(getGitPushCommands(escapeDoubleQuoted(commitMsg), vscodeAPI, true), path);
+            runInTerminal(getGitPushCommands(escapeDoubleQuoted(commitMsg), vscodeAPI, true), path, false, true);
         } break;
         case 'copy-file-content': {
             const text = await readActiveFileText();
@@ -1265,7 +1285,7 @@ function shellHistoryPreamble(family: 'bash' | 'pwsh'): string {
     return ` export HISTCONTROL=ignorespace:erasedups 2>/dev/null; setopt HIST_IGNORE_SPACE 2>/dev/null # vext`;
 }
 
-async function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
+async function runInTerminal(cmds: string[], cwd: string, longRunning = false, autoCloseOnSuccess = false) {
     const vscodeAPI = await initVscodeAPI();
     const suppress = getManagerTerminalHistoryMode(vscodeAPI) === 'suppress';
 
@@ -1288,5 +1308,9 @@ async function runInTerminal(cmds: string[], cwd: string, longRunning = false) {
     }
 
     const prefix = suppress ? ' ' : '';
-    cmds.forEach(cmd => termObj?.terminal?.sendText?.(`${prefix}${cmd}`));
+    const lines = cmds.slice();
+    if (autoCloseOnSuccess) {
+        lines.push(gitAutoCloseTrailerCmd(vscodeAPI));
+    }
+    lines.forEach(cmd => termObj?.terminal?.sendText?.(`${prefix}${cmd}`));
 }
