@@ -623,7 +623,7 @@ function rewriteSymlinkTarget(
     vscodeAPI: any,
     linkFs: string,
     newTargetAbs: string
-): 'ok' | 'elevated' | 'fail' {
+): 'ok' | 'elevated' | 'skip' | 'fail' {
     const rel = relativeSymlinkTarget(path.dirname(linkFs), newTargetAbs);
     let linkType: fs.symlink.Type;
     try {
@@ -649,6 +649,13 @@ function rewriteSymlinkTarget(
                 `rm -f "${fl}" && ln -s "${fr}" "${fl}"`
             );
             return 'elevated';
+        }
+        if (e?.code === 'ENOENT') {
+            // The link (or its parent directory) is already gone — nothing to relink.
+            // Drop the stale registry entry and continue with the remaining links.
+            knownLinks?.remove(linkFs);
+            console.log(`[relink:skip] ${linkFs}: no such file or directory`);
+            return 'skip';
         }
         vscodeAPI.window.showErrorMessage(`Relink: failed to rewrite symlink ${linkFs} — ${e}`);
         return 'fail';
@@ -724,11 +731,13 @@ async function renameAndRelink(vscodeAPI: any, uri?: vscode.Uri): Promise<void> 
 
     let ok = 0;
     let elevated = 0;
+    let skipped = 0;
     let failed = 0;
     for (const { linkFs, newTargetAbs } of inbound) {
         const r = rewriteSymlinkTarget(vscodeAPI, linkFs, newTargetAbs);
         if (r === 'ok') { ok++; }
         else if (r === 'elevated') { elevated++; }
+        else if (r === 'skip') { skipped++; }
         else { failed++; }
     }
 
@@ -737,8 +746,9 @@ async function renameAndRelink(vscodeAPI: any, uri?: vscode.Uri): Promise<void> 
     knownLinks?.renameLink(oldFs, newFs);
     knownLinks?.updateTarget(oldFs, newFs);
 
+    const actionable = inbound.length - skipped;
     const relinkSummary = inbound.length
-        ? `; relinked ${ok + elevated}/${inbound.length} link(s)${elevated ? ` (${elevated} elevated)` : ''}${failed ? `, ${failed} failed` : ''}`
+        ? `; relinked ${ok + elevated}/${actionable} link(s)${elevated ? ` (${elevated} elevated)` : ''}${skipped ? `, ${skipped} gone` : ''}${failed ? `, ${failed} failed` : ''}`
         : '; no inbound symlinks found';
     vscodeAPI.window.showInformationMessage(
         `Renamed "${oldBase}" → "${trimmed}"${relinkSummary}.`
