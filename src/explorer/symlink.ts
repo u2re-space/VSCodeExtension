@@ -18,6 +18,75 @@ function toPosixSegments(p: string): string {
 type ExistsPathFn = (p: string) => boolean;
 type RealpathFn = (p: string) => string;
 
+//
+// Known-links registry — persists link→target pairs created/normalized by this
+// extension so "Rename and relink" can update out-of-workspace links too.
+//
+type KnownLinksMap = Record<string, string>;
+
+interface KnownLinksRegistry {
+    get(): KnownLinksMap;
+    add(linkFs: string, targetFs: string): void;
+    remove(linkFs: string): void;
+    renameLink(oldLinkFs: string, newLinkFs: string): void;
+    updateTarget(oldTargetFs: string, newTargetFs: string): string[];
+}
+
+function createKnownLinksRegistry(context: vscode.ExtensionContext): KnownLinksRegistry {
+    const KEY = 'vext.symlink.knownLinks';
+    let cache: KnownLinksMap | undefined;
+
+    const load = (): KnownLinksMap => {
+        if (!cache) {
+            cache = (context.globalState.get(KEY) as KnownLinksMap | undefined) ?? {};
+        }
+        return cache;
+    };
+    const persist = (): void => {
+        const snap = { ...load() };
+        void context.globalState.update(KEY, snap);
+    };
+
+    return {
+        get: load,
+        add: (linkFs, targetFs) => {
+            const m = load();
+            m[path.resolve(linkFs)] = path.resolve(targetFs);
+            persist();
+        },
+        remove: (linkFs) => {
+            const m = load();
+            delete m[path.resolve(linkFs)];
+            persist();
+        },
+        renameLink: (oldLinkFs, newLinkFs) => {
+            const m = load();
+            const old = path.resolve(oldLinkFs);
+            if (Object.prototype.hasOwnProperty.call(m, old)) {
+                m[path.resolve(newLinkFs)] = m[old];
+                delete m[old];
+                persist();
+            }
+        },
+        updateTarget: (oldTargetFs, newTargetFs) => {
+            const m = load();
+            const old = path.resolve(oldTargetFs).toLowerCase();
+            const neu = path.resolve(newTargetFs);
+            const changed: string[] = [];
+            for (const [link, target] of Object.entries(m)) {
+                if (path.resolve(target).toLowerCase() === old) {
+                    m[link] = neu;
+                    changed.push(link);
+                }
+            }
+            if (changed.length) { persist(); }
+            return changed;
+        },
+    };
+}
+
+let knownLinks: KnownLinksRegistry | undefined;
+
 function pathExistsOrSymlink(p: string): boolean {
     try {
         fs.lstatSync(toFs(p));
@@ -314,6 +383,7 @@ async function createSymlinksFromSources(
         const r = tryCreateSymlinkWithRetry(vscodeAPI, dirToFs, linkPathFs, relTarget, linkType);
         if (r === 'ok' || r === 'elevated') {
             if (r === 'ok') { ok++; } else { elevated++; }
+            knownLinks?.add(linkPathFs, srcAbs);
             if (resolved.length === 1) {
                 singleLabel = path.basename(linkPathFs);
                 singleRel = relTarget;
@@ -396,6 +466,7 @@ function normalizeSymlinkTargetRebase(vscodeAPI: any, linkPath: string): void {
     try {
         fs.unlinkSync(linkPath);
         fs.symlinkSync(toFs(relTarget), linkPath, linkType);
+        knownLinks?.add(linkPath, resolvedTargetFs);
         vscodeAPI.window.showInformationMessage(`Normalize link: ${toPosixSegments(target)}  →  ${relTarget}`);
         console.log(`[normalize-link] ${linkPath}: ${target} → ${relTarget}`);
     } catch (e: any) {
@@ -423,13 +494,14 @@ function restoreSymlinkFromStub(
     const rawTarget = readStubLinkTarget(filePath);
     if (rawTarget === undefined) { return 'not-stub'; }
 
-    const { relTarget } = normalizeSymlinkTarget(filePath, rawTarget);
+    const { relTarget, resolvedTargetFs } = normalizeSymlinkTarget(filePath, rawTarget);
     // readStubLinkTarget already verified the target is an existing directory.
     const linkType: fs.symlink.Type = 'dir';
 
     try {
         fs.unlinkSync(filePath);
         fs.symlinkSync(toFs(relTarget), filePath, linkType);
+        knownLinks?.add(filePath, resolvedTargetFs);
         vscodeAPI.window.showInformationMessage(
             `Normalize link: restored symlink from stub → ${relTarget}`
         );
@@ -452,6 +524,225 @@ function restoreSymlinkFromStub(
         vscodeAPI.window.showErrorMessage(`Normalize link: failed to restore symlink from stub — ${e}`);
         return 'fail';
     }
+}
+
+//
+// Rename and relink
+//
+
+/** Resolved target of a symlink (absolute), regardless of absolute/relative raw target. */
+function resolveLinkTarget(linkFs: string): string | undefined {
+    let raw: string;
+    try {
+        raw = fs.readlinkSync(linkFs);
+    } catch {
+        return undefined;
+    }
+    const t = toFs(raw);
+    const dir = path.dirname(linkFs);
+    return path.isAbsolute(t) ? path.resolve(t) : path.resolve(dir, t);
+}
+
+/** Depth-first walk yielding symlink paths only (does not recurse into symlinked dirs). */
+function* walkSymlinks(rootFs: string): Generator<string> {
+    const stack: string[] = [rootFs];
+    while (stack.length) {
+        const dir = stack.pop() as string;
+        let entries: fs.Dirent[];
+        try {
+            entries = fs.readdirSync(dir, { withFileTypes: true });
+        } catch {
+            continue;
+        }
+        for (const e of entries) {
+            const full = path.join(dir, e.name);
+            if (e.isSymbolicLink()) {
+                yield full;
+            } else if (e.isDirectory()) {
+                stack.push(full);
+            }
+        }
+    }
+}
+
+type InboundMatch = { linkFs: string; newTargetAbs: string };
+
+/**
+ * Finds symlinks whose resolved target is the renamed resource or lives inside it
+ * (when renaming a directory). Searches workspace roots plus the known-links registry.
+ */
+function findInboundSymlinks(oldAbs: string, newAbs: string, roots: string[]): InboundMatch[] {
+    const isDir = (() => {
+        try {
+            return fs.statSync(oldAbs).isDirectory();
+        } catch {
+            return false;
+        }
+    })();
+    const lowerOld = oldAbs.toLowerCase();
+    const sepLower = path.sep.toLowerCase();
+    const lowerPrefix = lowerOld + sepLower;
+    const out: InboundMatch[] = [];
+    const seen = new Set<string>();
+
+    const newTargetFor = (resolved: string): string => {
+        if (resolved.toLowerCase() === lowerOld) {
+            return newAbs;
+        }
+        // resolved is inside the renamed directory: swap the prefix.
+        return newAbs + resolved.slice(oldAbs.length);
+    };
+    const consider = (linkFs: string): void => {
+        const key = linkFs.toLowerCase();
+        if (seen.has(key)) { return; }
+        const resolved = resolveLinkTarget(linkFs);
+        if (resolved === undefined) { return; }
+        const lr = resolved.toLowerCase();
+        const matches =
+            lr === lowerOld ||
+            (isDir && (lr + sepLower).startsWith(lowerPrefix));
+        if (!matches) { return; }
+        seen.add(key);
+        out.push({ linkFs, newTargetAbs: newTargetFor(resolved) });
+    };
+
+    for (const root of roots) {
+        for (const link of walkSymlinks(root)) {
+            consider(link);
+        }
+    }
+    if (knownLinks) {
+        for (const linkFs of Object.keys(knownLinks.get())) {
+            consider(linkFs);
+        }
+    }
+    return out;
+}
+
+function rewriteSymlinkTarget(
+    vscodeAPI: any,
+    linkFs: string,
+    newTargetAbs: string
+): 'ok' | 'elevated' | 'fail' {
+    const rel = relativeSymlinkTarget(path.dirname(linkFs), newTargetAbs);
+    let linkType: fs.symlink.Type;
+    try {
+        linkType = fs.statSync(newTargetAbs).isDirectory() ? 'dir' : 'file';
+    } catch {
+        linkType = 'file';
+    }
+    try {
+        fs.unlinkSync(linkFs);
+        fs.symlinkSync(toFs(rel), linkFs, linkType);
+        knownLinks?.add(linkFs, newTargetAbs);
+        return 'ok';
+    } catch (e: any) {
+        if (e?.code === 'EPERM' || e?.code === 'EACCES') {
+            const fwd = (s: string) => s.replace(/\\/g, '/');
+            const q = (s: string) => s.replace(/'/g, "''");
+            const fl = fwd(linkFs);
+            const fr = rel;
+            runElevated(
+                vscodeAPI,
+                path.dirname(linkFs),
+                `Remove-Item -Force '${q(fl)}'; New-Item -ItemType SymbolicLink -Path '${q(fl)}' -Target '${q(fr)}'`,
+                `rm -f "${fl}" && ln -s "${fr}" "${fl}"`
+            );
+            return 'elevated';
+        }
+        vscodeAPI.window.showErrorMessage(`Relink: failed to rewrite symlink ${linkFs} — ${e}`);
+        return 'fail';
+    }
+}
+
+async function renameAndRelink(vscodeAPI: any, uri?: vscode.Uri): Promise<void> {
+    if (!uri || !uri.fsPath) {
+        vscodeAPI.window.showErrorMessage(
+            'Rename and relink: invoke from the Explorer context menu on a file or directory.'
+        );
+        return;
+    }
+
+    const oldFs = path.resolve(uri.fsPath);
+    const oldBase = path.basename(oldFs);
+    const oldDir = path.dirname(oldFs);
+
+    if (!pathExistsOrSymlink(oldFs)) {
+        vscodeAPI.window.showErrorMessage(`Rename and relink: "${oldBase}" does not exist.`);
+        return;
+    }
+
+    const newName = await vscodeAPI.window.showInputBox({
+        prompt: 'New name. Inbound symlinks in the workspace (and known links) will be relinked.',
+        value: oldBase,
+        validateInput: (v: string) => {
+            const t = v.trim();
+            if (!t) { return 'Name cannot be empty.'; }
+            if (/[\\/]/.test(t)) { return 'Name must not contain path separators.'; }
+            if (t === oldBase) { return 'Enter a new name.'; }
+            return null;
+        },
+    });
+    if (newName === undefined) { return; }
+    const trimmed = newName.trim();
+    const newFs = path.join(oldDir, trimmed);
+
+    if (pathExistsOrSymlink(newFs)) {
+        const overwrite = await vscodeAPI.window.showWarningMessage(
+            `"${trimmed}" already exists. Overwrite it?`,
+            'Overwrite',
+            'Cancel'
+        );
+        if (overwrite !== 'Overwrite') { return; }
+    }
+
+    const roots = workspaceRoots(vscodeAPI);
+    const inbound = findInboundSymlinks(oldFs, newFs, roots);
+
+    try {
+        if (pathExistsOrSymlink(newFs)) {
+            fs.rmSync(newFs, { recursive: true, force: true });
+        }
+        fs.renameSync(oldFs, newFs);
+    } catch (e: any) {
+        if (e?.code === 'EPERM' || e?.code === 'EACCES') {
+            const fwd = (s: string) => s.replace(/\\/g, '/');
+            const q = (s: string) => s.replace(/'/g, "''");
+            const fo = fwd(oldFs);
+            const fn = fwd(newFs);
+            runElevated(
+                vscodeAPI,
+                oldDir,
+                `Rename-Item -Force '${q(fo)}' '${q(fn)}'`,
+                `mv -f "${fo}" "${fn}"`
+            );
+        } else {
+            vscodeAPI.window.showErrorMessage(`Rename and relink: failed to rename — ${e}`);
+            return;
+        }
+    }
+
+    let ok = 0;
+    let elevated = 0;
+    let failed = 0;
+    for (const { linkFs, newTargetAbs } of inbound) {
+        const r = rewriteSymlinkTarget(vscodeAPI, linkFs, newTargetAbs);
+        if (r === 'ok') { ok++; }
+        else if (r === 'elevated') { elevated++; }
+        else { failed++; }
+    }
+
+    // Keep the registry in sync: the resource may itself be a known link, and any
+    // registered link that targeted the old path now targets the new path.
+    knownLinks?.renameLink(oldFs, newFs);
+    knownLinks?.updateTarget(oldFs, newFs);
+
+    const relinkSummary = inbound.length
+        ? `; relinked ${ok + elevated}/${inbound.length} link(s)${elevated ? ` (${elevated} elevated)` : ''}${failed ? `, ${failed} failed` : ''}`
+        : '; no inbound symlinks found';
+    vscodeAPI.window.showInformationMessage(
+        `Renamed "${oldBase}" → "${trimmed}"${relinkSummary}.`
+    );
 }
 
 function isExplorerUri(x: unknown): x is vscode.Uri {
@@ -584,6 +875,7 @@ async function normalizeSymlinksFromExplorer(vscodeAPI: any, uris: vscode.Uri[])
 
 export async function symlink(context: vscode.ExtensionContext) {
     const vscodeAPI = await vscodePromise;
+    knownLinks = createKnownLinksRegistry(context);
 
     context.subscriptions.push(
         vscodeAPI.commands.registerCommand(
@@ -613,6 +905,22 @@ export async function symlink(context: vscode.ExtensionContext) {
             async (first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]) => {
                 await pickSourcesFromExplorerSelection(vscodeAPI, collectExplorerUris(first, ...rest));
             }
+        ),
+
+        vscodeAPI.commands.registerCommand(
+            'vext.symlink.renameRelink',
+            async (first?: vscode.Uri | vscode.Uri[], ...rest: unknown[]) => {
+                const list = collectExplorerUris(first, ...rest);
+                const primary = Array.isArray(first) ? undefined : first;
+                const target = primary ?? list[0];
+                if (!target) {
+                    vscodeAPI.window.showErrorMessage(
+                        'Rename and relink: select a file or directory in Explorer.'
+                    );
+                    return;
+                }
+                await renameAndRelink(vscodeAPI, target);
+            }
         )
     );
 }
@@ -623,6 +931,12 @@ export const __symlinkTest = {
     normalizeSymlinkTarget,
     linkPathForName,
     readStubLinkTarget,
+    resolveLinkTarget,
+    newTargetFor: (oldAbs: string, newAbs: string, resolved: string) => {
+        const lowerOld = oldAbs.toLowerCase();
+        if (resolved.toLowerCase() === lowerOld) { return newAbs; }
+        return newAbs + resolved.slice(oldAbs.length);
+    },
 };
 
 //

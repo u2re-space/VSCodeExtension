@@ -111,6 +111,34 @@ suite('Symlink path helpers', () => {
         assert.strictEqual(linkPath, path.join(dir, 'source (2)'));
     });
 
+    test('rename-and-relink swaps the renamed resource and rewrites targets inside it', () => {
+        const helpers = symlinkModule.__symlinkTest;
+        assert.ok(helpers, 'expected symlink test helpers to be exported');
+
+        const oldDir = path.resolve('/repo/assets/old-name');
+        const newDir = path.resolve('/repo/assets/new-name');
+
+        // Exact match → new resource path.
+        assert.strictEqual(
+            helpers.newTargetFor(oldDir, newDir, oldDir),
+            newDir
+        );
+
+        // A target inside the renamed directory keeps its suffix.
+        const insideTarget = path.join(oldDir, 'sub', 'icon.svg');
+        assert.strictEqual(
+            helpers.newTargetFor(oldDir, newDir, insideTarget),
+            path.join(newDir, 'sub', 'icon.svg')
+        );
+
+        // A sibling that only shares a name prefix is left untouched (not matched upstream).
+        const sibling = path.resolve('/repo/assets/old-name-extra');
+        assert.notStrictEqual(
+            helpers.newTargetFor(oldDir, newDir, sibling),
+            path.join(newDir, '-extra')
+        );
+    });
+
     test('readStubLinkTarget restores a stub file whose content is a directory path', () => {
         const helpers = symlinkModule.__symlinkTest;
         assert.ok(helpers, 'expected symlink test helpers to be exported');

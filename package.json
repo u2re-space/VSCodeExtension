@@ -4,7 +4,7 @@
     "description": "U2RE utils pack and toolkit",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.53",
+    "version": "0.0.54",
     "engines": {
         "vscode": "^1.105.1"
     },
@@ -36,6 +36,7 @@
         "onCommand:vext.symlink",
         "onCommand:vext.symlink.pickSources",
         "onCommand:vext.symlink.abs2rel",
+        "onCommand:vext.symlink.renameRelink",
         "onView:vext.managerView",
         "onCommand:vext.openManagerPanel"
     ],
@@ -55,8 +56,12 @@
                     "group": "5_cutcopypaste@2"
                 },
                 {
+                    "command": "vext.symlink.renameRelink",
+                    "group": "5_cutcopypaste@3"
+                },
+                {
                     "submenu": "vext.submenu.explorerCustomActions",
-                    "group": "5_cutcopypaste@3",
+                    "group": "5_cutcopypaste@4",
                     "when": "config.vext.explorer.customActions.enableSubmenu && (config.vext.explorer.customAction1.enabled || config.vext.explorer.customAction2.enabled || config.vext.explorer.customAction3.enabled)"
                 }
             ],
@@ -567,6 +572,11 @@
             {
                 "command": "vext.symlink.abs2rel",
                 "title": "Normalize link",
+                "icon": "$(file-symlink-file)"
+            },
+            {
+                "command": "vext.symlink.renameRelink",
+                "title": "Rename and relink",
                 "icon": "$(file-symlink-file)"
             },
             {
