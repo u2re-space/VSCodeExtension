@@ -1,12 +1,26 @@
 {
     "name": "U2RE-toolset",
-    "displayName": "U2RE utils pack and toolkit",
-    "description": "U2RE utils pack and toolkit",
+    "displayName": "U2RE tools and utilities",
+    "description": "U2RE tools and utilities for VSCode",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.55",
+    "version": "0.0.56",
     "engines": {
-        "vscode": "^1.105.1"
+        "vscode": "^1.125.0"
+    },
+    "keywords": [
+        "U2RE",
+        "tools",
+        "utilities",
+        "extension"
+    ],
+    "homepage": "https://github.com/u2re-space/VSCodeExtension",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/u2re-space/VSCodeExtension"
+    },
+    "bugs": {
+        "url": "https://github.com/u2re-space/VSCodeExtension/issues"
     },
     "icon": "./assets/service.png",
     "categories": [
@@ -32,13 +46,7 @@
     ],
     "main": "./dist/extension.mjs",
     "activationEvents": [
-        "onStartupFinished",
-        "onCommand:vext.symlink",
-        "onCommand:vext.symlink.pickSources",
-        "onCommand:vext.symlink.abs2rel",
-        "onCommand:vext.symlink.renameRelink",
-        "onView:vext.managerView",
-        "onCommand:vext.openManagerPanel"
+        "onStartupFinished"
     ],
     "contributes": {
         "menus": {
@@ -677,7 +685,7 @@
     "devDependencies": {
         "@types/mocha": "^10.0.10",
         "@types/node": "^20.17.57",
-        "@types/vscode": "^1.105.1",
+        "@types/vscode": "^1.125.0",
         "@typescript-eslint/eslint-plugin": "^8.10.0",
         "@typescript-eslint/parser": "^8.7.0",
         "@vscode/markdown-it-katex": "^1.1.2",
