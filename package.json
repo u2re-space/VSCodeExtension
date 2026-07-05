@@ -4,7 +4,7 @@
     "description": "U2RE tools and utilities for VSCode",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.56",
+    "version": "0.0.57",
     "engines": {
         "vscode": "^1.125.0"
     },
@@ -683,13 +683,11 @@
         "test": "vscode-test"
     },
     "devDependencies": {
-        "@types/mocha": "^10.0.10",
         "@types/node": "^20.17.57",
         "@types/vscode": "^1.125.0",
         "@typescript-eslint/eslint-plugin": "^8.10.0",
         "@typescript-eslint/parser": "^8.7.0",
         "@vscode/markdown-it-katex": "^1.1.2",
-        "@vscode/test-cli": "^0.0.10",
         "@vscode/test-electron": "^2.5.2",
         "@vscode/vsce": "^3.9.1",
         "esbuild": "^0.25.5",

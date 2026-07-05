@@ -9,8 +9,7 @@ export default [{
     languageOptions: {
         globals: {
             ...globals.commonjs,
-            ...globals.node,
-            ...globals.mocha,
+            ...globals.node
         },
         parser: tsParser,
         sourceType: "module",
