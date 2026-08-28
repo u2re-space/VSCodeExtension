@@ -4,7 +4,7 @@
     "description": "U2RE tools and utilities for VSCode",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.57",
+    "version": "0.0.58",
     "engines": {
         "vscode": "^1.125.0"
     },
