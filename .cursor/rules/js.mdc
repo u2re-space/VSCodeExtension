@@ -1,0 +1,16 @@
+---
+description: TS/JS conventions for this extension
+globs: "**/*.{ts,tsx,js,mjs}"
+alwaysApply: false
+---
+
+# JS/TS
+
+- Preserve runtime behavior and public command contracts (`vext.*`).
+- Load the `vscode` module only via `src/imports/api.ts`. For types: `import type * as vscode from "vscode"`.
+- Keep `.ts` extensions in local imports (`allowImportingTsExtensions`).
+- Prefer `const`, explicit public types, `unknown` + guards over `any`.
+- Reuse helpers in `src/imports/` before adding new modules. Manager webview client is `icons/actions.mjs` (`acquireVsCodeApi` + `postMessage`).
+- No new dependencies for simple refactors. No empty `catch` unless asked.
+
+After substantive edits: `npm run lint` and `npm run build`.

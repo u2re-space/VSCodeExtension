@@ -5,8 +5,23 @@
         "dist": false // set this to true to hide the "dist" folder with the compiled JS files
     },
     "search.exclude": {
-        "out": true, // set this to false to include "out" folder in search results
-        "dist": true // set this to false to include "dist" folder in search results
+        "out": true,
+        "dist": true,
+        "dev-dist": true,
+        "artifacts": true,
+        "node_modules": true,
+        "**/*.vsix": true,
+        "**/*.map": true
+    },
+    "search.followSymlinks": false,
+    "search.useIgnoreFiles": true,
+    "files.watcherExclude": {
+        "**/dist/**": true,
+        "**/out/**": true,
+        "**/dev-dist/**": true,
+        "**/artifacts/**": true,
+        "**/node_modules/**": true,
+        "**/.git/objects/**": true
     },
     // Turn off tsc task auto detection since we have the necessary tasks as npm scripts
     "typescript.tsc.autoDetect": "off",

@@ -1,0 +1,24 @@
+---
+description: U2RE-toolset always-on routing and invariants
+alwaysApply: true
+---
+
+# U2RE-toolset
+
+VS Code/Cursor extension (`u2re-dev`, commands `vext.*`). Chromium-class host.
+Entry: `src/extension.mjs`. Do not treat this tree as a fest workspace.
+
+## Locate
+
+1. Read `.cursor/maps/index.md`.
+2. Open one mapped file; grep there first.
+3. Repo-wide search last. Skip `dist/`, `out/`, `artifacts/`, `node_modules/`.
+
+Durable facts: `.cursor/memory.md` — read or append only when a fact must survive this chat (cap ~40 lines). Do not copy maps into memory.
+
+## Invariants
+
+- One canonical implementation; no parallel helpers.
+- Preserve behavior unless the task asks to change it.
+- Small, reviewable diffs. Ask if consolidation is ambiguous.
+

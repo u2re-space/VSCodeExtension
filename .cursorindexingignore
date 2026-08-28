@@ -1,0 +1,8 @@
+# Semantic-index skip only. Files stay @-readable.
+
+CHANGELOG.md
+LICENSE
+vsc-extension-quickstart.md
+*.map
+package-lock.json
+duotone

@@ -1,0 +1,13 @@
+---
+description: CSS for extension webviews and icon sheets
+globs: "**/*.{css,scss,sass}"
+alwaysApply: false
+---
+
+# CSS
+
+- Preserve computed/visual output unless the task asks to change it.
+- Prefer VS Code theme tokens (`--vscode-*`) over hardcoded colors.
+- Low specificity; avoid `!important` and class/DOM renames.
+- Dedupe while editing; keep one canonical rule per concern.
+- Webview CSS may live inline next to CSP/nonce (`src/web/webview.mjs`, `src/views/webview.ts`).
