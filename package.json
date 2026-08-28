@@ -254,11 +254,14 @@
                 "vext.managerView.primaryActions": {
                     "type": "array",
                     "default": [
-                        "open-dir",
                         "terminal",
+                        "open-dir",
                         "dev",
                         "build",
-                        "install"
+                        "watch",
+                        "publish",
+                        "install",
+                        "push"
                     ],
                     "items": {
                         "type": "string"

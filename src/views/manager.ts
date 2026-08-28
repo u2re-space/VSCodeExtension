@@ -897,6 +897,7 @@ async function handleWebviewMessage(
         'restart': ['npm run restart'],
         'stop': ['npm run stop'],
         'diff': ['git diff'],
+        'publish': ['npm run build && npm run publish'],
         'install': getInstallCommands(),
         'audit-fix': ['npm audit fix'],
         'install-fix': ['npm install -D', 'npm audit fix']

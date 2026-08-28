@@ -583,11 +583,39 @@ button.danger:focus {
     grid-column: 5;
 }
 
+/* Closed: keep UA hide. Open: unwrap ::details-content so the list can overlay left.
+   content-visibility:visible on a closed details is what made every flyout stay painted. */
+.more-menu:not([open])::details-content {
+    display: none;
+    content-visibility: hidden;
+}
+
+.more-menu[open]::details-content {
+    display: contents;
+    overflow: visible;
+    content-visibility: visible;
+    contain: none;
+    height: auto;
+    block-size: auto;
+}
+
+.more-menu,
+.more-menu[open] .more-menu-list,
+.more-menu[open] .more-menu-list > button {
+    max-inline-size: none;
+}
+
 .more-menu {
     position: relative;
     background: var(--button-bg);
     border-radius: 0.5rem;
     margin-inline-start: 0.5rem;
+    overflow: visible;
+    z-index: 3;
+}
+
+.more-menu[open] {
+    z-index: 6;
 }
 
 .more-menu > summary {
@@ -605,22 +633,58 @@ button.danger:focus {
 }
 
 .more-menu-list {
+    display: none;
+}
+
+.more-menu[open] .more-menu-list {
     position: absolute;
-    inset-inline-end: calc(100% + 0.25rem);
+    inset-inline-end: 100%;
+    inset-inline-start: auto;
     inset-block-start: 0;
-    display: grid;
-    grid-auto-flow: column;
+    inset-block-end: auto;
+    margin-inline-end: 0.25rem;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    inline-size: max-content;
+    width: max-content;
+    max-inline-size: none;
+    min-inline-size: 0;
     background: var(--background);
     border: 1px solid var(--border);
     border-radius: 0.5rem;
     box-shadow: var(--button-shadow);
     overflow: visible;
-    z-index: 5;
-    flex-direction: row;
+    z-index: 6;
 }
 
-.more-menu-list > button {
+.more-menu[open] .more-menu-list > button {
     border-radius: 0;
+    max-inline-size: none;
+}
+
+/* Row name stays under the left-opening flyout; do not clip it. */
+table:has(.more-menu[open]),
+tr:has(.more-menu[open]),
+td:has(.more-menu[open]),
+.actions-container:has(.more-menu[open]) {
+    overflow: visible;
+    clip-path: none;
+    content-visibility: visible;
+}
+
+body.has-more-overlay::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: color-mix(in srgb, var(--background) 45%, transparent);
+    z-index: 4;
+    pointer-events: auto;
+}
+
+body.has-more-overlay table {
+    position: relative;
+    z-index: 5;
 }
 
 button:first-child, .actions-container button:first-child {

@@ -135,6 +135,18 @@ function renderToolbar() {
     toolbarButtons = Array.from(document.querySelectorAll(".toolbar-actions button[data-command]"));
 }
 
+function syncMoreOverlay() {
+    const open = Boolean(document.querySelector(".more-menu[open]"));
+    document.body.classList.toggle("has-more-overlay", open);
+}
+
+function closeOtherMoreMenus(keep) {
+    document.querySelectorAll(".more-menu[open]").forEach((el) => {
+        if (el !== keep) { el.removeAttribute("open"); }
+    });
+    syncMoreOverlay();
+}
+
 function renderMoreMenu(secondary, moduleName) {
     const details = document.createElement("details");
     details.className = "more-menu";
@@ -151,6 +163,10 @@ function renderMoreMenu(secondary, moduleName) {
     });
 
     details.appendChild(menu);
+    details.addEventListener("toggle", () => {
+        if (details.open) { closeOtherMoreMenus(details); }
+        else { syncMoreOverlay(); }
+    });
     return details;
 }
 
@@ -214,6 +230,7 @@ function renderModules(modules = []) {
         tbody.appendChild(tr);
     }
     rows = Array.from(document.querySelectorAll("tr"));
+    syncMoreOverlay();
 }
 
 let toolbar = null;
@@ -256,9 +273,16 @@ function focusRow(idx, e) {
 document.body.addEventListener("click", (e) => {
     // @ts-ignore
     const btn = e?.target?.closest?.("button[data-command]");
-    if (!btn) { return; }
+    if (btn) {
+        // @ts-ignore
+        send(btn.dataset.command, btn.dataset.module || "");
+        btn.closest?.(".more-menu")?.removeAttribute?.("open");
+        syncMoreOverlay();
+        return;
+    }
     // @ts-ignore
-    send(btn.dataset.command, btn.dataset.module || "");
+    const menu = e?.target?.closest?.(".more-menu");
+    if (!menu) { closeOtherMoreMenus(null); }
 });
 
 document.body.addEventListener("keydown", (e) => {

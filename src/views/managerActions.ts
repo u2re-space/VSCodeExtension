@@ -30,9 +30,11 @@ export interface ManagerActionDef {
 
 export const DEFAULT_PRIMARY_ACTIONS: string[] = [
     "terminal",
+    "open-dir",
     "dev",
-    "test",
     "build",
+    "watch",
+    "publish",
     "install",
     "push"
 ];
@@ -44,17 +46,18 @@ export const DEFAULT_BULK_ACTIONS: string[] = [
 ];
 
 export const MANAGER_ACTIONS: ManagerActionDef[] = [
-    { id: "open-dir", title: "Open", group: "navigate", icon: "folder-open", scope: "row" },
     { id: "terminal", title: "Terminal", group: "run", icon: "terminal-window", scope: "row", primary: true },
+    { id: "open-dir", title: "Open", group: "navigate", icon: "folder-open", scope: "row", primary: true },
     { id: "dev", title: "Dev Serve", group: "run", icon: "rocket-launch", scope: "row", primary: true },
     { id: "build", title: "Build", group: "build", icon: "package", scope: "row", primary: true },
-    { id: "test", title: "Test", group: "build", icon: "flask", scope: "row", primary: true },
-    { id: "watch", title: "Watch", group: "run", icon: "eye", scope: "row" },
+    { id: "watch", title: "Watch", group: "run", icon: "eye", scope: "row", primary: true },
+    { id: "publish", title: "Publish", group: "setup", icon: "upload-simple", scope: "row", primary: true },
+    { id: "install", title: "Install", group: "setup", icon: "download-simple", scope: "row", primary: true },
+    { id: "push", title: "Commit & push", group: "git", icon: "git-commit", scope: "row", primary: true, requiresConfirm: true },
+    { id: "test", title: "Test", group: "build", icon: "flask", scope: "row" },
     { id: "restart", title: "Restart", group: "run", icon: "arrow-clockwise", scope: "row" },
     { id: "stop", title: "Stop", group: "run", icon: "stop-circle", scope: "row" },
     { id: "diff", title: "Git diff", group: "git", icon: "git-diff", scope: "row" },
-    { id: "install", title: "Install", group: "setup", icon: "download-simple", scope: "row", primary: true },
-    { id: "push", title: "Git push", group: "git", icon: "git-commit", scope: "row", primary: true, requiresConfirm: true },
     { id: "audit-fix", title: "Audit fix", group: "smart", icon: "shield-check", scope: "row", smart: true },
     { id: "install-fix", title: "Install + audit fix", group: "smart", icon: "wrench", scope: "row", smart: true },
     { id: "copy-file-content", title: "Copy active file content", group: "smart", icon: "file-text", scope: "row", smart: true },
