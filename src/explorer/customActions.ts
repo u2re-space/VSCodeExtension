@@ -231,7 +231,7 @@ async function runAction(index: (typeof ACTION_IDS)[number], uri?: vscode.Uri): 
 
 async function updateActionContexts(): Promise<void> {
     const vscodeAPI = await vscodePromise;
-    const section = vscodeAPI.workspace.getConfiguration("vext");
+    const section = vscodeAPI.workspace.getConfiguration("vext") as vscode.WorkspaceConfiguration;
     const submenuEnabled = section.get<boolean>(GLOBAL_EXPLORER_CONFIG, true);
     let anyEnabled = false;
 

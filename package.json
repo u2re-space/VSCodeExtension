@@ -4,7 +4,7 @@
     "description": "U2RE tools and utilities for VSCode",
     "publisher": "u2re-dev",
     "readme": "./README.md",
-    "version": "0.0.58",
+    "version": "0.0.60",
     "engines": {
         "vscode": "^1.125.0"
     },
@@ -704,5 +704,11 @@
         "tsx": "^4.19.4",
         "turndown": "^7.2.0",
         "typescript": "^5.8.3"
+    },
+    "allowScripts": {
+        "@vscode/vsce-sign@2.1.0": true,
+        "esbuild@0.25.12": true,
+        "esbuild@0.28.2": true,
+        "keytar@7.9.0": true
     }
 }

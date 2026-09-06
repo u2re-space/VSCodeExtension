@@ -152,7 +152,7 @@ export class CustomSidebarViewProvider {
     constructor(extensionUri) { this._extensionUri = extensionUri; }
 
     //
-    resolveWebviewView(webviewView, context, token) {
+    resolveWebviewView(webviewView) {
         this._view = webviewView;
         webviewView.webview.options = { enableScripts: true, localResourceRoots: [this._extensionUri] };
 

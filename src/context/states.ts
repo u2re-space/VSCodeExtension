@@ -6,16 +6,12 @@ import vscodePromise from '../imports/api.ts';
 
 //
 const makeDebouncer = (delay: number = 1000)=>{
-    let timer: NodeJS.Timeout | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     return (fn: ()=>void)=>{
         if (timer) { clearTimeout(timer); timer = undefined; }
         timer = setTimeout(fn, delay);
     };
 };
-
-//
-const cmdDBN = makeDebouncer();
-const ctxDBN = makeDebouncer();
 
 //
 const redDBN = makeDebouncer(100);
@@ -99,8 +95,8 @@ export async function contexts(context: vscode.ExtensionContext) {
     //
     context?.subscriptions?.push?.(
         vscode?.workspace?.onDidChangeTextDocument?.((ev)=>{
-            if (ev?.reason == 2) { changeFlags.redo = true; redDBN(()=>(changeFlags.redo = false)); };
-            if (ev?.reason == 1) { changeFlags.undo = true; undDBN(()=>(changeFlags.undo = false));  };
+            if (ev?.reason === 2) { changeFlags.redo = true; redDBN(()=>(changeFlags.redo = false)); };
+            if (ev?.reason === 1) { changeFlags.undo = true; undDBN(()=>(changeFlags.undo = false));  };
         })
     );
 

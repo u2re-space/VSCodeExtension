@@ -19,10 +19,6 @@ const turndownService = new TurndownService();
 const MATH_DELIMITER_PATTERN = /\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\]|(?<!\$)\$[^$\n]+\$|\\\([\s\S]*?\\\)/;
 const FENCED_CODE_PATTERN = /(^|\n)(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n\2(?=\n|$)/g;
 const INLINE_CODE_PATTERN = /`[^`\n]+`/g;
-const SANITIZE_OPTIONS = {
-    FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "applet", "link", "meta", "base", "form", "noscript", "template"],
-    FORBID_CONTENTS: ["script", "style", "iframe", "object", "embed", "applet", "noscript", "template"]
-};
 
 //
 function maskCodeSegments(markdown: string): { masked: string; restore: (value: string) => string } {
@@ -68,7 +64,9 @@ try {
                 }
     
                 const { masked, restore } = maskCodeSegments(markdown);
-                const katexNode = document.createElement("div");
+                const doc = globalThis.document;
+                if (!doc) { return markdown; }
+                const katexNode = doc.createElement("div");
                 // Code fragments are masked above, so HTML here is only from non-code markdown.
                 katexNode.innerHTML = masked;
                 renderMathInElement(katexNode, {

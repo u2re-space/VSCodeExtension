@@ -7,7 +7,7 @@
 | `src/imports/api.ts` | default Promise of `vscode` (`createRequire`; webview `acquireVsCodeApi`) |
 | `src/imports/utils.ts` | `getSelection`, `replaceSelectionWith` |
 | `src/imports/str.ts` | `dummy`, `weak_dummy`, `tryXML`, `stripMathDelimiters`, `escapeML` |
-| `src/views/manager.ts` | `ManagerViewProvider`, `manager()`; `scanWorkspaceModules` / `runModuleScan`; `handleWebviewMessage`; persist `vext.managerModulesCacheV2` |
+| `src/views/manager.ts` | `ManagerViewProvider`, `manager()`; `scanWorkspaceModules` / `runModuleScan`; `handleWebviewMessage`; persist `vext.managerModulesCacheV2`; project symlinks resolve to workspace-relative realpath (`../name`, `__managerTest`) |
 | `src/views/managerActions.ts` | `MANAGER_ACTIONS`, `getManagerUiConfig`, `getFilteredActions`, `resolveTheme` |
 | `src/views/webview.ts` | `getWebviewContent`, `getMinimalManagerFallbackHtml` |
 | `icons/actions.mjs` | Manager UI client; `postMessage` (`ready`, action ids, `webviewError`) |

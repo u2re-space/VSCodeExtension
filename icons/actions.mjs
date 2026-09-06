@@ -170,21 +170,42 @@ function renderMoreMenu(secondary, moduleName) {
     return details;
 }
 
+function asModuleView(m) {
+    if (m && typeof m === "object") {
+        const p = String(m.path || "./");
+        return { path: p, label: String(m.label || p) };
+    }
+    const s = String(m || "./");
+    return { path: s, label: s };
+}
+
 function renderModules(modules = []) {
     const tbody = document.getElementById("modulesTbody");
     if (!tbody) { return; }
     const rowActions = getRowActions();
-    const list = Array.from(new Set(["./", ...(modules || [])].filter(Boolean)));
+    const seen = new Set();
+    const list = [];
+    for (const raw of ["./", ...(modules || [])]) {
+        if (raw == null || raw === "") { continue; }
+        const view = asModuleView(raw);
+        const key = view.path.replace(/\\/g, "/").toLowerCase();
+        if (seen.has(key)) { continue; }
+        seen.add(key);
+        list.push(view);
+    }
     tbody.textContent = "";
 
-    for (const m of list) {
+    for (const { path: m, label } of list) {
         const tr = document.createElement("tr");
         tr.tabIndex = 0;
         tr.dataset.module = m;
 
         const tdName = document.createElement("td");
         tdName.className = "name";
-        tdName.textContent = m;
+        tdName.textContent = label;
+        if (label !== m) {
+            tdName.title = m;
+        }
 
         const tdActions = document.createElement("td");
         tdActions.className = "actions";

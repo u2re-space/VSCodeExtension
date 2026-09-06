@@ -20,7 +20,8 @@ const getVsCodeApi = () => {
     // Webview (browser): fallback to acquireVsCodeApi
     try {
         // @ts-ignore
-        if (typeof acquireVsCodeApi !== "undefined") { return acquireVsCodeApi?.(); }
+        const acquire = globalThis.acquireVsCodeApi;
+        if (typeof acquire === "function") { return acquire(); }
     } catch (e) {
         console.warn(e);
     }
