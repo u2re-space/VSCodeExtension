@@ -263,4 +263,45 @@ suite('agent bus', () => {
         assert.strictEqual(scheduled[1].ms, 4000);
         bus.close();
     });
+
+    test('ignores run.started before a local start', () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        FakeSocket.latest.receive({ type: 'run.started', run: { id: 'r1', command: 'run', status: 'running' } });
+        const result = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(result.frames.length, 1);
+        assert.strictEqual(result.frames[0].type, 'start');
+        bus.close();
+    });
+
+    test('clears starting phase after a drop so submit can start again', () => {
+        const scheduled = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        FakeSocket.latest.close(1006);
+        scheduled[0].fn();
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        const result = bus.submit({ command: 'run', prompt: 'again', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(result.error, undefined);
+        assert.strictEqual(result.frames[0].type, 'start');
+        bus.close();
+    });
 });

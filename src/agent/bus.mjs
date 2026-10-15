@@ -10,6 +10,12 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
     let timer = null;
     let phase = 'idle';
 
+    const clearStartingPhase = () => {
+        if (phase === 'starting') {
+            phase = 'idle';
+        }
+    };
+
     const status = (state, detail = '') => {
         onStatus?.({ type: 'status', state, detail });
     };
@@ -52,7 +58,7 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             if (frame.type === 'error' && frame.code === 'unauthorized') {
                 unauthorized = true;
             }
-            if (frame.type === 'run.started' && frame.run) {
+            if (frame.type === 'run.started' && frame.run && phase === 'starting') {
                 phase = { runId: frame.run.id, command: frame.run.command };
             }
             if (frame.type === 'run.ended' && phase && phase.runId === frame.runId) {
@@ -64,6 +70,7 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             if (gen !== generation) {
                 return;
             }
+            clearStartingPhase();
             socket = null;
             if (stopped || unauthorized || event?.code === 1008) {
                 if (event?.code === 1008) {
@@ -88,6 +95,7 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
 
     return {
         connect(next) {
+            clearStartingPhase();
             stopped = false;
             unauthorized = false;
             delay = 0;
@@ -104,6 +112,7 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             open();
         },
         close() {
+            clearStartingPhase();
             stopped = true;
             generation += 1;
             if (timer) {
