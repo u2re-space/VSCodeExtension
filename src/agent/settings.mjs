@@ -4,7 +4,8 @@ export function readAgentSettings(get) {
     const portValue = get('vext.agent.port');
     const port = Number.isInteger(portValue) && portValue >= 0 && portValue <= 65535 ? portValue : 0;
     const debounceValue = get('vext.agent.completion.debounceMs');
-    const debounceMs = typeof debounceValue === 'number' && Number.isFinite(debounceValue) && debounceValue >= 0 ? debounceValue : 350;
+    const parsedDebounce = typeof debounceValue === 'number' && Number.isFinite(debounceValue) && debounceValue >= 0 ? debounceValue : 1000;
+    const debounceMs = Math.max(1000, parsedDebounce);
     const approveValue = get('vext.agent.approve');
     return {
         port,

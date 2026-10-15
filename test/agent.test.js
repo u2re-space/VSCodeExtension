@@ -506,6 +506,10 @@ suite('agent panel', () => {
         assert.match(html, /id="prompt"/);
         assert.match(html, /id="log"/);
         assert.match(html, /agent-body/);
+        assert.match(html, /class="more-menu"/);
+        assert.match(html, /ph-rocket-launch/);
+        assert.match(html, /ph-arrow-clockwise/);
+        assert.match(html, /actions-container/);
     });
 });
 
@@ -524,7 +528,7 @@ suite('agent settings', () => {
         ]);
         const settings = readAgentSettings((key) => values.get(key));
         assert.strictEqual(settings.port, 8765);
-        assert.strictEqual(settings.approve, 'ask');
+        assert.strictEqual(settings.debounceMs, 1000);
         assert.deepStrictEqual(spawnArgs(settings), ['serve', '--port', '8765']);
         assert.deepStrictEqual(spawnArgs({ ...settings, port: 0 }), ['serve']);
         const env = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiApiKey: 'secret' });
@@ -565,7 +569,7 @@ suite('agent settings', () => {
         assert.ok(pkg.contributes.views.agentView.some((view) => view.id === 'vext.agentView'));
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
-        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 350);
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 1000);
         for (const key of ['vext.agent.command', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
             assert.strictEqual(pkg.contributes.configuration.properties[key].scope, 'machine');
         }

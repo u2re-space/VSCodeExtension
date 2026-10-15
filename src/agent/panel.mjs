@@ -1,3 +1,4 @@
+import { getManagerUiConfig, resolveTheme } from '../views/managerActions.ts';
 import { agentHtml } from './html.mjs';
 
 const nonce32 = () => {
@@ -24,7 +25,8 @@ export class AgentViewProvider {
         const nonce = nonce32();
         const cssHref = String(webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'icons', 'webview.css')));
         const scriptHref = String(webview.asWebviewUri(vscode.Uri.joinPath(this._extensionUri, 'icons', 'agent.mjs')));
-        webview.html = agentHtml({ cssHref, scriptHref, nonce, cspSource: webview.cspSource });
+        const theme = resolveTheme(vscode, getManagerUiConfig(vscode).theme);
+        webview.html = agentHtml({ cssHref, scriptHref, nonce, cspSource: webview.cspSource, theme });
         this._session.attach(webview);
         const disposable = webview.onDidReceiveMessage((message) => {
             this._session.onWebview(message);

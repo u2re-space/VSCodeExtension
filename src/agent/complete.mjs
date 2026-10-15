@@ -147,6 +147,8 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
 
 export function registerAgentCompletion(vscode, client, getSettings, onError) {
     let seq = 0;
+    let lastSentAt = 0;
+    let inFlight = false;
     return vscode.languages.registerInlineCompletionItemProvider(
         [{ scheme: 'file' }, { scheme: 'untitled' }],
         {
@@ -159,25 +161,24 @@ export function registerAgentCompletion(vscode, client, getSettings, onError) {
                 if (cancelled || token?.isCancellationRequested) {
                     return { items: [] };
                 }
-                const id = String(++seq);
-                const filePath = document.uri.scheme === 'file' ? document.uri.fsPath : undefined;
-                let body;
+                if (inFlight || Date.now() - lastSentAt < settings.debounceMs) {
+                    return { items: [] };
+                }
+                lastSentAt = Date.now();
+                inFlight = true;
                 try {
-                    body = completionRequest({
+                    const id = String(++seq);
+                    const filePath = document.uri.scheme === 'file' ? document.uri.fsPath : undefined;
+                    const body = completionRequest({
                         id,
                         language: document.languageId,
                         path: filePath,
                         text: document.getText(),
                         cursor: { line: position.line, character: position.character },
                     });
-                } catch (error) {
-                    onError?.(error?.message || 'Ошибка дополнения.');
-                    return { items: [] };
-                }
-                if (!body) {
-                    return { items: [] };
-                }
-                try {
+                    if (!body) {
+                        return { items: [] };
+                    }
                     const text = await client.request(body, token);
                     if (!text) {
                         return { items: [] };
@@ -186,6 +187,8 @@ export function registerAgentCompletion(vscode, client, getSettings, onError) {
                 } catch (error) {
                     onError?.(error?.message || 'Ошибка дополнения.');
                     return { items: [] };
+                } finally {
+                    inFlight = false;
                 }
             },
         },

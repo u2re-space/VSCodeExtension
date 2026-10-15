@@ -2,8 +2,34 @@ const vscode = acquireVsCodeApi();
 const status = document.getElementById('status');
 const log = document.getElementById('log');
 const approval = document.getElementById('approval');
+const approvalText = document.getElementById('approvalText');
+const approvalInput = document.getElementById('approvalInput');
+const approvalActions = document.getElementById('approvalActions');
 const prompt = document.getElementById('prompt');
 const stop = document.getElementById('stop');
+
+const icon = (name) => {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', 'ph-icon');
+    svg.setAttribute('viewBox', '0 0 256 256');
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#ph-${name}`);
+    svg.appendChild(use);
+    return svg;
+};
+
+const choice = (decision, glyph, dangerous) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.title = decision;
+    button.setAttribute('aria-label', decision);
+    if (dangerous) {
+        button.classList.add('danger');
+    }
+    button.appendChild(icon(glyph));
+    return button;
+};
 
 const append = (className, text) => {
     const row = document.createElement('div');
@@ -37,7 +63,9 @@ window.addEventListener('message', (event) => {
         return;
     }
     if (message.type === 'status') {
-        status.textContent = message.detail || message.state;
+        const text = message.detail || message.state;
+        status.textContent = text;
+        status.title = text;
         return;
     }
     if (message.type === 'stopVisible') {
@@ -64,43 +92,56 @@ window.addEventListener('message', (event) => {
     if (message.type === 'run' && message.status === 'ended') {
         append('info', `завершено (${message.exitCode})`);
         approval.hidden = true;
-        approval.replaceChildren();
+        approvalText.textContent = '';
+        approvalInput.hidden = true;
+        approvalInput.value = '';
+        approvalActions.replaceChildren();
         return;
     }
     if (message.type === 'approval') {
         approval.hidden = false;
-        approval.replaceChildren();
-        const title = document.createElement('div');
-        title.textContent = `${message.name || 'действие'} · ${message.category || ''} ${message.preview || ''}`.trim();
-        approval.appendChild(title);
-        for (const decision of ['yes', 'no', 'always', 'abort']) {
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.textContent = decision;
+        approvalInput.hidden = true;
+        approvalText.textContent = `${message.name || 'действие'} · ${message.category || ''} ${message.preview || ''}`.trim();
+        approvalActions.replaceChildren();
+        const choices = [
+            ['yes', 'check', false],
+            ['no', 'x', true],
+            ['always', 'shield-check', false],
+            ['abort', 'stop-circle', true],
+        ];
+        for (const [decision, glyph, dangerous] of choices) {
+            const button = choice(decision, glyph, dangerous);
             button.addEventListener('click', () => {
                 vscode.postMessage({ type: 'approve', requestId: message.requestId, decision });
                 approval.hidden = true;
             });
-            approval.appendChild(button);
+            approvalActions.appendChild(button);
         }
         return;
     }
     if (message.type === 'question') {
         approval.hidden = false;
-        approval.replaceChildren();
-        const title = document.createElement('div');
-        title.textContent = message.question;
-        const input = document.createElement('input');
-        input.type = 'text';
+        approvalText.textContent = message.question;
+        approvalInput.hidden = false;
+        approvalInput.value = '';
+        approvalActions.replaceChildren();
         const send = document.createElement('button');
         send.type = 'button';
-        send.textContent = 'Ответить';
+        send.title = 'Ответить';
+        send.setAttribute('aria-label', 'Ответить');
+        send.appendChild(icon('paper-plane-tilt'));
         send.addEventListener('click', () => {
-            vscode.postMessage({ type: 'answer', requestId: message.requestId, text: input.value });
+            vscode.postMessage({ type: 'answer', requestId: message.requestId, text: approvalInput.value });
             approval.hidden = true;
+            approvalInput.hidden = true;
         });
-        approval.append(title, input, send);
+        approvalActions.append(send);
     }
+});
+
+const more = document.querySelector('.more-menu');
+more?.addEventListener('toggle', () => {
+    document.body.classList.toggle('has-more-overlay', Boolean(more.open));
 });
 
 vscode.postMessage({ type: 'ready' });

@@ -562,9 +562,9 @@
                 },
                 "vext.agent.completion.debounceMs": {
                     "type": "number",
-                    "default": 350,
-                    "minimum": 0,
-                    "description": "Pause before a completion request."
+                    "default": 1000,
+                    "minimum": 1000,
+                    "description": "Pause before a completion request. A request is never sent more than once a second."
                 }
             }
         },
