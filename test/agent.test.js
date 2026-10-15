@@ -8,6 +8,7 @@ import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
+import { readAgentSettings, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
 const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
 
@@ -369,5 +370,44 @@ suite('agent panel', () => {
         assert.match(html, /id="prompt"/);
         assert.match(html, /id="log"/);
         assert.match(html, /agent-body/);
+    });
+});
+
+suite('agent settings', () => {
+    test('reads defaults and spawn inputs', () => {
+        const values = new Map([
+            ['vext.agent.port', 8765],
+            ['vext.agent.token', ''],
+            ['vext.agent.openaiBaseUrl', 'https://example.test/v1'],
+            ['vext.agent.openaiApiKey', ''],
+            ['vext.agent.launch', false],
+            ['vext.agent.command', 'ai'],
+            ['vext.agent.approve', 'nope'],
+            ['vext.agent.completion.enabled', true],
+            ['vext.agent.completion.debounceMs', 350],
+        ]);
+        const settings = readAgentSettings((key) => values.get(key));
+        assert.strictEqual(settings.port, 8765);
+        assert.strictEqual(settings.approve, 'ask');
+        assert.deepStrictEqual(spawnArgs(settings), ['serve', '--port', '8765']);
+        assert.deepStrictEqual(spawnArgs({ ...settings, port: 0 }), ['serve']);
+        const env = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiApiKey: 'secret' });
+        assert.strictEqual(env.OPENAI_BASE_URL, 'https://example.test/v1');
+        assert.strictEqual(env.OPENAI_API_KEY, 'secret');
+        assert.strictEqual(env.PATH, 'C:\\bin');
+        const untouched = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiBaseUrl: '', openaiApiKey: '' });
+        assert.strictEqual(untouched.OPENAI_API_KEY, undefined);
+    });
+
+    test('package.json contributes the agent view, commands, and settings', () => {
+        const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+        const ids = pkg.contributes.commands.map((command) => command.command);
+        assert.ok(ids.includes('vext.agent.start'));
+        assert.ok(ids.includes('vext.agent.stop'));
+        assert.ok(ids.includes('vext.agent.reconnect'));
+        assert.ok(pkg.contributes.views.agentView.some((view) => view.id === 'vext.agentView'));
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 350);
     });
 });

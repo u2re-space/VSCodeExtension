@@ -1,6 +1,6 @@
 # src + commands
 
-`activate` in `src/extension.mjs`: `symlink`, `customActions`, `mathml`, `markdown`, `manager`, `contexts`.
+`activate` in `src/extension.mjs`: `symlink`, `customActions`, `mathml`, `markdown`, `manager`, `contexts`, `agent`.
 
 | File | Exports / internals |
 |---|---|
@@ -12,6 +12,7 @@
 | `src/views/webview.ts` | `getWebviewContent`, `getMinimalManagerFallbackHtml` |
 | `icons/actions.mjs` | Manager UI client; `postMessage` (`ready`, action ids, `webviewError`) |
 | `src/web/webview.mjs` | `CustomSidebarViewProvider`, `webview()` — `vext.gptView` / `vext.gptPanelView` |
+| `src/agent/index.mjs` | `agent(context)`; endpoint `src/agent/endpoint.mjs`; frames `src/agent/protocol.mjs`; bus `src/agent/bus.mjs`; completion `src/agent/complete.mjs`; panel `src/agent/panel.mjs` |
 | `src/explorer/symlink.ts` | `symlink()`, known-links `vext.symlink.knownLinks`, `__symlinkTest` |
 | `src/explorer/customActions.ts` | `customActions()` — `vext.explorer.customAction1..3` |
 | `src/editor/markdown.ts` | `vext.htd.*` / `vext.dth.*` |
@@ -19,6 +20,6 @@
 | `src/context/states.ts` | `contexts()` — `vext.proxyUndo` / `vext.proxyRedo`, `lineIsEmpty` |
 
 Commands (registrar must match `package.json`):
-`vext.symlink{,.pickSources,.abs2rel,.renameRelink}` · `vext.{htd,dth,ltm,mtl}.{paste,convert,copy}` · `vext.explorer.customAction{1,2,3}` · `vext.openManagerPanel` · `vext.proxyUndo` · `vext.proxyRedo` · `vext.openWebview` (gpt, not in `contributes`).
+`vext.symlink{,.pickSources,.abs2rel,.renameRelink}` · `vext.{htd,dth,ltm,mtl}.{paste,convert,copy}` · `vext.explorer.customAction{1,2,3}` · `vext.openManagerPanel` · `vext.proxyUndo` · `vext.proxyRedo` · `vext.agent.start` · `vext.agent.stop` · `vext.agent.reconnect` · `vext.openWebview` (gpt, not in `contributes`).
 
 Do not invent command IDs without updating `contributes`.

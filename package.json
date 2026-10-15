@@ -511,6 +511,55 @@
                     "type": "boolean",
                     "default": true,
                     "description": "Open terminal panel when running custom action 3."
+                },
+                "vext.agent.port": {
+                    "type": "number",
+                    "default": 0,
+                    "minimum": 0,
+                    "maximum": 65535,
+                    "description": "WebSocket port for ai serve. 0 uses the port from serve.json."
+                },
+                "vext.agent.token": {
+                    "type": "string",
+                    "default": "",
+                    "description": "Token for an already running ai serve. Empty uses serve.json. Ignored for a process this extension started."
+                },
+                "vext.agent.openaiBaseUrl": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OPENAI_BASE_URL passed only to an ai serve process started by this extension."
+                },
+                "vext.agent.openaiApiKey": {
+                    "type": "string",
+                    "default": "",
+                    "description": "OPENAI_API_KEY passed only to an ai serve process started by this extension."
+                },
+                "vext.agent.launch": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Start ai serve when no live serve.json is found."
+                },
+                "vext.agent.command": {
+                    "type": "string",
+                    "default": "ai",
+                    "description": "Command used to start ai serve."
+                },
+                "vext.agent.approve": {
+                    "type": "string",
+                    "enum": ["ask", "read", "write", "all"],
+                    "default": "ask",
+                    "description": "Approval level sent with each agent start frame."
+                },
+                "vext.agent.completion.enabled": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Show ghost-text completions from ai serve."
+                },
+                "vext.agent.completion.debounceMs": {
+                    "type": "number",
+                    "default": 350,
+                    "minimum": 0,
+                    "description": "Pause before a completion request."
                 }
             }
         },
@@ -524,6 +573,11 @@
                 {
                     "id": "gptView",
                     "title": "GPTunnel View",
+                    "icon": "assets/openai.svg"
+                },
+                {
+                    "id": "agentView",
+                    "title": "Universal AI",
                     "icon": "assets/openai.svg"
                 }
             ],
@@ -561,6 +615,15 @@
                     "id": "vext.gptPanelView",
                     "name": "GPTunnel (Panel)",
                     "contextualTitle": "GPTunnel"
+                }
+            ],
+            "agentView": [
+                {
+                    "icon": "assets/openai.svg",
+                    "type": "webview",
+                    "id": "vext.agentView",
+                    "name": "Agent",
+                    "contextualTitle": "Universal AI"
                 }
             ]
         },
@@ -657,6 +720,21 @@
             {
                 "command": "vext.explorer.customAction3",
                 "title": "Run Custom Action 3"
+            },
+            {
+                "command": "vext.agent.start",
+                "title": "Universal AI: Start agent",
+                "icon": "$(play)"
+            },
+            {
+                "command": "vext.agent.stop",
+                "title": "Universal AI: Stop agent",
+                "icon": "$(debug-stop)"
+            },
+            {
+                "command": "vext.agent.reconnect",
+                "title": "Universal AI: Reconnect agent",
+                "icon": "$(refresh)"
             }
         ]
     },

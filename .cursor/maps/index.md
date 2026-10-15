@@ -10,6 +10,7 @@ Do not start with repo-wide Grep. Open one row, then search inside that file.
 | Manager HTML + CSP | `src/views/webview.ts` |
 | Manager webview client | `icons/actions.mjs` |
 | GPTunnel views | `src/web/webview.mjs` |
+| Agent WebSocket / completion | `src/agent/index.mjs` |
 | Symlink / relink | `src/explorer/symlink.ts` |
 | Custom explorer actions | `src/explorer/customActions.ts` |
 | HTML ↔ Markdown | `src/editor/markdown.ts` |

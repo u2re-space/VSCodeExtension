@@ -12,6 +12,9 @@ import { contexts } from "./context/states.ts";
 import { symlink } from './explorer/symlink.ts';
 import { customActions } from './explorer/customActions.ts';
 
+// agent
+import { agent } from './agent/index.mjs';
+
 // polyfill for Promise.try
 if (Promise.try === undefined || Promise.try === null || !("try" in Promise)) {
     Promise.try ??= (fn, ...args)=>{
@@ -34,6 +37,7 @@ export function activate(context) {
     Promise.try(markdown, context)?.catch?.(e=>console.error(e));
     Promise.try(manager, context)?.catch?.(e=>console.error(e));
     Promise.try(contexts, context)?.catch?.(e=>console.error(e));
+    Promise.try(agent, context)?.catch?.(e=>console.error(e));
 }
 
 // This method is called when your extension is deactivated
