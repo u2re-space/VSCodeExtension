@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { createBus } from '../src/agent/bus.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 
@@ -169,5 +170,97 @@ suite('agent protocol', () => {
         const ended = panelMessageFromHub({ type: 'run.ended', runId: 'r1', status: 'completed', exitCode: 0 });
         assert.strictEqual(ended.status, 'ended');
         assert.strictEqual(ended.exitCode, 0);
+    });
+});
+
+class FakeSocket {
+    static latest = null;
+    constructor(url) {
+        this.url = url;
+        this.readyState = 0;
+        this.sent = [];
+        this.listeners = {};
+        FakeSocket.latest = this;
+    }
+    send(data) {
+        this.sent.push(JSON.parse(data));
+    }
+    close(code = 1000) {
+        this.readyState = 3;
+        this.onclose?.({ code });
+    }
+    open() {
+        this.readyState = 1;
+        this.onopen?.();
+    }
+    receive(frame) {
+        this.onmessage?.({ data: JSON.stringify(frame) });
+    }
+}
+
+suite('agent bus', () => {
+    test('says hello and starts a run', () => {
+        const messages = [];
+        const statuses = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: (message) => messages.push(message),
+            onStatus: (message) => statuses.push(message),
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        assert.deepStrictEqual(FakeSocket.latest.sent[0], { type: 'hello', role: 'client', token: 'tok' });
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        assert.strictEqual(statuses.at(-1).state, 'ready');
+        const result = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(result.frames[0].type, 'start');
+        assert.strictEqual(FakeSocket.latest.sent.at(-1).command, 'run');
+        const pending = bus.submit({ command: 'ask', prompt: 'more', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(pending.error, 'pending');
+        FakeSocket.latest.receive({ type: 'run.started', run: { id: 'r1', command: 'run', status: 'running' } });
+        const follow = bus.submit({ command: 'chat', prompt: 'hi', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(follow.frames[0].type, 'cancel');
+        bus.close();
+    });
+
+    test('stops retrying after an unauthorized hello', () => {
+        const scheduled = [];
+        const statuses = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: (message) => statuses.push(message),
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'bad' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'error', code: 'unauthorized', message: 'Неверный токен.' });
+        FakeSocket.latest.close(1008);
+        assert.strictEqual(scheduled.length, 0);
+        assert.strictEqual(statuses.at(-1).state, 'unauthorized');
+        bus.close();
+    });
+
+    test('schedules a growing retry after a drop', () => {
+        const scheduled = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.close(1006);
+        assert.strictEqual(scheduled[0].ms, 2000);
+        scheduled[0].fn();
+        FakeSocket.latest.open();
+        FakeSocket.latest.close(1006);
+        assert.strictEqual(scheduled[1].ms, 4000);
+        bus.close();
     });
 });
