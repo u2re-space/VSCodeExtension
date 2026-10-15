@@ -339,10 +339,13 @@ class ModuleCollector {
     private pathKeys = new Set<string>();
     private identityCache = new Map<string, string>();
 
-    constructor(
-        private vscodeAPI: any,
-        private wsdUri: vscode.Uri
-    ) {}
+    private vscodeAPI: any;
+    private wsdUri: vscode.Uri;
+
+    constructor(vscodeAPI: any, wsdUri: vscode.Uri) {
+        this.vscodeAPI = vscodeAPI;
+        this.wsdUri = wsdUri;
+    }
 
     private relKey(rel: string): string {
         return rel.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
