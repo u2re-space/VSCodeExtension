@@ -1,4 +1,6 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 
 import vscodeAPI from '../imports/api.ts';
 import { createBus } from './bus.mjs';
@@ -8,6 +10,7 @@ import { AgentViewProvider } from './panel.mjs';
 import { launchOutcome, readAgentSettings, spawnArgs, spawnEnv } from './settings.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const STDERR_CAP = 4096;
 
 const killPid = (pid) => {
     try {
@@ -16,6 +19,80 @@ const killPid = (pid) => {
         if (error?.code !== 'ESRCH') {
             throw error;
         }
+    }
+};
+
+const killChild = (proc) => {
+    if (!proc) {
+        return;
+    }
+    const pid = proc.pid;
+    if (process.platform === 'win32' && Number.isInteger(pid) && pid > 0) {
+        try {
+            execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], {
+                windowsHide: true,
+                stdio: 'ignore',
+                timeout: 5000,
+            });
+        } catch {
+            /* already gone */
+        }
+    }
+    try {
+        proc.kill();
+    } catch {
+        /* already gone */
+    }
+};
+
+const launchLockFile = () => path.join(agentHome(), 'launch.lock');
+
+const takeLaunchLock = async () => {
+    const file = launchLockFile();
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    const write = async () => {
+        await fs.writeFile(file, String(process.pid), { flag: 'wx' });
+        return { file };
+    };
+    try {
+        return await write();
+    } catch (error) {
+        if (error?.code !== 'EEXIST') {
+            throw error;
+        }
+    }
+    let holder = 0;
+    try {
+        holder = Number(await fs.readFile(file, 'utf8'));
+    } catch {
+        return null;
+    }
+    if (Number.isInteger(holder) && pidAlive(holder)) {
+        return null;
+    }
+    try {
+        await fs.unlink(file);
+    } catch {
+        return null;
+    }
+    try {
+        return await write();
+    } catch {
+        return null;
+    }
+};
+
+const releaseLaunchLock = async (lock) => {
+    if (!lock) {
+        return;
+    }
+    try {
+        const current = Number(await fs.readFile(lock.file, 'utf8'));
+        if (current === process.pid) {
+            await fs.unlink(lock.file);
+        }
+    } catch {
+        /* already gone */
     }
 };
 
@@ -87,9 +164,7 @@ export async function agent(context) {
             spawnWatch.on = false;
         }
         if (proc) {
-            try {
-                proc.kill();
-            } catch { /* already gone */ }
+            killChild(proc);
             if (child === proc) {
                 child = null;
             }
@@ -115,29 +190,55 @@ export async function agent(context) {
         const watch = { on: true };
         spawnWatch = watch;
         const settings = settingsOf();
-        const proc = spawn(settings.command, spawnArgs(settings), {
-            shell: process.platform === 'win32',
-            windowsHide: true,
-            env: spawnEnv(process.env, settings),
-        });
-        proc.on('error', (error) => {
-            if (!watch.on || spawnError) {
-                return;
-            }
-            spawnError = error;
-            wakeWait();
-        });
-        proc.on('exit', (code) => {
-            if (!watch.on || spawnError || code === 0 || code === null) {
-                return;
-            }
-            spawnError = new Error(`spawn ${settings.command} ENOENT`);
-            wakeWait();
-        });
-        child = proc;
-        const deadline = Date.now() + 10000;
-        let found = null;
+        let lock = null;
+        let proc = null;
         try {
+            if (!cancelled()) {
+                try {
+                    lock = await takeLaunchLock();
+                } catch (error) {
+                    spawnError = error;
+                }
+            }
+            if (lock && !spawnError && !cancelled()) {
+                let stderrText = '';
+                proc = spawn(settings.command, spawnArgs(settings), {
+                    shell: process.platform === 'win32',
+                    windowsHide: true,
+                    env: spawnEnv(process.env, settings),
+                    stdio: ['ignore', 'ignore', 'pipe'],
+                });
+                child = proc;
+                proc.stderr?.on('data', (chunk) => {
+                    if (stderrText.length >= STDERR_CAP) {
+                        return;
+                    }
+                    stderrText += chunk.toString();
+                    if (stderrText.length > STDERR_CAP) {
+                        stderrText = stderrText.slice(0, STDERR_CAP);
+                    }
+                });
+                proc.on('error', (error) => {
+                    if (!watch.on || spawnError) {
+                        return;
+                    }
+                    spawnError = error;
+                    wakeWait();
+                });
+                proc.on('exit', (code) => {
+                    if (!watch.on || spawnError || code === 0 || code === null) {
+                        return;
+                    }
+                    const detail = stderrText.trim();
+                    const message = detail
+                        ? `${settings.command} exited with code ${code}: ${detail}`
+                        : `${settings.command} exited with code ${code}`;
+                    spawnError = new Error(message);
+                    wakeWait();
+                });
+            }
+            const deadline = Date.now() + 10000;
+            let found = null;
             while (Date.now() < deadline && !cancelled() && !spawnError) {
                 const record = await loadServeRecord(agentHome());
                 if (cancelled() || spawnError) {
@@ -152,11 +253,13 @@ export async function agent(context) {
             const pending = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (pending === 'adopt') {
                 watch.on = false;
-                ownPid = found.pid;
-                post({ type: 'stopVisible', visible: true });
+                if (lock) {
+                    ownPid = found.pid;
+                    post({ type: 'stopVisible', visible: true });
+                }
                 return;
             }
-            await releaseLaunch(proc, pending !== 'spawn-error');
+            await releaseLaunch(proc, proc !== null && pending !== 'spawn-error');
             ownPid = null;
             const outcome = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (outcome === 'spawn-error') {
@@ -172,6 +275,7 @@ export async function agent(context) {
             vscode.window.showErrorMessage(message);
             post({ type: 'status', state: 'error', detail: message });
         } finally {
+            await releaseLaunchLock(lock);
             if (wakeLaunch === wakeWait) {
                 wakeLaunch = null;
             }
@@ -182,17 +286,32 @@ export async function agent(context) {
     };
 
     const ensureServer = async (allowLaunch) => {
+        const tokenAtStart = launchToken;
         endpoint = await currentEndpoint();
+        const tokenMoved = () => tokenAtStart !== launchToken;
         if (endpoint || !allowLaunch) {
+            if (tokenMoved()) {
+                return null;
+            }
             return endpoint;
+        }
+        if (tokenMoved() && !launchTask) {
+            return null;
         }
         if (!launchTask) {
             launchTask = spawnAndWait().finally(() => {
                 launchTask = null;
             });
         }
+        const launchedAs = launchToken;
         await launchTask;
+        if (launchedAs !== launchToken) {
+            return null;
+        }
         endpoint = await currentEndpoint();
+        if (launchedAs !== launchToken) {
+            return null;
+        }
         return endpoint;
     };
 
@@ -201,12 +320,29 @@ export async function agent(context) {
             post({ type: 'status', state: 'error', detail: 'WebSocket недоступен в этом хосте.' });
             return;
         }
+        const seen = launchToken;
         const next = await ensureServer(allowLaunch);
+        if (seen !== launchToken && (!next || launchToken !== seen + 1)) {
+            return;
+        }
         if (!next) {
             post({ type: 'status', state: 'disconnected', detail: 'агент не запущен' });
             return;
         }
         bus.connect(next);
+    };
+
+    const reportSubmit = (result) => {
+        if (!result) {
+            return;
+        }
+        if (result.error === 'no-workspace') {
+            post({ type: 'status', state: 'error', detail: 'нет папки workspace' });
+        } else if (result.error === 'empty') {
+            post({ type: 'status', state: 'error', detail: 'пустой промпт' });
+        } else if (result.error === 'disconnected') {
+            post({ type: 'status', state: 'disconnected', detail: 'агент не запущен' });
+        }
     };
 
     const ensureComplete = async () => {
@@ -239,6 +375,7 @@ export async function agent(context) {
                 return;
             }
             if (message.type === 'ready') {
+                post({ type: 'stopVisible', visible: ownPid !== null });
                 await ensureBus(settingsOf().launch);
                 return;
             }
@@ -252,6 +389,7 @@ export async function agent(context) {
             }
             if (message.type === 'stop') {
                 const inFlight = launchTask !== null;
+                const ownedLaunch = ownPid !== null || child !== null;
                 launchToken += 1;
                 const wake = wakeLaunch;
                 wakeLaunch = null;
@@ -266,12 +404,11 @@ export async function agent(context) {
                         killPid(ownPid);
                     }
                     if (child) {
-                        try {
-                            child.kill();
-                        } catch { /* already gone */ }
+                        const proc = child;
                         child = null;
+                        killChild(proc);
                     }
-                    if (inFlight) {
+                    if (inFlight && ownedLaunch) {
                         const record = await loadServeRecord(agentHome());
                         if (record && pidAlive(record.pid)) {
                             killPid(record.pid);
@@ -279,6 +416,7 @@ export async function agent(context) {
                     }
                 } finally {
                     ownPid = null;
+                    bus.resetPhase();
                     bus.close();
                     complete.close();
                     endpoint = null;
@@ -297,13 +435,15 @@ export async function agent(context) {
                     cwd,
                     approve: settingsOf().approve,
                 });
-                if (result.error === 'no-workspace') {
-                    post({ type: 'status', state: 'error', detail: 'нет папки workspace' });
-                } else if (result.error === 'empty') {
-                    post({ type: 'status', state: 'error', detail: 'пустой промпт' });
-                } else if (result.error === 'disconnected') {
-                    post({ type: 'status', state: 'disconnected', detail: 'агент не запущен' });
+                if (result && typeof result.then === 'function') {
+                    reportSubmit(await result);
+                    return;
                 }
+                reportSubmit(result);
+                return;
+            }
+            if (message.type === 'cancel') {
+                bus.cancel();
                 return;
             }
             if (message.type === 'approve') {
@@ -317,7 +457,9 @@ export async function agent(context) {
     };
 
     const provider = new AgentViewProvider(context.extensionUri, session);
-    context.subscriptions.push(vscode.window.registerWebviewViewProvider(AgentViewProvider.viewType, provider));
+    context.subscriptions.push(vscode.window.registerWebviewViewProvider(AgentViewProvider.viewType, provider, {
+        webviewOptions: { retainContextWhenHidden: true },
+    }));
     context.subscriptions.push(registerAgentCompletion(vscode, {
         request: async (body, token) => {
             await ensureComplete();

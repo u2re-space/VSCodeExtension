@@ -19,6 +19,9 @@ document.getElementById('reconnect').addEventListener('click', () => {
 stop.addEventListener('click', () => {
     vscode.postMessage({ type: 'stop' });
 });
+document.getElementById('cancel').addEventListener('click', () => {
+    vscode.postMessage({ type: 'cancel' });
+});
 document.getElementById('composer').addEventListener('submit', (event) => {
     event.preventDefault();
     const command = event.submitter?.dataset?.command;

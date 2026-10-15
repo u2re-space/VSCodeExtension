@@ -9,6 +9,8 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
     let delay = 0;
     let timer = null;
     let phase = 'idle';
+    let hubReady = false;
+    let pending = null;
 
     const clearStartingPhase = () => {
         if (phase === 'starting') {
@@ -27,11 +29,72 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
         }
     };
 
+    const failPending = () => {
+        const queued = pending;
+        pending = null;
+        if (!queued) {
+            return;
+        }
+        queued.resolve({ error: 'disconnected' });
+    };
+
+    const sameTarget = (next) => Boolean(
+        next
+        && endpoint
+        && endpoint.url === next.url
+        && endpoint.token === next.token,
+    );
+
+    const socketPendingOrOpen = () => Boolean(socket && (socket.readyState === 0 || socket.readyState === 1));
+
+    const send = (frame) => {
+        if (!hubReady || !socket || socket.readyState !== 1) {
+            return false;
+        }
+        socket.send(JSON.stringify(frame));
+        return true;
+    };
+
+    const dispatch = (result) => {
+        for (const frame of result.frames) {
+            send(frame);
+        }
+        if (result.frames.some((frame) => frame.type === 'start')) {
+            phase = 'starting';
+        }
+        return result;
+    };
+
+    const flushPending = () => {
+        const queued = pending;
+        pending = null;
+        if (!queued) {
+            return;
+        }
+        if (!hubReady || !socket || socket.readyState !== 1) {
+            queued.resolve({ error: 'disconnected' });
+            return;
+        }
+        queued.resolve(dispatch(queued.result));
+    };
+
+    const forgetRunIfAbsent = (runs) => {
+        if (!phase || typeof phase !== 'object' || !phase.runId) {
+            return;
+        }
+        const list = Array.isArray(runs) ? runs : [];
+        const present = list.some((run) => run && run.id === phase.runId);
+        if (!present) {
+            phase = 'idle';
+        }
+    };
+
     const open = () => {
         if (!endpoint || stopped || unauthorized) {
             return;
         }
         const gen = ++generation;
+        hubReady = false;
         status('connecting', endpoint.url);
         const ws = new WebSocketImpl(endpoint.url);
         socket = ws;
@@ -53,10 +116,16 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             }
             if (frame.type === 'ready') {
                 delay = 0;
+                hubReady = true;
                 status('ready', endpoint.url);
+                forgetRunIfAbsent(frame.runs);
+                flushPending();
             }
             if (frame.type === 'error' && frame.code === 'unauthorized') {
                 unauthorized = true;
+            }
+            if (frame.type === 'error' && phase === 'starting') {
+                phase = 'idle';
             }
             if (frame.type === 'run.started' && frame.run && phase === 'starting') {
                 phase = { runId: frame.run.id, command: frame.run.command };
@@ -71,7 +140,9 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
                 return;
             }
             clearStartingPhase();
+            hubReady = false;
             socket = null;
+            failPending();
             if (stopped || unauthorized || event?.code === 1008) {
                 if (event?.code === 1008) {
                     unauthorized = true;
@@ -85,17 +156,14 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
         };
     };
 
-    const send = (frame) => {
-        if (!socket || socket.readyState !== 1) {
-            return false;
-        }
-        socket.send(JSON.stringify(frame));
-        return true;
-    };
-
     return {
         connect(next) {
+            if (!stopped && !unauthorized && sameTarget(next) && socketPendingOrOpen()) {
+                return;
+            }
             clearStartingPhase();
+            failPending();
+            hubReady = false;
             stopped = false;
             unauthorized = false;
             delay = 0;
@@ -113,6 +181,8 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
         },
         close() {
             clearStartingPhase();
+            failPending();
+            hubReady = false;
             stopped = true;
             generation += 1;
             if (timer) {
@@ -124,6 +194,9 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             } catch { /* already closed */ }
             socket = null;
         },
+        resetPhase() {
+            phase = 'idle';
+        },
         submit(input) {
             const result = submissionFrame({ ...input, phase });
             if (result.error === 'pending') {
@@ -133,22 +206,39 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             if (result.error) {
                 return result;
             }
+            if (!hubReady) {
+                if (!socketPendingOrOpen() || stopped) {
+                    return { error: 'disconnected' };
+                }
+                if (pending) {
+                    return { error: 'pending' };
+                }
+                return new Promise((resolve) => {
+                    pending = { result, resolve };
+                });
+            }
             if (!socket || socket.readyState !== 1) {
                 return { error: 'disconnected' };
             }
-            for (const frame of result.frames) {
-                send(frame);
-            }
-            if (result.frames.some((frame) => frame.type === 'start')) {
-                phase = 'starting';
-            }
-            return result;
+            return dispatch(result);
         },
         approve(requestId, decision) {
+            if (!hubReady) {
+                return false;
+            }
             return send(approveFrame(requestId, decision));
         },
         answer(requestId, text) {
+            if (!hubReady) {
+                return false;
+            }
             return send(answerFrame(requestId, text));
+        },
+        cancel() {
+            if (!hubReady || !phase || typeof phase !== 'object' || !phase.runId) {
+                return false;
+            }
+            return send({ type: 'cancel', runId: phase.runId });
         },
     };
 }

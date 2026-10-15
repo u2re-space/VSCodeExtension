@@ -72,7 +72,7 @@ export function resolveEndpoint({ record, settings, ownPid = null, alive = false
     const recordOk = Boolean(alive && record && typeof record.url === 'string' && typeof record.token === 'string');
     if (recordOk) {
         const url = port > 0 ? withPort(record.url, port) : record.url.replace(/\/$/, '');
-        const owned = ownPid != null && ownPid === record.pid;
+        const owned = ownPid !== null && ownPid !== undefined && ownPid === record.pid;
         const token = !owned && tokenSetting ? tokenSetting : record.token;
         return { url, token, completeWs: completeWs(url, token) };
     }

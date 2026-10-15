@@ -21,7 +21,7 @@ export function agentHtml({ cssHref, scriptHref, nonce, cspSource }) {
     .agent-log .warn, .agent-log .fail { color: var(--button-active); }
     #prompt { inline-size: 100%; min-block-size: 4.5rem; resize: vertical; }
     .agent-actions, .agent-approval { display: flex; flex-wrap: wrap; gap: 6px; }
-    .agent-actions button, .agent-approval button, #reconnect, #stop {
+    .agent-actions button, .agent-approval button, #reconnect, #stop, #cancel {
       border: 1px solid var(--border); background: var(--button-bg); color: var(--foreground); border-radius: 8px; padding: 4px 8px;
     }
   </style>
@@ -32,6 +32,7 @@ export function agentHtml({ cssHref, scriptHref, nonce, cspSource }) {
       <span id="status" class="toolbar-label">агент не запущен</span>
       <button id="reconnect" type="button">Переподключить</button>
       <button id="stop" type="button" hidden>Остановить</button>
+      <button id="cancel" type="button">Отмена</button>
     </div>
     <div id="log" class="agent-log" aria-live="polite"></div>
     <div id="approval" class="agent-approval" hidden></div>

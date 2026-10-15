@@ -307,6 +307,110 @@ suite('agent bus', () => {
         assert.strictEqual(result.frames[0].type, 'start');
         bus.close();
     });
+
+    test('sends a submit that arrived before ready', async () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const pending = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'start'), false);
+        FakeSocket.latest.open();
+        assert.deepStrictEqual(FakeSocket.latest.sent, [{ type: 'hello', role: 'client', token: 'tok' }]);
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        const result = await pending;
+        assert.strictEqual(result.frames[0].type, 'start');
+        assert.strictEqual(FakeSocket.latest.sent.at(-1).type, 'start');
+        bus.close();
+    });
+
+    test('drops a queued submit when the socket closes before ready', async () => {
+        const scheduled = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const pending = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        FakeSocket.latest.close(1006);
+        assert.deepStrictEqual(await pending, { error: 'disconnected' });
+        scheduled[0].fn();
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'start'), false);
+        bus.close();
+    });
+
+    test('an error while starting lets the next submit start', () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        FakeSocket.latest.receive({ type: 'error', message: 'failed' });
+        const result = bus.submit({ command: 'run', prompt: 'again', cwd: 'C:\\work', approve: 'ask' });
+        assert.notStrictEqual(result.error, 'pending');
+        assert.strictEqual(result.frames[0].type, 'start');
+        bus.close();
+    });
+
+    test('a ready frame without the current run returns to idle', () => {
+        const scheduled = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        FakeSocket.latest.receive({ type: 'run.started', run: { id: 'r1', command: 'run', status: 'running' } });
+        FakeSocket.latest.close(1006);
+        scheduled[0].fn();
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        const result = bus.submit({ command: 'ask', prompt: 'next', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(result.frames.length, 1);
+        assert.strictEqual(result.frames[0].type, 'start');
+        bus.close();
+    });
+
+    test('does not replace a socket already connecting to the same target', () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const first = FakeSocket.latest;
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        assert.strictEqual(FakeSocket.latest, first);
+        assert.strictEqual(first.readyState, 0);
+        first.open();
+        first.receive({ type: 'ready', runs: [] });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        assert.strictEqual(FakeSocket.latest, first);
+        assert.strictEqual(first.readyState, 1);
+        bus.close();
+    });
 });
 
 suite('agent complete', () => {
@@ -367,6 +471,7 @@ suite('agent panel', () => {
         assert.match(html, /data-command="image"/);
         assert.match(html, /id="reconnect"/);
         assert.match(html, /id="stop"/);
+        assert.match(html, /id="cancel"/);
         assert.match(html, /id="prompt"/);
         assert.match(html, /id="log"/);
         assert.match(html, /agent-body/);
@@ -420,5 +525,8 @@ suite('agent settings', () => {
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 350);
+        for (const key of ['vext.agent.command', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
+            assert.strictEqual(pkg.contributes.configuration.properties[key].scope, 'machine');
+        }
     });
 });

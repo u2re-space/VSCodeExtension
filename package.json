@@ -526,26 +526,31 @@
                 },
                 "vext.agent.openaiBaseUrl": {
                     "type": "string",
+                    "scope": "machine",
                     "default": "",
                     "description": "OPENAI_BASE_URL passed only to an ai serve process started by this extension."
                 },
                 "vext.agent.openaiApiKey": {
                     "type": "string",
+                    "scope": "machine",
                     "default": "",
                     "description": "OPENAI_API_KEY passed only to an ai serve process started by this extension."
                 },
                 "vext.agent.launch": {
                     "type": "boolean",
+                    "scope": "machine",
                     "default": false,
                     "description": "Start ai serve when no live serve.json is found."
                 },
                 "vext.agent.command": {
                     "type": "string",
+                    "scope": "machine",
                     "default": "ai",
                     "description": "Command used to start ai serve."
                 },
                 "vext.agent.approve": {
                     "type": "string",
+                    "scope": "machine",
                     "enum": ["ask", "read", "write", "all"],
                     "default": "ask",
                     "description": "Approval level sent with each agent start frame."
