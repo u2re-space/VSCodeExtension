@@ -4,8 +4,14 @@ import os from 'os';
 import path from 'path';
 
 import { __agentTest } from '../src/agent/endpoint.mjs';
+import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 
 const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
+
+const {
+    nextDelay, submissionFrame, approveFrame, completionRequest, acceptCompletion,
+    panelMessageFromEvent, panelMessageFromHub, FULL_BYTES,
+} = protocolTest;
 
 suite('agent endpoint', () => {
     const live = { pid: 42, url: 'ws://127.0.0.1:1111', token: 'file-token' };
@@ -77,5 +83,91 @@ suite('agent endpoint', () => {
         const got = resolveEndpoint({ record: live, settings: { port: 9000, token: 'set' }, ownPid: null, alive: false });
         assert.strictEqual(got.url, 'ws://127.0.0.1:9000');
         assert.strictEqual(got.token, 'set');
+    });
+});
+
+suite('agent protocol', () => {
+    test('doubles the reconnect delay up to 30 seconds', () => {
+        assert.strictEqual(nextDelay(0), 2000);
+        assert.strictEqual(nextDelay(2000), 4000);
+        assert.strictEqual(nextDelay(4000), 8000);
+        assert.strictEqual(nextDelay(8000), 16000);
+        assert.strictEqual(nextDelay(16000), 30000);
+        assert.strictEqual(nextDelay(30000), 30000);
+    });
+
+    test('builds start and cancels a run that is still going', () => {
+        const idle = submissionFrame({ command: 'run', prompt: 'fix', cwd: 'C:\\work', approve: 'ask', phase: 'idle' });
+        assert.deepStrictEqual(idle.frames, [
+            { type: 'start', command: 'run', prompt: 'fix', cwd: 'C:\\work', approve: 'ask' },
+        ]);
+        const busy = submissionFrame({
+            command: 'ask', prompt: 'why', cwd: 'C:\\work', approve: 'read', phase: { runId: 'r1', command: 'run' },
+        });
+        assert.strictEqual(busy.frames[0].type, 'cancel');
+        assert.strictEqual(busy.frames[0].runId, 'r1');
+        assert.strictEqual(busy.frames[1].command, 'ask');
+        const image = submissionFrame({ command: 'image', prompt: 'icon', cwd: 'C:\\work', approve: 'ask', phase: 'idle' });
+        assert.strictEqual(image.frames[0].command, 'image');
+    });
+
+    test('sends chat follow-ups as input', () => {
+        const first = submissionFrame({ command: 'chat', prompt: 'hi', cwd: 'C:\\work', approve: 'ask', phase: 'idle' });
+        assert.strictEqual(first.frames[0].type, 'start');
+        const next = submissionFrame({
+            command: 'chat', prompt: '/exit', cwd: '', approve: 'ask', phase: { runId: 'c1', command: 'chat' },
+        });
+        assert.deepStrictEqual(next.frames, [{ type: 'input', runId: 'c1', text: '/exit' }]);
+    });
+
+    test('rejects an empty prompt, a missing folder, and a start that has not been acknowledged', () => {
+        assert.strictEqual(submissionFrame({ command: 'run', prompt: '  ', cwd: 'C:\\work', approve: 'ask', phase: 'idle' }).error, 'empty');
+        assert.strictEqual(submissionFrame({ command: 'run', prompt: 'x', cwd: '', approve: 'ask', phase: 'idle' }).error, 'no-workspace');
+        assert.strictEqual(submissionFrame({ command: 'run', prompt: 'x', cwd: 'C:\\work', approve: 'ask', phase: 'starting' }).error, 'pending');
+    });
+
+    test('builds approval decisions', () => {
+        for (const decision of ['yes', 'no', 'always', 'abort']) {
+            assert.deepStrictEqual(approveFrame('q1', decision), { type: 'approve', requestId: 'q1', decision });
+        }
+    });
+
+    test('sends a small document whole and windows a large one', () => {
+        const small = completionRequest({
+            id: '1', language: 'javascript', path: 'C:\\a.js', text: 'let a = ', cursor: { line: 0, character: 8 },
+        });
+        assert.strictEqual(small.content, 'let a = ');
+        assert.strictEqual(small.path, 'C:\\a.js');
+        assert.strictEqual(small.cursor.line, 0);
+        const line = 'x'.repeat(80);
+        const lines = Array.from({ length: 4000 }, () => line);
+        const text = lines.join('\n');
+        assert.ok(Buffer.byteLength(text, 'utf8') > FULL_BYTES);
+        const windowed = completionRequest({
+            id: '2', language: 'javascript', path: 'C:\\a.js', text, cursor: { line: 1000, character: 3 },
+        });
+        assert.notStrictEqual(windowed.content, text);
+        assert.strictEqual(windowed.cursor.line, 200);
+        assert.strictEqual(windowed.cursor.character, 3);
+        const huge = 'y'.repeat(900001);
+        assert.strictEqual(completionRequest({
+            id: '3', language: 'plaintext', path: undefined, text: huge, cursor: { line: 0, character: 0 },
+        }), null);
+    });
+
+    test('accepts only the matching nonempty completion', () => {
+        assert.strictEqual(acceptCompletion('2', { type: 'completion', id: '2', text: 'items.length' }), 'items.length');
+        assert.strictEqual(acceptCompletion('2', { type: 'completion', id: '1', text: 'nope' }), null);
+        assert.strictEqual(acceptCompletion('2', { type: 'completion', id: '2', text: '' }), null);
+    });
+
+    test('maps stream events and drops reasoning from the log', () => {
+        assert.deepStrictEqual(panelMessageFromEvent({ type: 'text.delta', text: 'hi' }), { type: 'text', text: 'hi' });
+        assert.strictEqual(panelMessageFromEvent({ type: 'tool.exec.done', name: 'write', ok: true, summary: 'saved' }).type, 'log');
+        assert.strictEqual(panelMessageFromEvent({ type: 'reasoning.delta', text: 'secret' }).type, 'status');
+        assert.notStrictEqual(panelMessageFromEvent({ type: 'reasoning.delta', text: 'secret' }).type, 'log');
+        const ended = panelMessageFromHub({ type: 'run.ended', runId: 'r1', status: 'completed', exitCode: 0 });
+        assert.strictEqual(ended.status, 'ended');
+        assert.strictEqual(ended.exitCode, 0);
     });
 });
