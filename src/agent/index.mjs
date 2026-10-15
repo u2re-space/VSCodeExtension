@@ -127,6 +127,13 @@ export async function agent(context) {
             spawnError = error;
             wakeWait();
         });
+        proc.on('exit', (code) => {
+            if (!watch.on || spawnError || code === 0 || code === null) {
+                return;
+            }
+            spawnError = new Error(`spawn ${settings.command} ENOENT`);
+            wakeWait();
+        });
         child = proc;
         const deadline = Date.now() + 10000;
         let found = null;
