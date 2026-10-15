@@ -4,6 +4,7 @@ import os from 'os';
 import path from 'path';
 
 import { createBus } from '../src/agent/bus.mjs';
+import { createCompleteClient } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 
@@ -303,5 +304,29 @@ suite('agent bus', () => {
         assert.strictEqual(result.error, undefined);
         assert.strictEqual(result.frames[0].type, 'start');
         bus.close();
+    });
+});
+
+suite('agent complete', () => {
+    test('resolves the completion with the same id', async () => {
+        const client = createCompleteClient({ WebSocketImpl: FakeSocket, onStatus: () => {} });
+        client.connect({ completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok' });
+        FakeSocket.latest.open();
+        const pending = client.request({ type: 'complete', id: '7', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: false, onCancellationRequested: () => {} });
+        assert.strictEqual(FakeSocket.latest.sent[0].id, '7');
+        FakeSocket.latest.receive({ type: 'completion', id: '1', text: 'stale' });
+        FakeSocket.latest.receive({ type: 'completion', id: '7', text: 'bc' });
+        assert.strictEqual(await pending, 'bc');
+        client.close();
+    });
+
+    test('returns null for an empty completion', async () => {
+        const client = createCompleteClient({ WebSocketImpl: FakeSocket, onStatus: () => {} });
+        client.connect({ completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok' });
+        FakeSocket.latest.open();
+        const pending = client.request({ type: 'complete', id: '8', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: false, onCancellationRequested: () => {} });
+        FakeSocket.latest.receive({ type: 'completion', id: '8', text: '' });
+        assert.strictEqual(await pending, null);
+        client.close();
     });
 });
