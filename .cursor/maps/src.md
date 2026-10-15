@@ -12,7 +12,7 @@
 | `src/views/webview.ts` | `getWebviewContent`, `getMinimalManagerFallbackHtml` |
 | `icons/actions.mjs` | Manager UI client; `postMessage` (`ready`, action ids, `webviewError`) |
 | `src/web/webview.mjs` | `CustomSidebarViewProvider`, `webview()` — `vext.gptView` / `vext.gptPanelView` |
-| `src/agent/index.mjs` | `agent(context)`; endpoint `src/agent/endpoint.mjs`; frames `src/agent/protocol.mjs`; bus `src/agent/bus.mjs`; completion `src/agent/complete.mjs`; panel `src/agent/panel.mjs` |
+| `src/agent/index.mjs` | `agent(context)`; `launchOutcome` in `settings.mjs`; endpoint `src/agent/endpoint.mjs`; frames `src/agent/protocol.mjs`; bus `src/agent/bus.mjs`; completion `src/agent/complete.mjs`; panel `src/agent/panel.mjs` |
 | `src/explorer/symlink.ts` | `symlink()`, known-links `vext.symlink.knownLinks`, `__symlinkTest` |
 | `src/explorer/customActions.ts` | `customActions()` — `vext.explorer.customAction1..3` |
 | `src/editor/markdown.ts` | `vext.htd.*` / `vext.dth.*` |

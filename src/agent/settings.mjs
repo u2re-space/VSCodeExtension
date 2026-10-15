@@ -27,6 +27,19 @@ export function spawnArgs(settings) {
     return args;
 }
 
+export function launchOutcome({ cancelled, spawnError, found }) {
+    if (spawnError) {
+        return 'spawn-error';
+    }
+    if (cancelled) {
+        return 'cancelled';
+    }
+    if (!found) {
+        return 'timeout';
+    }
+    return 'adopt';
+}
+
 export function spawnEnv(baseEnv, settings) {
     const env = { ...baseEnv };
     if (settings.openaiBaseUrl) {

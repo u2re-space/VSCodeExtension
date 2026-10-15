@@ -8,7 +8,7 @@ import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
-import { readAgentSettings, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
+import { launchOutcome, readAgentSettings, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
 const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
 
@@ -397,6 +397,17 @@ suite('agent settings', () => {
         assert.strictEqual(env.PATH, 'C:\\bin');
         const untouched = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiBaseUrl: '', openaiApiKey: '' });
         assert.strictEqual(untouched.OPENAI_API_KEY, undefined);
+    });
+
+    test('does not adopt a launch the user stopped', () => {
+        const found = { pid: 42 };
+        const spawnError = new Error('spawn ai ENOENT');
+        assert.strictEqual(launchOutcome({ cancelled: false, spawnError: null, found }), 'adopt');
+        assert.strictEqual(launchOutcome({ cancelled: true, spawnError: null, found }), 'cancelled');
+        assert.strictEqual(launchOutcome({ cancelled: true, spawnError: null, found: null }), 'cancelled');
+        assert.strictEqual(launchOutcome({ cancelled: false, spawnError: null, found: null }), 'timeout');
+        assert.strictEqual(launchOutcome({ cancelled: false, spawnError, found: null }), 'spawn-error');
+        assert.strictEqual(launchOutcome({ cancelled: true, spawnError, found }), 'spawn-error');
     });
 
     test('package.json contributes the agent view, commands, and settings', () => {
