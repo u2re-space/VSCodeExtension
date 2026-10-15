@@ -8,7 +8,7 @@ import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
-import { launchOutcome, readAgentSettings, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
+import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
 const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
 
@@ -391,6 +391,37 @@ suite('agent bus', () => {
         bus.close();
     });
 
+    test('rebuilds a queued chat follow-up as start when ready omits the run', async () => {
+        const scheduled = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: (fn, ms) => { scheduled.push({ fn, ms }); return scheduled.length; },
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [{ id: 'r1' }] });
+        bus.submit({ command: 'chat', prompt: 'hi', cwd: 'C:\\work', approve: 'ask' });
+        FakeSocket.latest.receive({ type: 'run.started', run: { id: 'r1', command: 'chat', status: 'running' } });
+        FakeSocket.latest.close(1006);
+        scheduled[0].fn();
+        FakeSocket.latest.open();
+        const pending = bus.submit({ command: 'chat', prompt: 'more', cwd: 'C:\\work', approve: 'ask' });
+        assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'input' || frame.type === 'start'), false);
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        const result = await pending;
+        assert.strictEqual(result.frames.length, 1);
+        assert.strictEqual(result.frames[0].type, 'start');
+        assert.strictEqual(result.frames[0].command, 'chat');
+        assert.strictEqual(result.frames[0].prompt, 'more');
+        assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'input'), false);
+        assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'cancel'), false);
+        assert.strictEqual(FakeSocket.latest.sent.at(-1).type, 'start');
+        bus.close();
+    });
+
     test('does not replace a socket already connecting to the same target', () => {
         const bus = createBus({
             WebSocketImpl: FakeSocket,
@@ -513,6 +544,14 @@ suite('agent settings', () => {
         assert.strictEqual(launchOutcome({ cancelled: false, spawnError: null, found: null }), 'timeout');
         assert.strictEqual(launchOutcome({ cancelled: false, spawnError, found: null }), 'spawn-error');
         assert.strictEqual(launchOutcome({ cancelled: true, spawnError, found }), 'spawn-error');
+    });
+
+    test('kills only when the live pid equals the pid we spawned', () => {
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 42, livePid: 42 }), true);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 42, livePid: 99 }), false);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 7, spawnedPid: 42, livePid: 42 }), false);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: null, spawnedPid: null, livePid: 42 }), false);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 42, livePid: null }), false);
     });
 
     test('package.json contributes the agent view, commands, and settings', () => {

@@ -75,7 +75,15 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             queued.resolve({ error: 'disconnected' });
             return;
         }
-        queued.resolve(dispatch(queued.result));
+        const result = submissionFrame({ ...queued.input, phase });
+        if (result.error === 'pending') {
+            status('connecting', 'запуск…');
+        }
+        if (result.error) {
+            queued.resolve(result);
+            return;
+        }
+        queued.resolve(dispatch(result));
     };
 
     const forgetRunIfAbsent = (runs) => {
@@ -198,15 +206,21 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             phase = 'idle';
         },
         submit(input) {
-            const result = submissionFrame({ ...input, phase });
-            if (result.error === 'pending') {
-                status('connecting', 'запуск…');
-                return result;
-            }
-            if (result.error) {
-                return result;
-            }
+            const stored = {
+                command: input.command,
+                prompt: input.prompt,
+                cwd: input.cwd,
+                approve: input.approve,
+            };
             if (!hubReady) {
+                const preview = submissionFrame({ ...stored, phase });
+                if (preview.error === 'pending') {
+                    status('connecting', 'запуск…');
+                    return preview;
+                }
+                if (preview.error) {
+                    return preview;
+                }
                 if (!socketPendingOrOpen() || stopped) {
                     return { error: 'disconnected' };
                 }
@@ -214,11 +228,19 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
                     return { error: 'pending' };
                 }
                 return new Promise((resolve) => {
-                    pending = { result, resolve };
+                    pending = { input: stored, resolve };
                 });
             }
             if (!socket || socket.readyState !== 1) {
                 return { error: 'disconnected' };
+            }
+            const result = submissionFrame({ ...stored, phase });
+            if (result.error === 'pending') {
+                status('connecting', 'запуск…');
+                return result;
+            }
+            if (result.error) {
+                return result;
             }
             return dispatch(result);
         },

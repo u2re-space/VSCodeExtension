@@ -7,10 +7,12 @@ import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
 import { agentHome, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
-import { launchOutcome, readAgentSettings, spawnArgs, spawnEnv } from './settings.mjs';
+import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, spawnArgs, spawnEnv } from './settings.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const STDERR_CAP = 4096;
+
+const positivePid = (pid) => (Number.isInteger(pid) && pid > 0 ? pid : null);
 
 const killPid = (pid) => {
     try {
@@ -116,6 +118,10 @@ export async function agent(context) {
         }
     };
 
+    const showStop = () => {
+        post({ type: 'stopVisible', visible: ownPid !== null || child !== null });
+    };
+
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
     statusBar.name = 'U2RE Agent';
     statusBar.text = 'U2RE Agent';
@@ -173,7 +179,12 @@ export async function agent(context) {
             return;
         }
         const record = await loadServeRecord(agentHome());
-        if (record && pidAlive(record.pid)) {
+        const spawnedPid = positivePid(proc?.pid);
+        if (record && pidAlive(record.pid) && shouldKillSpawnedPid({
+            ownPid: spawnedPid,
+            spawnedPid,
+            livePid: record.pid,
+        })) {
             killPid(record.pid);
         }
     };
@@ -209,6 +220,10 @@ export async function agent(context) {
                     stdio: ['ignore', 'ignore', 'pipe'],
                 });
                 child = proc;
+                const spawnedNow = positivePid(proc?.pid);
+                if (spawnedNow !== null) {
+                    ownPid = spawnedNow;
+                }
                 proc.stderr?.on('data', (chunk) => {
                     if (stderrText.length >= STDERR_CAP) {
                         return;
@@ -253,14 +268,24 @@ export async function agent(context) {
             const pending = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (pending === 'adopt') {
                 watch.on = false;
-                if (lock) {
-                    ownPid = found.pid;
-                    post({ type: 'stopVisible', visible: true });
+                const spawnedPid = positivePid(proc?.pid) ?? positivePid(child?.pid);
+                if (shouldKillSpawnedPid({ ownPid: spawnedPid, spawnedPid, livePid: found.pid })) {
+                    ownPid = spawnedPid;
+                    if (proc) {
+                        child = proc;
+                    }
+                } else if (!proc) {
+                    child = null;
+                    ownPid = null;
+                } else {
+                    ownPid = null;
                 }
+                showStop();
                 return;
             }
             await releaseLaunch(proc, proc !== null && pending !== 'spawn-error');
             ownPid = null;
+            showStop();
             const outcome = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (outcome === 'spawn-error') {
                 const message = spawnError.message || String(spawnError);
@@ -365,7 +390,7 @@ export async function agent(context) {
         vscode,
         attach(webview) {
             views.add(webview);
-            post({ type: 'stopVisible', visible: ownPid !== null });
+            showStop();
         },
         detach(webview) {
             views.delete(webview);
@@ -375,7 +400,7 @@ export async function agent(context) {
                 return;
             }
             if (message.type === 'ready') {
-                post({ type: 'stopVisible', visible: ownPid !== null });
+                showStop();
                 await ensureBus(settingsOf().launch);
                 return;
             }
@@ -388,8 +413,6 @@ export async function agent(context) {
                 return;
             }
             if (message.type === 'stop') {
-                const inFlight = launchTask !== null;
-                const ownedLaunch = ownPid !== null || child !== null;
                 launchToken += 1;
                 const wake = wakeLaunch;
                 wakeLaunch = null;
@@ -399,29 +422,32 @@ export async function agent(context) {
                 if (spawnWatch) {
                     spawnWatch.on = false;
                 }
+                const spawnedPid = positivePid(child?.pid);
+                const ownedPid = ownPid;
+                const proc = child;
+                child = null;
                 try {
-                    if (ownPid !== null) {
-                        killPid(ownPid);
+                    const record = await loadServeRecord(agentHome());
+                    const livePid = record && pidAlive(record.pid) ? record.pid : null;
+                    if (shouldKillSpawnedPid({ ownPid: ownedPid, spawnedPid, livePid })) {
+                        killPid(livePid);
                     }
-                    if (child) {
-                        const proc = child;
-                        child = null;
-                        killChild(proc);
-                    }
-                    if (inFlight && ownedLaunch) {
-                        const record = await loadServeRecord(agentHome());
-                        if (record && pidAlive(record.pid)) {
-                            killPid(record.pid);
+                    if (proc) {
+                        const childPid = positivePid(proc.pid);
+                        const killingLive = childPid !== null && childPid === livePid;
+                        if (!killingLive || shouldKillSpawnedPid({ ownPid: ownedPid, spawnedPid: childPid, livePid })) {
+                            killChild(proc);
                         }
                     }
                 } finally {
                     ownPid = null;
+                    child = null;
                     bus.resetPhase();
                     bus.close();
                     complete.close();
                     endpoint = null;
                     completeUrl = '';
-                    post({ type: 'stopVisible', visible: false });
+                    showStop();
                     post({ type: 'status', state: 'disconnected', detail: 'агент не запущен' });
                 }
                 return;
