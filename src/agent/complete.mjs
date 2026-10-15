@@ -19,6 +19,7 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
     let socket = null;
     let endpoint = null;
     let generation = 0;
+    let resolveOpened = () => {};
     let opened = Promise.resolve();
     const waiters = new Map();
 
@@ -29,6 +30,10 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
         }
     };
 
+    const settleOpened = () => {
+        resolveOpened();
+    };
+
     const open = () => {
         if (!endpoint?.completeWs) {
             return;
@@ -36,9 +41,17 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
         const gen = ++generation;
         const ws = new WebSocketImpl(endpoint.completeWs);
         socket = ws;
+        let resolveThis = () => {};
         opened = new Promise((resolve) => {
-            ws.onopen = () => resolve();
+            resolveThis = resolve;
+            resolveOpened = resolve;
         });
+        ws.onopen = () => {
+            if (gen !== generation) {
+                return;
+            }
+            resolveThis();
+        };
         ws.onmessage = (event) => {
             if (gen !== generation) {
                 return;
@@ -70,31 +83,35 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
                 return;
             }
             socket = null;
+            settleOpened();
             failAll();
         };
     };
 
+    const dropSocket = () => {
+        generation += 1;
+        const current = socket;
+        socket = null;
+        settleOpened();
+        failAll();
+        try {
+            current?.close(1000);
+        } catch { /* already closed */ }
+    };
+
     return {
         connect(next) {
-            generation += 1;
-            try {
-                socket?.close(1000);
-            } catch { /* already closed */ }
-            socket = null;
+            dropSocket();
             endpoint = next;
             open();
         },
         close() {
-            generation += 1;
-            failAll();
-            try {
-                socket?.close(1000);
-            } catch { /* already closed */ }
-            socket = null;
+            dropSocket();
         },
         request(body, signal) {
+            const gen = generation;
             const sendNow = () => new Promise((resolve) => {
-                if (!socket || socket.readyState !== 1) {
+                if (gen !== generation || !socket || socket.readyState !== 1) {
                     resolve(null);
                     return;
                 }
@@ -116,6 +133,9 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
             });
             if (socket && socket.readyState === 1) {
                 return sendNow();
+            }
+            if (signal?.isCancellationRequested) {
+                return Promise.resolve(null);
             }
             return opened.then(sendNow);
         },

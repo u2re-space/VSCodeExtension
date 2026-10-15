@@ -329,4 +329,22 @@ suite('agent complete', () => {
         assert.strictEqual(await pending, null);
         client.close();
     });
+
+    test('resolves null when closed before the socket opens', async () => {
+        const client = createCompleteClient({ WebSocketImpl: FakeSocket, onStatus: () => {} });
+        client.connect({ completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok' });
+        const pending = client.request({ type: 'complete', id: '9', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: false, onCancellationRequested: () => {} });
+        client.close();
+        assert.strictEqual(await pending, null);
+        assert.strictEqual(FakeSocket.latest.sent.length, 0);
+    });
+
+    test('resolves null when cancelled before the socket opens', async () => {
+        const client = createCompleteClient({ WebSocketImpl: FakeSocket, onStatus: () => {} });
+        client.connect({ completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok' });
+        const pending = client.request({ type: 'complete', id: '10', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: true, onCancellationRequested: () => {} });
+        assert.strictEqual(await pending, null);
+        assert.strictEqual(FakeSocket.latest.sent.length, 0);
+        client.close();
+    });
 });
