@@ -27,11 +27,8 @@ export function spawnArgs(settings) {
     return args;
 }
 
-export function shouldKillSpawnedPid({ ownPid, spawnedPid, livePid }) {
-    return Number.isInteger(spawnedPid)
-        && spawnedPid > 0
-        && ownPid === spawnedPid
-        && livePid === spawnedPid;
+export function shouldKillSpawnedPid({ ownPid, livePid }) {
+    return Number.isInteger(ownPid) && ownPid > 0 && ownPid === livePid;
 }
 
 export function launchOutcome({ cancelled, spawnError, found }) {

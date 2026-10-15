@@ -546,8 +546,10 @@ suite('agent settings', () => {
         assert.strictEqual(launchOutcome({ cancelled: true, spawnError, found }), 'spawn-error');
     });
 
-    test('kills only when the live pid equals the pid we spawned', () => {
+    test('kills the owned live pid even when the shell pid differs', () => {
         assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 42, livePid: 42 }), true);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 7, livePid: 42 }), true);
+        assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 7, livePid: 99 }), false);
         assert.strictEqual(shouldKillSpawnedPid({ ownPid: 42, spawnedPid: 42, livePid: 99 }), false);
         assert.strictEqual(shouldKillSpawnedPid({ ownPid: 7, spawnedPid: 42, livePid: 42 }), false);
         assert.strictEqual(shouldKillSpawnedPid({ ownPid: null, spawnedPid: null, livePid: 42 }), false);

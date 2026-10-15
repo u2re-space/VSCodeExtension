@@ -119,7 +119,7 @@ export async function agent(context) {
     };
 
     const showStop = () => {
-        post({ type: 'stopVisible', visible: ownPid !== null || child !== null });
+        post({ type: 'stopVisible', visible: ownPid !== null });
     };
 
     const statusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
@@ -182,7 +182,6 @@ export async function agent(context) {
         const spawnedPid = positivePid(proc?.pid);
         if (record && pidAlive(record.pid) && shouldKillSpawnedPid({
             ownPid: spawnedPid,
-            spawnedPid,
             livePid: record.pid,
         })) {
             killPid(record.pid);
@@ -268,16 +267,14 @@ export async function agent(context) {
             const pending = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (pending === 'adopt') {
                 watch.on = false;
-                const spawnedPid = positivePid(proc?.pid) ?? positivePid(child?.pid);
-                if (shouldKillSpawnedPid({ ownPid: spawnedPid, spawnedPid, livePid: found.pid })) {
-                    ownPid = spawnedPid;
-                    if (proc) {
-                        child = proc;
+                if (proc) {
+                    child = proc;
+                    const filePid = positivePid(found.pid);
+                    if (filePid !== null) {
+                        ownPid = filePid;
                     }
-                } else if (!proc) {
-                    child = null;
-                    ownPid = null;
                 } else {
+                    child = null;
                     ownPid = null;
                 }
                 showStop();
@@ -422,20 +419,19 @@ export async function agent(context) {
                 if (spawnWatch) {
                     spawnWatch.on = false;
                 }
-                const spawnedPid = positivePid(child?.pid);
                 const ownedPid = ownPid;
                 const proc = child;
                 child = null;
                 try {
                     const record = await loadServeRecord(agentHome());
                     const livePid = record && pidAlive(record.pid) ? record.pid : null;
-                    if (shouldKillSpawnedPid({ ownPid: ownedPid, spawnedPid, livePid })) {
+                    if (shouldKillSpawnedPid({ ownPid: ownedPid, livePid })) {
                         killPid(livePid);
                     }
                     if (proc) {
                         const childPid = positivePid(proc.pid);
                         const killingLive = childPid !== null && childPid === livePid;
-                        if (!killingLive || shouldKillSpawnedPid({ ownPid: ownedPid, spawnedPid: childPid, livePid })) {
+                        if (!killingLive || shouldKillSpawnedPid({ ownPid: ownedPid, livePid })) {
                             killChild(proc);
                         }
                     }
