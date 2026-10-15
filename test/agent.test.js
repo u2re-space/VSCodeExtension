@@ -3,6 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
+import { agentHtml } from '../src/agent/html.mjs';
 import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
@@ -346,5 +347,27 @@ suite('agent complete', () => {
         assert.strictEqual(await pending, null);
         assert.strictEqual(FakeSocket.latest.sent.length, 0);
         client.close();
+    });
+});
+
+suite('agent panel', () => {
+    test('renders the command buttons and a locked down csp', () => {
+        const html = agentHtml({
+            cssHref: 'https://vscode.local/webview.css',
+            scriptHref: 'https://vscode.local/agent.mjs',
+            nonce: 'abc',
+            cspSource: 'https://vscode.local',
+        });
+        assert.match(html, /default-src 'none'/);
+        assert.match(html, /script-src https:\/\/vscode\.local 'nonce-abc'/);
+        assert.match(html, /data-command="run"/);
+        assert.match(html, /data-command="ask"/);
+        assert.match(html, /data-command="chat"/);
+        assert.match(html, /data-command="image"/);
+        assert.match(html, /id="reconnect"/);
+        assert.match(html, /id="stop"/);
+        assert.match(html, /id="prompt"/);
+        assert.match(html, /id="log"/);
+        assert.match(html, /agent-body/);
     });
 });
