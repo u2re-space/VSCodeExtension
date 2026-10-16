@@ -1,5 +1,18 @@
 const APPROVE = new Set(['ask', 'read', 'write', 'all']);
 
+const RECONNECT_SECTIONS = [
+    'vext.agent.port',
+    'vext.agent.token',
+    'vext.agent.openaiBaseUrl',
+    'vext.agent.openaiApiKey',
+    'vext.agent.launch',
+    'vext.agent.command',
+];
+
+export function shouldReconnectAgent(affectsConfiguration) {
+    return RECONNECT_SECTIONS.some((section) => affectsConfiguration(section));
+}
+
 const COMPLETION_MODELS = new Set([
     'gpt-6-luna',
     'anthropic/claude-haiku-5-5',

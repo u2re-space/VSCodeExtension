@@ -8,7 +8,7 @@ import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
-import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
+import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
 const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
 
@@ -547,6 +547,29 @@ suite('agent settings', () => {
     test('an unrecognized completion model setting falls back to gpt-6-luna', () => {
         const settings = readAgentSettings((key) => (key === 'vext.agent.completion.model' ? 'nope' : undefined));
         assert.strictEqual(settings.completionModel, 'gpt-6-luna');
+    });
+
+    test('every completion model enum id round-trips through readAgentSettings', () => {
+        const pkg = JSON.parse(fs.readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+        const ids = pkg.contributes.configuration.properties['vext.agent.completion.model'].enum;
+        for (const id of ids) {
+            const settings = readAgentSettings((key) => (key === 'vext.agent.completion.model' ? id : undefined));
+            assert.strictEqual(settings.completionModel, id);
+        }
+    });
+
+    test('a completion setting change does not reconnect the agent', () => {
+        const reconnects = (changed) => shouldReconnectAgent((section) => changed.includes(section));
+        assert.strictEqual(reconnects(['vext.agent.completion.model']), false);
+        assert.strictEqual(reconnects(['vext.agent.completion.enabled']), false);
+        assert.strictEqual(reconnects(['vext.agent.completion.debounceMs']), false);
+        assert.strictEqual(reconnects(['vext.agent.approve']), false);
+        assert.strictEqual(reconnects(['vext.agent.port']), true);
+        assert.strictEqual(reconnects(['vext.agent.token']), true);
+        assert.strictEqual(reconnects(['vext.agent.openaiBaseUrl']), true);
+        assert.strictEqual(reconnects(['vext.agent.openaiApiKey']), true);
+        assert.strictEqual(reconnects(['vext.agent.launch']), true);
+        assert.strictEqual(reconnects(['vext.agent.command']), true);
     });
 
     test('ghost text sends the selected completion model', async () => {

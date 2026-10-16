@@ -7,7 +7,7 @@ import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
 import { agentHome, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
-import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, spawnArgs, spawnEnv } from './settings.mjs';
+import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from './settings.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const STDERR_CAP = 4096;
@@ -492,7 +492,7 @@ export async function agent(context) {
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.stop', () => session.onWebview({ type: 'stop' })));
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.reconnect', () => session.onWebview({ type: 'reconnect' })));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
-        if (!event.affectsConfiguration('vext.agent')) {
+        if (!shouldReconnectAgent((section) => event.affectsConfiguration(section))) {
             return;
         }
         bus.close();
