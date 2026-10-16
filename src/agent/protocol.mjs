@@ -40,7 +40,14 @@ export function submissionFrame({ command, prompt, cwd, approve, phase }) {
     return { frames: [start] };
 }
 
-function buildBody({ id, language, path: filePath, content, cursor, model }) {
+function copyList(value, limit) {
+    if (!Array.isArray(value) || value.length === 0) {
+        return undefined;
+    }
+    return value.slice(0, limit);
+}
+
+function buildBody({ id, language, path: filePath, content, cursor, model, problems, validation, files }) {
     const body = {
         type: 'complete',
         id,
@@ -54,13 +61,26 @@ function buildBody({ id, language, path: filePath, content, cursor, model }) {
     if (typeof model === 'string' && model.trim()) {
         body.model = model.trim();
     }
+    const problemList = copyList(problems, 24);
+    const validationList = copyList(validation, 24);
+    const fileList = copyList(files, 200);
+    if (problemList) {
+        body.problems = problemList;
+    }
+    if (validationList) {
+        body.validation = validationList;
+    }
+    if (fileList) {
+        body.files = fileList;
+    }
     return body;
 }
 
-export function completionRequest({ id, language, path: filePath, text, cursor, model }) {
+export function completionRequest({ id, language, path: filePath, text, cursor, model, problems, validation, files }) {
     const full = String(text ?? '');
+    const context = { model, problems, validation, files };
     if (Buffer.byteLength(full, 'utf8') <= FULL_BYTES) {
-        return buildBody({ id, language, path: filePath, content: full, cursor, model });
+        return buildBody({ id, language, path: filePath, content: full, cursor, ...context });
     }
     const lines = full.split('\n');
     for (const [before, after] of RADII) {
@@ -73,7 +93,7 @@ export function completionRequest({ id, language, path: filePath, text, cursor, 
             path: filePath,
             content,
             cursor: { line: cursor.line - start, character: cursor.character },
-            model,
+            ...context,
         });
         if (Buffer.byteLength(JSON.stringify(body), 'utf8') <= JSON_BYTES) {
             return body;

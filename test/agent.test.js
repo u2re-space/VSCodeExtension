@@ -145,6 +145,15 @@ suite('agent protocol', () => {
         assert.strictEqual(small.content, 'let a = ');
         assert.strictEqual(small.path, 'C:\\a.js');
         assert.strictEqual(small.cursor.line, 0);
+        const withContext = completionRequest({
+            id: '1', language: 'javascript', path: 'C:\\a.js', text: 'let a = ', cursor: { line: 0, character: 8 },
+            problems: [{ line: 0, character: 0, severity: 'error', source: 'eslint', message: 'oops' }],
+            validation: [{ line: 1, character: 0, severity: 'error', source: 'typescript', message: 'missing' }],
+            files: ['src/a.js', 'node_modules/pkg/index.js'],
+        });
+        assert.strictEqual(withContext.problems[0].source, 'eslint');
+        assert.strictEqual(withContext.validation[0].source, 'typescript');
+        assert.deepStrictEqual(withContext.files, ['src/a.js', 'node_modules/pkg/index.js']);
         const line = 'x'.repeat(80);
         const lines = Array.from({ length: 4000 }, () => line);
         const text = lines.join('\n');
