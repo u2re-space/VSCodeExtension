@@ -310,7 +310,7 @@ export function registerAgentCompletion(vscode, client, getSettings, onError) {
                     }
                     const liveCursor = cursorNow(vscode, document, anchor, version);
                     const placed = liveCursor && liveInsertion({
-                        insertText: text,
+                        insertText: text?.trim?.() || text,
                         snapshot,
                         anchor,
                         liveText: document.getText(),
