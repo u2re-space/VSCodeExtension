@@ -40,7 +40,7 @@ export function submissionFrame({ command, prompt, cwd, approve, phase }) {
     return { frames: [start] };
 }
 
-function buildBody({ id, language, path: filePath, content, cursor }) {
+function buildBody({ id, language, path: filePath, content, cursor, model }) {
     const body = {
         type: 'complete',
         id,
@@ -51,13 +51,16 @@ function buildBody({ id, language, path: filePath, content, cursor }) {
     if (filePath) {
         body.path = filePath;
     }
+    if (typeof model === 'string' && model.trim()) {
+        body.model = model.trim();
+    }
     return body;
 }
 
-export function completionRequest({ id, language, path: filePath, text, cursor }) {
+export function completionRequest({ id, language, path: filePath, text, cursor, model }) {
     const full = String(text ?? '');
     if (Buffer.byteLength(full, 'utf8') <= FULL_BYTES) {
-        return buildBody({ id, language, path: filePath, content: full, cursor });
+        return buildBody({ id, language, path: filePath, content: full, cursor, model });
     }
     const lines = full.split('\n');
     for (const [before, after] of RADII) {
@@ -70,6 +73,7 @@ export function completionRequest({ id, language, path: filePath, text, cursor }
             path: filePath,
             content,
             cursor: { line: cursor.line - start, character: cursor.character },
+            model,
         });
         if (Buffer.byteLength(JSON.stringify(body), 'utf8') <= JSON_BYTES) {
             return body;

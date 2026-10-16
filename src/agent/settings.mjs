@@ -1,5 +1,16 @@
 const APPROVE = new Set(['ask', 'read', 'write', 'all']);
 
+const COMPLETION_MODELS = new Set([
+    'gpt-6-luna',
+    'anthropic/claude-haiku-5-5',
+    'qwen/qwen3.8-omni-flash',
+    'qwen/qwen3.8-flash',
+    'z-ai/glm-5.3-flash',
+    'x-ai/grok-4.7',
+    'gemini-3.8-flash',
+    'deepseek/deepseek-v4.1-flash',
+]);
+
 export function readAgentSettings(get) {
     const portValue = get('vext.agent.port');
     const port = Number.isInteger(portValue) && portValue >= 0 && portValue <= 65535 ? portValue : 0;
@@ -7,6 +18,8 @@ export function readAgentSettings(get) {
     const parsedDebounce = typeof debounceValue === 'number' && Number.isFinite(debounceValue) && debounceValue >= 0 ? debounceValue : 1000;
     const debounceMs = Math.max(1000, parsedDebounce);
     const approveValue = get('vext.agent.approve');
+    const modelValue = get('vext.agent.completion.model');
+    const completionModel = COMPLETION_MODELS.has(modelValue) ? modelValue : 'gpt-6-luna';
     return {
         port,
         token: typeof get('vext.agent.token') === 'string' ? get('vext.agent.token') : '',
@@ -17,6 +30,7 @@ export function readAgentSettings(get) {
         approve: APPROVE.has(approveValue) ? approveValue : 'ask',
         completionEnabled: get('vext.agent.completion.enabled') !== false,
         debounceMs,
+        completionModel,
     };
 }
 

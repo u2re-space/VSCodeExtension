@@ -175,6 +175,7 @@ export function registerAgentCompletion(vscode, client, getSettings, onError) {
                         path: filePath,
                         text: document.getText(),
                         cursor: { line: position.line, character: position.character },
+                        model: settings.completionModel,
                     });
                     if (!body) {
                         return { items: [] };

@@ -565,6 +565,21 @@
                     "default": 1000,
                     "minimum": 1000,
                     "description": "Pause before a completion request. A request is never sent more than once a second."
+                },
+                "vext.agent.completion.model": {
+                    "type": "string",
+                    "enum": [
+                        "gpt-6-luna",
+                        "anthropic/claude-haiku-5-5",
+                        "qwen/qwen3.8-omni-flash",
+                        "qwen/qwen3.8-flash",
+                        "z-ai/glm-5.3-flash",
+                        "x-ai/grok-4.7",
+                        "gemini-3.8-flash",
+                        "deepseek/deepseek-v4.1-flash"
+                    ],
+                    "default": "gpt-6-luna",
+                    "description": "Model for ghost-text completion. gemini-3.8-flash may be expensive. deepseek/deepseek-v4.1-flash is expensive."
                 }
             }
         },

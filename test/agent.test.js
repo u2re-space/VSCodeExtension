@@ -5,7 +5,7 @@ import path from 'path';
 
 import { agentHtml } from '../src/agent/html.mjs';
 import { createBus } from '../src/agent/bus.mjs';
-import { createCompleteClient } from '../src/agent/complete.mjs';
+import { createCompleteClient, registerAgentCompletion } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
@@ -139,7 +139,9 @@ suite('agent protocol', () => {
     test('sends a small document whole and windows a large one', () => {
         const small = completionRequest({
             id: '1', language: 'javascript', path: 'C:\\a.js', text: 'let a = ', cursor: { line: 0, character: 8 },
+            model: 'x-ai/grok-4.7',
         });
+        assert.strictEqual(small.model, 'x-ai/grok-4.7');
         assert.strictEqual(small.content, 'let a = ');
         assert.strictEqual(small.path, 'C:\\a.js');
         assert.strictEqual(small.cursor.line, 0);
@@ -529,6 +531,7 @@ suite('agent settings', () => {
         const settings = readAgentSettings((key) => values.get(key));
         assert.strictEqual(settings.port, 8765);
         assert.strictEqual(settings.debounceMs, 1000);
+        assert.strictEqual(settings.completionModel, 'gpt-6-luna');
         assert.deepStrictEqual(spawnArgs(settings), ['serve', '--port', '8765']);
         assert.deepStrictEqual(spawnArgs({ ...settings, port: 0 }), ['serve']);
         const env = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiApiKey: 'secret' });
@@ -537,6 +540,36 @@ suite('agent settings', () => {
         assert.strictEqual(env.PATH, 'C:\\bin');
         const untouched = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiBaseUrl: '', openaiApiKey: '' });
         assert.strictEqual(untouched.OPENAI_API_KEY, undefined);
+    });
+
+    test('an unrecognized completion model setting falls back to gpt-6-luna', () => {
+        const settings = readAgentSettings((key) => (key === 'vext.agent.completion.model' ? 'nope' : undefined));
+        assert.strictEqual(settings.completionModel, 'gpt-6-luna');
+    });
+
+    test('ghost text sends the selected completion model', async () => {
+        let sent = null;
+        const client = { request(body) { sent = body; return Promise.resolve('next'); } };
+        let provider = null;
+        const vscode = {
+            languages: {
+                registerInlineCompletionItemProvider(_selector, value) {
+                    provider = value;
+                    return { dispose() {} };
+                },
+            },
+        };
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 1000, completionModel: 'x-ai/grok-4.7',
+        }));
+        const items = await provider.provideInlineCompletionItems(
+            { languageId: 'javascript', uri: { scheme: 'untitled' }, getText: () => 'const n = ' },
+            { line: 0, character: 10 },
+            {},
+            { isCancellationRequested: false },
+        );
+        assert.strictEqual(sent.model, 'x-ai/grok-4.7');
+        assert.strictEqual(items.items[0].insertText, 'next');
     });
 
     test('does not adopt a launch the user stopped', () => {
@@ -570,6 +603,20 @@ suite('agent settings', () => {
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 1000);
+        const completionModel = pkg.contributes.configuration.properties['vext.agent.completion.model'];
+        assert.strictEqual(completionModel.default, 'gpt-6-luna');
+        assert.deepStrictEqual(completionModel.enum, [
+            'gpt-6-luna',
+            'anthropic/claude-haiku-5-5',
+            'qwen/qwen3.8-omni-flash',
+            'qwen/qwen3.8-flash',
+            'z-ai/glm-5.3-flash',
+            'x-ai/grok-4.7',
+            'gemini-3.8-flash',
+            'deepseek/deepseek-v4.1-flash',
+        ]);
+        assert.match(completionModel.description, /gemini-3\.8-flash may be expensive/);
+        assert.match(completionModel.description, /deepseek\/deepseek-v4\.1-flash is expensive/);
         for (const key of ['vext.agent.command', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
             assert.strictEqual(pkg.contributes.configuration.properties[key].scope, 'machine');
         }
