@@ -151,7 +151,9 @@ suite('agent protocol', () => {
         assert.ok(Buffer.byteLength(text, 'utf8') > FULL_BYTES);
         const windowed = completionRequest({
             id: '2', language: 'javascript', path: 'C:\\a.js', text, cursor: { line: 1000, character: 3 },
+            model: 'x-ai/grok-4.7',
         });
+        assert.strictEqual(windowed.model, 'x-ai/grok-4.7');
         assert.notStrictEqual(windowed.content, text);
         assert.strictEqual(windowed.cursor.line, 200);
         assert.strictEqual(windowed.cursor.character, 3);
