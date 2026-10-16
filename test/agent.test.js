@@ -154,6 +154,15 @@ suite('agent protocol', () => {
         assert.strictEqual(withContext.problems[0].source, 'eslint');
         assert.strictEqual(withContext.validation[0].source, 'typescript');
         assert.deepStrictEqual(withContext.files, ['src/a.js', 'node_modules/pkg/index.js']);
+        const headed = completionRequest({
+            id: '4', language: 'javascript', path: 'C:\\a.js',
+            text: 'import x from "./x.js";\n\nconst n = ',
+            cursor: { line: 2, character: 10 },
+            references: [{ path: 'src/util.js', language: 'javascript', content: 'export const n = 1;\n' }],
+        });
+        assert.match(headed.header, /import x from "\.\/x\.js"/);
+        assert.strictEqual(headed.references[0].path, 'src/util.js');
+        assert.match(headed.references[0].content, /export const n/);
         const line = 'x'.repeat(80);
         const lines = Array.from({ length: 4000 }, () => line);
         const text = lines.join('\n');
@@ -541,7 +550,7 @@ suite('agent settings', () => {
         ]);
         const settings = readAgentSettings((key) => values.get(key));
         assert.strictEqual(settings.port, 8765);
-        assert.strictEqual(settings.debounceMs, 1000);
+        assert.strictEqual(settings.debounceMs, 350);
         assert.strictEqual(settings.completionModel, 'gpt-6-luna');
         assert.deepStrictEqual(spawnArgs(settings), ['serve', '--port', '8765']);
         assert.deepStrictEqual(spawnArgs({ ...settings, port: 0 }), ['serve']);
@@ -581,11 +590,15 @@ suite('agent settings', () => {
         assert.strictEqual(reconnects(['vext.agent.command']), true);
     });
 
-    test('ghost text sends the selected completion model', async () => {
-        let sent = null;
-        const client = { request(body) { sent = body; return Promise.resolve('next'); } };
+    function host() {
         let provider = null;
         const vscode = {
+            Range: class Range {
+                constructor(startLine, startCharacter, endLine, endCharacter) {
+                    this.start = { line: startLine, character: startCharacter };
+                    this.end = { line: endLine, character: endCharacter };
+                }
+            },
             languages: {
                 registerInlineCompletionItemProvider(_selector, value) {
                     provider = value;
@@ -593,17 +606,191 @@ suite('agent settings', () => {
                 },
             },
         };
+        return {
+            vscode,
+            provider: () => provider,
+        };
+    }
+
+    test('ghost text inserts at the cursor and sends the selected model', async () => {
+        let sent = null;
+        const client = { request(body) { sent = body; return Promise.resolve('next'); } };
+        const { vscode, provider } = host();
         registerAgentCompletion(vscode, client, () => ({
-            completionEnabled: true, debounceMs: 1000, completionModel: 'x-ai/grok-4.7',
+            completionEnabled: true, debounceMs: 0, completionModel: 'x-ai/grok-4.7',
         }));
-        const items = await provider.provideInlineCompletionItems(
-            { languageId: 'javascript', uri: { scheme: 'untitled' }, getText: () => 'const n = ' },
+        const items = await provider().provideInlineCompletionItems(
+            { languageId: 'javascript', uri: { scheme: 'untitled' }, version: 1, getText: () => 'const n = ' },
             { line: 0, character: 10 },
             {},
             { isCancellationRequested: false },
         );
         assert.strictEqual(sent.model, 'x-ai/grok-4.7');
+        assert.strictEqual(sent.files, undefined);
+        assert.strictEqual(sent.references, undefined);
         assert.strictEqual(items.items[0].insertText, 'next');
+        assert.strictEqual(items.items[0].filterText, 'next');
+        assert.deepStrictEqual(items.items[0].range.start, { line: 0, character: 10 });
+        assert.deepStrictEqual(items.items[0].range.end, { line: 0, character: 10 });
+    });
+
+    test('open editors are sent as references and the focused file is not repeated', async () => {
+        let sent = null;
+        const client = { request(body) { sent = body; return Promise.resolve('length'); } };
+        const { vscode, provider } = host();
+        const focused = {
+            languageId: 'javascript',
+            uri: { scheme: 'file', fsPath: 'C:\\work\\src\\a.js', toString() { return 'file:///C:/work/src/a.js'; } },
+            version: 1,
+            getText: () => 'import x from "./util.js";\n\nconst n = ',
+        };
+        const other = {
+            languageId: 'javascript',
+            uri: { scheme: 'file', fsPath: 'C:\\work\\src\\util.js', toString() { return 'file:///C:/work/src/util.js'; } },
+            getText: () => 'export function total(items) {\n  return items.length;\n}\n',
+        };
+        vscode.window = { visibleTextEditors: [{ document: focused }, { document: other }] };
+        vscode.workspace = { workspaceFolders: [{ uri: { fsPath: 'C:\\work' } }] };
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 0, completionModel: 'gpt-6-luna',
+        }));
+        const items = await provider().provideInlineCompletionItems(
+            focused,
+            { line: 2, character: 10 },
+            {},
+            { isCancellationRequested: false },
+        );
+        assert.match(sent.header, /import x from "\.\/util\.js"/);
+        assert.strictEqual(sent.references.length, 1);
+        assert.strictEqual(sent.references[0].path, 'src/util.js');
+        assert.match(sent.references[0].content, /function total/);
+        assert.strictEqual(items.items[0].insertText, 'length');
+        assert.deepStrictEqual(items.items[0].range.start, { line: 2, character: 10 });
+        assert.deepStrictEqual(items.items[0].range.end, { line: 2, character: 10 });
+    });
+
+    test('a later cursor is not dropped while an older request is in flight', async () => {
+        let release = () => {};
+        const sent = [];
+        const client = {
+            request(body) {
+                sent.push(body.cursor.character);
+                if (body.cursor.character === 1) {
+                    return new Promise((resolve) => { release = () => resolve('stale'); });
+                }
+                return Promise.resolve('fresh');
+            },
+        };
+        const { vscode, provider } = host();
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 0, completionModel: 'gpt-6-luna',
+        }));
+        const doc = { languageId: 'javascript', uri: { scheme: 'untitled' }, version: 1, getText: () => 'a' };
+        const first = provider().provideInlineCompletionItems(doc, { line: 0, character: 1 }, {}, { isCancellationRequested: false });
+        const until = Date.now() + 1000;
+        while (sent.length < 1 && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        const second = await provider().provideInlineCompletionItems(
+            { ...doc, getText: () => 'ab' },
+            { line: 0, character: 2 },
+            {},
+            { isCancellationRequested: false },
+        );
+        release();
+        assert.strictEqual(await first, undefined);
+        assert.deepStrictEqual(sent, [1, 2]);
+        assert.strictEqual(second.items[0].insertText, 'fresh');
+        assert.strictEqual(second.items[0].filterText, 'fresh');
+        assert.deepStrictEqual(second.items[0].range.start, { line: 0, character: 2 });
+        assert.deepStrictEqual(second.items[0].range.end, { line: 0, character: 2 });
+    });
+
+    test('a suggestion is not shown after an unrelated edit', async () => {
+        let ready = false;
+        let release = () => {};
+        const client = {
+            request() {
+                return new Promise((resolve) => {
+                    ready = true;
+                    release = () => resolve('1');
+                });
+            },
+        };
+        const { vscode, provider } = host();
+        const doc = {
+            languageId: 'javascript',
+            uri: { scheme: 'untitled', fsPath: 'mem' },
+            version: 1,
+            getText: () => 'const a = ',
+        };
+        vscode.window = {
+            activeTextEditor: { document: doc, selection: { active: { line: 0, character: 10 } } },
+        };
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 0, completionModel: 'gpt-6-luna',
+        }));
+        const pending = provider().provideInlineCompletionItems(doc, { line: 0, character: 10 }, {}, { isCancellationRequested: false });
+        const until = Date.now() + 1000;
+        while (!ready && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.strictEqual(ready, true);
+        doc.version = 2;
+        doc.getText = () => 'let other = 1;\n';
+        vscode.window.activeTextEditor.selection.active = { line: 0, character: 0 };
+        release();
+        assert.strictEqual(await pending, undefined);
+    });
+
+    test('typed text that matches the suggestion leaves only the rest as ghost text', async () => {
+        let ready = false;
+        let release = () => {};
+        const client = {
+            request() {
+                return new Promise((resolve) => {
+                    ready = true;
+                    release = () => resolve('1;');
+                });
+            },
+        };
+        const { vscode, provider } = host();
+        const doc = {
+            languageId: 'javascript',
+            uri: { scheme: 'untitled', fsPath: 'mem' },
+            version: 1,
+            getText: () => 'const a = ',
+        };
+        vscode.window = {
+            activeTextEditor: { document: doc, selection: { active: { line: 0, character: 10 } } },
+        };
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 0, completionModel: 'gpt-6-luna',
+        }));
+        const pending = provider().provideInlineCompletionItems(doc, { line: 0, character: 10 }, {}, { isCancellationRequested: false });
+        const until = Date.now() + 1000;
+        while (!ready && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        assert.strictEqual(ready, true);
+        doc.version = 2;
+        doc.getText = () => 'const a = 1';
+        vscode.window.activeTextEditor.selection.active = { line: 0, character: 11 };
+        release();
+        const items = await pending;
+        assert.strictEqual(items.items[0].insertText, ';');
+        assert.strictEqual(items.items[0].filterText, ';');
+        assert.deepStrictEqual(items.items[0].range.start, { line: 0, character: 11 });
+        assert.deepStrictEqual(items.items[0].range.end, { line: 0, character: 11 });
+    });
+
+    test('a cancelled completion does not publish an empty list', async () => {
+        const client = { request() { return Promise.resolve('next'); } };
+        const { vscode, provider } = host();
+        registerAgentCompletion(vscode, client, () => ({
+            completionEnabled: true, debounceMs: 0, completionModel: 'gpt-6-luna',
+        }));
+        const items = await provider().provideInlineCompletionItems(
+            { languageId: 'javascript', uri: { scheme: 'untitled' }, version: 1, getText: () => 'a' },
+            { line: 0, character: 1 },
+            {},
+            { isCancellationRequested: true },
+        );
+        assert.strictEqual(items, undefined);
     });
 
     test('does not adopt a launch the user stopped', () => {
@@ -636,7 +823,7 @@ suite('agent settings', () => {
         assert.ok(pkg.contributes.views.agentView.some((view) => view.id === 'vext.agentView'));
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
-        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 1000);
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 350);
         const completionModel = pkg.contributes.configuration.properties['vext.agent.completion.model'];
         assert.strictEqual(completionModel.default, 'gpt-6-luna');
         assert.deepStrictEqual(completionModel.enum, [

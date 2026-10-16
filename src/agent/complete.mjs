@@ -146,7 +146,6 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
 }
 
 const SEVERITY = ['error', 'warning', 'info', 'hint'];
-let treeCache = null;
 
 function editorDiagnostics(vscode, document) {
     if (typeof vscode.languages?.getDiagnostics !== 'function') {
@@ -162,34 +161,106 @@ function editorDiagnostics(vscode, document) {
     }));
 }
 
-async function workspaceFiles(vscode) {
-    const folder = vscode.workspace?.workspaceFolders?.[0];
-    if (!folder || typeof vscode.workspace.findFiles !== 'function') {
-        return [];
-    }
-    const now = Date.now();
-    if (treeCache && treeCache.key === folder.uri.fsPath && now - treeCache.at < 5000) {
-        return treeCache.files;
-    }
-    const uris = await vscode.workspace.findFiles('**/*', '**/{node_modules,.git,dist,build,coverage,.next}/**', 200);
-    const root = folder.uri.fsPath.replace(/\\/g, '/').replace(/\/$/, '');
-    const files = [];
-    for (const uri of uris) {
-        const full = String(uri.fsPath ?? '').replace(/\\/g, '/');
-        const rel = full.startsWith(`${root}/`) ? full.slice(root.length + 1) : full;
-        if (!rel || rel.split('/').includes('node_modules') || rel.split('/').includes('.git')) {
-            continue;
+function offsetIn(text, position) {
+    const lines = String(text ?? '').split('\n');
+    const line = Math.min(Math.max(position?.line ?? 0, 0), Math.max(0, lines.length - 1));
+    let offset = 0;
+    for (let i = 0; i < line; i++) {offset += lines[i].length + 1;}
+    const character = Math.min(Math.max(position?.character ?? 0, 0), lines[line].length);
+    return offset + character;
+}
+
+function sameDocument(left, right) {
+    if (!left || !right) {return false;}
+    if (left === right) {return true;}
+    const key = (doc) => {
+        const uri = doc.uri;
+        if (!uri) {return '';}
+        if (typeof uri.toString === 'function' && uri.toString !== Object.prototype.toString) {
+            const text = uri.toString();
+            if (text && text !== '[object Object]') {return text;}
         }
-        files.push(rel);
+        return uri.fsPath || uri.path || '';
+    };
+    const a = key(left);
+    const b = key(right);
+    return Boolean(a) && a === b;
+}
+
+/**
+ * Ghost text that still belongs at the live cursor. Null when the buffer changed into something else.
+ * insertText is only the characters the user has not typed. The range is that cursor, so the editor inserts instead of replacing the line.
+ * @param {{ insertText: string, snapshot: string, anchor: { line: number, character: number }, liveText: string, liveCursor: { line: number, character: number } }} input
+ * @returns {{ insertText: string, start: { line: number, character: number }, end: { line: number, character: number } }|null}
+ */
+export function liveInsertion({ insertText, snapshot, anchor, liveText, liveCursor }) {
+    const insertion = String(insertText ?? '');
+    if (!insertion || !anchor || !liveCursor) {return null;}
+    if (liveCursor.line !== anchor.line || liveCursor.character < anchor.character) {return null;}
+    const source = String(snapshot ?? '');
+    const live = String(liveText ?? '');
+    const origin = offsetIn(source, anchor);
+    const head = source.slice(0, origin);
+    const tail = source.slice(origin);
+    if (!live.startsWith(head) || !live.endsWith(tail)) {return null;}
+    const typed = live.slice(head.length, live.length - tail.length);
+    if (typed.includes('\n') || typed.length !== liveCursor.character - anchor.character) {return null;}
+    if (!insertion.startsWith(typed) || typed.length === insertion.length) {return null;}
+    // The editor paints ghost text only for a pure insertion. The range is the cursor,
+    // and insertText is the part the user has not typed yet.
+    return {
+        insertText: insertion.slice(typed.length),
+        start: { line: liveCursor.line, character: liveCursor.character },
+        end: { line: liveCursor.line, character: liveCursor.character },
+    };
+}
+
+function relativePath(root, fsPath) {
+    const full = String(fsPath ?? '').replace(/\\/g, '/');
+    const base = String(root ?? '').replace(/\\/g, '/').replace(/\/$/, '');
+    if (!full || !base) {return full;}
+    const prefix = `${base}/`;
+    if (full.toLowerCase().startsWith(prefix.toLowerCase())) {return full.slice(prefix.length);}
+    return full;
+}
+
+function openReferences(vscode, document) {
+    const editors = vscode.window?.visibleTextEditors;
+    if (!Array.isArray(editors)) {return [];}
+    const root = vscode.workspace?.workspaceFolders?.[0]?.uri?.fsPath ?? '';
+    const out = [];
+    for (const editor of editors) {
+        const doc = editor?.document;
+        if (!doc || sameDocument(doc, document)) {continue;}
+        const scheme = doc.uri?.scheme;
+        if (scheme !== 'file' && scheme !== 'untitled') {continue;}
+        const raw = typeof doc.getText === 'function' ? String(doc.getText() ?? '') : '';
+        const content = raw.split('\n').slice(0, 40).join('\n').trim();
+        if (!content) {continue;}
+        const full = scheme === 'file' ? doc.uri.fsPath : (doc.uri.path || '');
+        out.push({
+            path: relativePath(root, full),
+            language: typeof doc.languageId === 'string' ? doc.languageId : '',
+            content,
+        });
+        if (out.length >= 4) {break;}
     }
-    treeCache = { key: folder.uri.fsPath, at: now, files };
-    return files;
+    return out;
+}
+
+function cursorNow(vscode, document, anchor, version) {
+    const editor = vscode.window?.activeTextEditor;
+    const active = editor?.selection?.active;
+    if (editor && active && sameDocument(editor.document, document)) {
+        return { line: active.line, character: active.character };
+    }
+    if (document.version === version) {return anchor;}
+    return null;
 }
 
 export function registerAgentCompletion(vscode, client, getSettings, onError) {
     let seq = 0;
-    let lastSentAt = 0;
-    let inFlight = false;
+    let ticket = 0;
     return vscode.languages.registerInlineCompletionItemProvider(
         [{ scheme: 'file' }, { scheme: 'untitled' }],
         {
@@ -198,49 +269,72 @@ export function registerAgentCompletion(vscode, client, getSettings, onError) {
                 if (!settings.completionEnabled) {
                     return { items: [] };
                 }
+                const mine = ++ticket;
                 const cancelled = await wait(settings.debounceMs, token);
-                if (cancelled || token?.isCancellationRequested) {
-                    return { items: [] };
+                if (cancelled || token?.isCancellationRequested || mine !== ticket) {
+                    return undefined;
                 }
-                if (inFlight || Date.now() - lastSentAt < settings.debounceMs) {
-                    return { items: [] };
-                }
-                lastSentAt = Date.now();
-                inFlight = true;
+                const anchor = { line: position.line, character: position.character };
+                const snapshot = document.getText();
+                const version = document.version;
                 try {
                     const id = String(++seq);
                     const filePath = document.uri.scheme === 'file' ? document.uri.fsPath : undefined;
                     const diagnostics = editorDiagnostics(vscode, document);
-                    let files = [];
-                    try {
-                        files = await workspaceFiles(vscode);
-                    } catch {
-                        files = [];
-                    }
                     const body = completionRequest({
                         id,
                         language: document.languageId,
                         path: filePath,
-                        text: document.getText(),
-                        cursor: { line: position.line, character: position.character },
+                        text: snapshot,
+                        cursor: anchor,
                         model: settings.completionModel,
                         problems: diagnostics,
                         validation: diagnostics,
-                        files,
+                        references: openReferences(vscode, document),
                     });
                     if (!body) {
                         return { items: [] };
                     }
+                    if (mine !== ticket || token?.isCancellationRequested) {
+                        return undefined;
+                    }
                     const text = await client.request(body, token);
-                    if (!text) {
+                    if (!getSettings().completionEnabled) {
                         return { items: [] };
                     }
-                    return { items: [{ insertText: text }] };
+                    if (mine !== ticket || token?.isCancellationRequested) {
+                        return undefined;
+                    }
+                    if (!text) {
+                        return undefined;
+                    }
+                    const liveCursor = cursorNow(vscode, document, anchor, version);
+                    const placed = liveCursor && liveInsertion({
+                        insertText: text,
+                        snapshot,
+                        anchor,
+                        liveText: document.getText(),
+                        liveCursor,
+                    });
+                    if (!placed) {
+                        return undefined;
+                    }
+                    // Without a range, the editor replaces the current word through the end of the line
+                    // and then hides the item unless that text is a prefix of the insertion.
+                    const range = new vscode.Range(placed.start.line, placed.start.character, placed.end.line, placed.end.character);
+                    return {
+                        items: [{
+                            insertText: placed.insertText,
+                            filterText: placed.insertText,
+                            range,
+                        }],
+                    };
                 } catch (error) {
+                    if (mine !== ticket || token?.isCancellationRequested) {
+                        return undefined;
+                    }
                     onError?.(error?.message || 'Ошибка дополнения.');
                     return { items: [] };
-                } finally {
-                    inFlight = false;
                 }
             },
         },

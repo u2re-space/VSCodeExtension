@@ -47,7 +47,88 @@ function copyList(value, limit) {
     return value.slice(0, limit);
 }
 
-function buildBody({ id, language, path: filePath, content, cursor, model, problems, validation, files }) {
+const HEADER_LINE = /^\s*(?:import\s|import\(|export\s+(?:type\s+|interface\s+|\{|\*)|export\s+[\w$]+\s+from\s|const\s+\w+\s*=\s*require\s*\(|[A-Za-z_$][\w$.]*\s*=\s*require\s*\(|using\s|#include\s|package\s|namespace\s|from\s+\S+\s+import\s)/;
+const HEADER_NOTE = /^\s*(?:\/\/|\/\*|\*(?:\/|\s|$)|#(?!include\s)\s|--)/;
+const HEADER_DIRECTIVE = /^\s*['"]use [\w.]+['"];?\s*$/;
+
+/**
+ * Import block above the cursor. Empty when the file does not open with imports.
+ * @param {string} text
+ * @param {number} cursorLine
+ * @returns {string|undefined}
+ */
+export function completionHeader(text, cursorLine) {
+    const lines = String(text ?? '').split('\n');
+    const stop = Math.min(Math.max(cursorLine ?? 0, 0), lines.length);
+    const header = [];
+    let started = false;
+    for (let i = 0; i < stop && header.length < 24; i++) {
+        const line = lines[i];
+        if (HEADER_LINE.test(line)) {
+            started = true;
+            header.push(line);
+            continue;
+        }
+        const blank = line.trim() === '';
+        const note = HEADER_NOTE.test(line) || HEADER_DIRECTIVE.test(line) || line.startsWith('#!');
+        if (!started) {
+            if (blank) {
+                continue;
+            }
+            if (note) {
+                header.push(line);
+                continue;
+            }
+            return undefined;
+        }
+        if (blank || note) {
+            header.push(line);
+            continue;
+        }
+        break;
+    }
+    if (!started) {
+        return undefined;
+    }
+    while (header.length > 0 && header[header.length - 1].trim() === '') {
+        header.pop();
+    }
+    const joined = header.join('\n').trim();
+    if (!joined) {
+        return undefined;
+    }
+    return joined.length > 4000 ? joined.slice(0, 4000) : joined;
+}
+
+function copyReferences(value) {
+    if (!Array.isArray(value) || value.length === 0) {
+        return undefined;
+    }
+    const out = [];
+    for (const item of value) {
+        if (!item || typeof item !== 'object') {
+            continue;
+        }
+        const content = typeof item.content === 'string' ? item.content.replace(/\r\n/g, '\n').trim() : '';
+        if (!content) {
+            continue;
+        }
+        const row = { content: content.slice(0, 2000) };
+        if (typeof item.path === 'string' && item.path.trim()) {
+            row.path = item.path.trim().slice(0, 300);
+        }
+        if (typeof item.language === 'string' && item.language.trim()) {
+            row.language = item.language.trim().slice(0, 40);
+        }
+        out.push(row);
+        if (out.length >= 4) {
+            break;
+        }
+    }
+    return out.length ? out : undefined;
+}
+
+function buildBody({ id, language, path: filePath, content, cursor, model, problems, validation, files, header, references }) {
     const body = {
         type: 'complete',
         id,
@@ -61,9 +142,13 @@ function buildBody({ id, language, path: filePath, content, cursor, model, probl
     if (typeof model === 'string' && model.trim()) {
         body.model = model.trim();
     }
+    if (typeof header === 'string' && header.trim()) {
+        body.header = header.trim();
+    }
     const problemList = copyList(problems, 24);
     const validationList = copyList(validation, 24);
     const fileList = copyList(files, 200);
+    const referenceList = copyReferences(references);
     if (problemList) {
         body.problems = problemList;
     }
@@ -73,12 +158,22 @@ function buildBody({ id, language, path: filePath, content, cursor, model, probl
     if (fileList) {
         body.files = fileList;
     }
+    if (referenceList) {
+        body.references = referenceList;
+    }
     return body;
 }
 
-export function completionRequest({ id, language, path: filePath, text, cursor, model, problems, validation, files }) {
+export function completionRequest({ id, language, path: filePath, text, cursor, model, problems, validation, files, references }) {
     const full = String(text ?? '');
-    const context = { model, problems, validation, files };
+    const context = {
+        model,
+        problems,
+        validation,
+        files,
+        references,
+        header: completionHeader(full, cursor?.line ?? 0),
+    };
     if (Buffer.byteLength(full, 'utf8') <= FULL_BYTES) {
         return buildBody({ id, language, path: filePath, content: full, cursor, ...context });
     }
@@ -213,6 +308,7 @@ export const __agentTest = {
     submissionFrame,
     approveFrame,
     answerFrame,
+    completionHeader,
     completionRequest,
     acceptCompletion,
     panelMessageFromEvent,

@@ -562,9 +562,9 @@
                 },
                 "vext.agent.completion.debounceMs": {
                     "type": "number",
-                    "default": 1000,
-                    "minimum": 1000,
-                    "description": "Pause before a completion request. A request is never sent more than once a second."
+                    "default": 350,
+                    "minimum": 50,
+                    "description": "How long to wait after the last edit before asking for ghost text."
                 },
                 "vext.agent.completion.model": {
                     "type": "string",

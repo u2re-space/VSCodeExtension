@@ -109,6 +109,7 @@ export async function agent(context) {
     let launchToken = 0;
     let wakeLaunch = null;
     let spawnWatch = null;
+    let completionOffline = false;
 
     const settingsOf = () => readAgentSettings((key) => vscode.workspace.getConfiguration().get(key));
 
@@ -144,6 +145,9 @@ export async function agent(context) {
             post({ ...message, detail: message.detail || detail });
             if (message.state === 'ready' && endpoint) {
                 post({ type: 'status', state: 'ready', detail: endpoint.url });
+                if (settingsOf().completionEnabled) {
+                    void ensureComplete();
+                }
             }
         },
     });
@@ -374,8 +378,13 @@ export async function agent(context) {
         }
         const next = await currentEndpoint();
         if (!next) {
+            if (settingsOf().completionEnabled && !completionOffline) {
+                completionOffline = true;
+                flash('агент не запущен');
+            }
             return;
         }
+        completionOffline = false;
         endpoint = next;
         if (completeUrl !== next.completeWs || !complete.isOpen()) {
             completeUrl = next.completeWs;
@@ -505,7 +514,11 @@ export async function agent(context) {
         }
     }));
     if (settingsOf().launch) {
-        void ensureServer(true);
+        void ensureServer(true).then(() => {
+            if (settingsOf().completionEnabled) {
+                void ensureComplete();
+            }
+        });
     }
     context.subscriptions.push({ dispose: () => { bus.close(); complete.close(); } });
 }

@@ -41,4 +41,5 @@ export function activate(context) {
 }
 
 // This method is called when your extension is deactivated
-export function deactivate() {}
+export function deactivate() {
+}
