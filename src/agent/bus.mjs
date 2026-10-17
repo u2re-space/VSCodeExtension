@@ -1,6 +1,6 @@
-import { answerFrame, approveFrame, nextDelay, panelMessageFromHub, submissionFrame } from './protocol.mjs';
+import { answerFrame, approveFrame, claimFrames, nextDelay, panelMessageFromHub, submissionFrame, toolResultFrame } from './protocol.mjs';
 
-export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule = clearTimeout, onMessage, onStatus }) {
+export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule = clearTimeout, onMessage, onStatus, onToolRequest = null }) {
     let socket = null;
     let endpoint = null;
     let generation = 0;
@@ -11,6 +11,50 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
     let phase = 'idle';
     let hubReady = false;
     let pending = null;
+    const runDirs = new Map();
+    const inflight = new Set();
+
+    const abortInflight = (runId) => {
+        for (const controller of inflight) {
+            if (runId === undefined || controller.runId === runId) {
+                controller.abort();
+            }
+        }
+    };
+
+    const rememberRun = (run) => {
+        if (!run || typeof run.id !== 'string' || typeof run.cwd !== 'string') {
+            return;
+        }
+        runDirs.set(run.id, run.cwd);
+    };
+
+    const answerTool = async (frame) => {
+        if (!frame || typeof frame.requestId !== 'string' || frame.requestId === '') {
+            return;
+        }
+        const gen = generation;
+        const controller = new AbortController();
+        controller.runId = typeof frame.runId === 'string' ? frame.runId : '';
+        inflight.add(controller);
+        try {
+            const cwd = controller.runId ? (runDirs.get(controller.runId) ?? '') : '';
+            const result = onToolRequest
+                ? await onToolRequest(frame, cwd, controller.signal)
+                : { error: 'Обработка инструмента недоступна.' };
+            if (controller.signal.aborted || gen !== generation) {
+                return;
+            }
+            send(toolResultFrame(frame.requestId, result ?? { error: 'Ошибка инструмента.' }));
+        } catch (error) {
+            if (controller.signal.aborted || gen !== generation || error?.name === 'AbortError') {
+                return;
+            }
+            send(toolResultFrame(frame.requestId, { error: error?.message || String(error) }));
+        } finally {
+            inflight.delete(controller);
+        }
+    };
 
     const clearStartingPhase = () => {
         if (phase === 'starting') {
@@ -127,6 +171,14 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
                 hubReady = true;
                 status('ready', endpoint.url);
                 forgetRunIfAbsent(frame.runs);
+                if (Array.isArray(frame.runs)) {
+                    for (const run of frame.runs) {
+                        rememberRun(run);
+                    }
+                }
+                for (const claim of claimFrames(frame.runs)) {
+                    send(claim);
+                }
                 flushPending();
             }
             if (frame.type === 'error' && frame.code === 'unauthorized') {
@@ -135,11 +187,23 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             if (frame.type === 'error' && phase === 'starting') {
                 phase = 'idle';
             }
-            if (frame.type === 'run.started' && frame.run && phase === 'starting') {
-                phase = { runId: frame.run.id, command: frame.run.command };
+            if (frame.type === 'run.started') {
+                rememberRun(frame.run);
+                if (frame.run && phase === 'starting') {
+                    phase = { runId: frame.run.id, command: frame.run.command };
+                }
             }
-            if (frame.type === 'run.ended' && phase && phase.runId === frame.runId) {
-                phase = 'idle';
+            if (frame.type === 'run.ended') {
+                abortInflight(frame.runId);
+                if (typeof frame.runId === 'string') {
+                    runDirs.delete(frame.runId);
+                }
+                if (phase && phase.runId === frame.runId) {
+                    phase = 'idle';
+                }
+            }
+            if (frame.type === 'tool.request') {
+                void answerTool(frame);
             }
             deliver(frame);
         };
@@ -150,6 +214,7 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             clearStartingPhase();
             hubReady = false;
             socket = null;
+            abortInflight();
             failPending();
             if (stopped || unauthorized || event?.code === 1008) {
                 if (event?.code === 1008) {
@@ -171,6 +236,8 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
             }
             clearStartingPhase();
             failPending();
+            abortInflight();
+            runDirs.clear();
             hubReady = false;
             stopped = false;
             unauthorized = false;
@@ -190,6 +257,8 @@ export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule 
         close() {
             clearStartingPhase();
             failPending();
+            abortInflight();
+            runDirs.clear();
             hubReady = false;
             stopped = true;
             generation += 1;

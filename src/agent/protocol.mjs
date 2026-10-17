@@ -19,6 +19,53 @@ export function answerFrame(requestId, text) {
     return { type: 'answer', requestId, text: String(text ?? '') };
 }
 
+export const PROCESSABLE = ['delete_file', 'list_files', 'read_file', 'replace_text', 'run_command', 'run_script', 'search_files', 'write_file'];
+
+const CHANGE_OPS = new Set(['create', 'overwrite', 'edit', 'delete']);
+
+export function claimFrames(runs) {
+    if (!Array.isArray(runs)) {
+        return [];
+    }
+    const frames = [];
+    for (const run of runs) {
+        if (!run || run.source !== 'client' || run.status !== 'running' || typeof run.id !== 'string' || run.id === '') {
+            continue;
+        }
+        frames.push({ type: 'processing.claim', runId: run.id, tools: PROCESSABLE.slice() });
+    }
+    return frames;
+}
+
+export function toolResultFrame(requestId, result) {
+    const error = result && typeof result.error === 'string' ? result.error.trim() : '';
+    if (!result || error) {
+        return { type: 'tool.result', requestId, error: error || 'Ошибка инструмента.' };
+    }
+    const frame = {
+        type: 'tool.result',
+        requestId,
+        output: typeof result.output === 'string' ? result.output : '',
+        summary: typeof result.summary === 'string' ? result.summary : '',
+    };
+    if (Array.isArray(result.changes)) {
+        const changes = [];
+        for (const item of result.changes) {
+            if (!item || typeof item.path !== 'string' || !CHANGE_OPS.has(item.op)) {
+                continue;
+            }
+            changes.push({ op: item.op, path: item.path });
+            if (changes.length >= 100) {
+                break;
+            }
+        }
+        if (changes.length) {
+            frame.changes = changes;
+        }
+    }
+    return frame;
+}
+
 export function submissionFrame({ command, prompt, cwd, approve, phase }) {
     if (typeof prompt !== 'string' || prompt.trim() === '') {
         return { error: 'empty' };
@@ -33,7 +80,7 @@ export function submissionFrame({ command, prompt, cwd, approve, phase }) {
     if (typeof cwd !== 'string' || cwd.trim() === '') {
         return { error: 'no-workspace' };
     }
-    const start = { type: 'start', command, prompt, cwd, approve };
+    const start = { type: 'start', command, prompt, cwd, approve, processing: PROCESSABLE.slice() };
     if (running && phase.runId) {
         return { frames: [{ type: 'cancel', runId: phase.runId }, start] };
     }
@@ -256,6 +303,11 @@ export function panelMessageFromEvent(event) {
     if (event.type === 'image.progress') {
         return { type: 'status', state: 'ready', detail: 'генерирует изображение…' };
     }
+    if (event.type === 'processing.held') {
+        const tools = Array.isArray(event.tools) ? event.tools.filter((name) => typeof name === 'string') : [];
+        const text = tools.length ? `редактор выполняет: ${tools.join(', ')}` : 'инструменты выполняет агент';
+        return { type: 'log', level: 'info', text };
+    }
     return null;
 }
 
@@ -298,6 +350,11 @@ export function panelMessageFromHub(frame) {
     if (frame.type === 'question.request') {
         return { type: 'question', runId: frame.runId, requestId: frame.requestId, question: String(frame.question ?? '') };
     }
+    if (frame.type === 'processing.released') {
+        const tools = Array.isArray(frame.tools) ? frame.tools.filter((name) => typeof name === 'string') : [];
+        const text = tools.length ? `редактор отпустил: ${tools.join(', ')}` : 'редактор отпустил инструменты';
+        return { type: 'log', level: 'warn', text };
+    }
     return null;
 }
 
@@ -305,6 +362,9 @@ export const __agentTest = {
     FULL_BYTES,
     JSON_BYTES,
     nextDelay,
+    PROCESSABLE,
+    claimFrames,
+    toolResultFrame,
     submissionFrame,
     approveFrame,
     answerFrame,

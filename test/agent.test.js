@@ -7,6 +7,7 @@ import { agentHtml } from '../src/agent/html.mjs';
 import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from '../src/agent/complete.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
+import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
@@ -15,6 +16,7 @@ const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint 
 const {
     nextDelay, submissionFrame, approveFrame, completionRequest, acceptCompletion,
     panelMessageFromEvent, panelMessageFromHub, FULL_BYTES,
+    PROCESSABLE, claimFrames, toolResultFrame,
 } = protocolTest;
 
 suite('agent endpoint', () => {
@@ -39,11 +41,23 @@ suite('agent endpoint', () => {
 
     test('reads serve.json from a directory', async () => {
         const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vext-agent-'));
+        const vscode = {
+            Uri: {
+                file: (file) => ({ fsPath: file, scheme: 'file' }),
+                joinPath: (base, ...parts) => ({ fsPath: path.join(base.fsPath, ...parts), scheme: 'file' }),
+            },
+            workspace: {
+                fs: {
+                    readFile: async (uri) => fs.readFileSync(uri.fsPath),
+                },
+            },
+        };
         fs.writeFileSync(path.join(dir, 'serve.json'), JSON.stringify(live));
-        assert.deepStrictEqual(await loadServeRecord(dir), live);
+        assert.deepStrictEqual(await loadServeRecord(vscode, dir), live);
         fs.writeFileSync(path.join(dir, 'serve.json'), '{');
-        assert.strictEqual(await loadServeRecord(dir), null);
-        assert.strictEqual(await loadServeRecord(path.join(dir, 'missing')), null);
+        assert.strictEqual(await loadServeRecord(vscode, dir), null);
+        assert.strictEqual(await loadServeRecord(vscode, path.join(dir, 'missing')), null);
+        fs.rmSync(dir, { recursive: true, force: true });
     });
 
     test('returns the file url and token for a live record', () => {
@@ -103,7 +117,7 @@ suite('agent protocol', () => {
     test('builds start and cancels a run that is still going', () => {
         const idle = submissionFrame({ command: 'run', prompt: 'fix', cwd: 'C:\\work', approve: 'ask', phase: 'idle' });
         assert.deepStrictEqual(idle.frames, [
-            { type: 'start', command: 'run', prompt: 'fix', cwd: 'C:\\work', approve: 'ask' },
+            { type: 'start', command: 'run', prompt: 'fix', cwd: 'C:\\work', approve: 'ask', processing: PROCESSABLE.slice() },
         ]);
         const busy = submissionFrame({
             command: 'ask', prompt: 'why', cwd: 'C:\\work', approve: 'read', phase: { runId: 'r1', command: 'run' },
@@ -122,6 +136,20 @@ suite('agent protocol', () => {
             command: 'chat', prompt: '/exit', cwd: '', approve: 'ask', phase: { runId: 'c1', command: 'chat' },
         });
         assert.deepStrictEqual(next.frames, [{ type: 'input', runId: 'c1', text: '/exit' }]);
+        assert.strictEqual(next.frames[0].processing, undefined);
+    });
+
+    test('claims only a running client run and builds a tool result', () => {
+        assert.deepStrictEqual(claimFrames([
+            { id: 'c1', source: 'client', status: 'running' },
+            { id: 't1', source: 'terminal', status: 'running' },
+            { id: 'old', source: 'client', status: 'ended' },
+            { id: '', source: 'client', status: 'running' },
+        ]), [{ type: 'processing.claim', runId: 'c1', tools: PROCESSABLE.slice() }]);
+        assert.deepStrictEqual(claimFrames(null), []);
+        const done = toolResultFrame('q1', { output: 'body', summary: 'sum', changes: [{ op: 'edit', path: 'a.js' }, { op: 'nope', path: 'b.js' }] });
+        assert.deepStrictEqual(done, { type: 'tool.result', requestId: 'q1', output: 'body', summary: 'sum', changes: [{ op: 'edit', path: 'a.js' }] });
+        assert.deepStrictEqual(toolResultFrame('q2', { error: ' Файл не найден ' }), { type: 'tool.result', requestId: 'q2', error: 'Файл не найден' });
     });
 
     test('rejects an empty prompt, a missing folder, and a start that has not been acknowledged', () => {
@@ -192,6 +220,12 @@ suite('agent protocol', () => {
         assert.strictEqual(panelMessageFromEvent({ type: 'tool.exec.done', name: 'write', ok: true, summary: 'saved' }).type, 'log');
         assert.strictEqual(panelMessageFromEvent({ type: 'reasoning.delta', text: 'secret' }).type, 'status');
         assert.notStrictEqual(panelMessageFromEvent({ type: 'reasoning.delta', text: 'secret' }).type, 'log');
+        assert.deepStrictEqual(panelMessageFromEvent({ type: 'processing.held', tools: ['read_file', 'write_file'] }), {
+            type: 'log', level: 'info', text: 'редактор выполняет: read_file, write_file',
+        });
+        assert.deepStrictEqual(panelMessageFromHub({ type: 'processing.released', tools: ['read_file'] }), {
+            type: 'log', level: 'warn', text: 'редактор отпустил: read_file',
+        });
         const ended = panelMessageFromHub({ type: 'run.ended', runId: 'r1', status: 'completed', exitCode: 0 });
         assert.strictEqual(ended.status, 'ended');
         assert.strictEqual(ended.exitCode, 0);
@@ -241,6 +275,7 @@ suite('agent bus', () => {
         assert.strictEqual(statuses.at(-1).state, 'ready');
         const result = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
         assert.strictEqual(result.frames[0].type, 'start');
+        assert.deepStrictEqual(result.frames[0].processing, PROCESSABLE);
         assert.strictEqual(FakeSocket.latest.sent.at(-1).command, 'run');
         const pending = bus.submit({ command: 'ask', prompt: 'more', cwd: 'C:\\work', approve: 'ask' });
         assert.strictEqual(pending.error, 'pending');
@@ -463,6 +498,67 @@ suite('agent bus', () => {
         assert.strictEqual(FakeSocket.latest, first);
         assert.strictEqual(first.readyState, 1);
         bus.close();
+    });
+
+    test('claims a live client run on connect and returns the tool result', async () => {
+        let seen;
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+            onToolRequest: async (frame, cwd) => {
+                seen = { name: frame.name, cwd };
+                return { output: 'body', summary: 'sum', changes: [{ op: 'edit', path: 'a.js' }] };
+            },
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({
+            type: 'ready',
+            runs: [
+                { id: 'c1', source: 'client', status: 'running', cwd: 'C:\\work' },
+                { id: 't1', source: 'terminal', status: 'running', cwd: 'C:\\term' },
+            ],
+        });
+        const claims = FakeSocket.latest.sent.filter((frame) => frame.type === 'processing.claim');
+        assert.strictEqual(claims.length, 1);
+        assert.strictEqual(claims[0].runId, 'c1');
+        assert.deepStrictEqual(claims[0].tools, PROCESSABLE);
+        FakeSocket.latest.receive({ type: 'tool.request', runId: 'c1', requestId: 'q', name: 'read_file', args: { path: 'a.js' } });
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.deepStrictEqual(seen, { name: 'read_file', cwd: 'C:\\work' });
+        assert.deepStrictEqual(FakeSocket.latest.sent.find((frame) => frame.type === 'tool.result'), {
+            type: 'tool.result', requestId: 'q', output: 'body', summary: 'sum', changes: [{ op: 'edit', path: 'a.js' }],
+        });
+        bus.close();
+    });
+
+    test('remembers cwd from run.started and drops a result after close', async () => {
+        let release;
+        const gate = new Promise((resolve) => {
+            release = resolve;
+        });
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+            onToolRequest: () => gate.then(() => ({ output: 'late', summary: 's' })),
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const socket = FakeSocket.latest;
+        socket.open();
+        socket.receive({ type: 'ready', runs: [] });
+        socket.receive({ type: 'run.started', run: { id: 'r9', command: 'ask', status: 'running', cwd: 'D:\\proj', source: 'client' } });
+        assert.strictEqual(socket.sent.some((frame) => frame.type === 'processing.claim'), false);
+        socket.receive({ type: 'tool.request', runId: 'r9', requestId: 'q2', name: 'list_files', args: {} });
+        bus.close();
+        release();
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.strictEqual(socket.sent.some((frame) => frame.type === 'tool.result'), false);
     });
 });
 
@@ -841,5 +937,269 @@ suite('agent settings', () => {
         for (const key of ['vext.agent.command', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
             assert.strictEqual(pkg.contributes.configuration.properties[key].scope, 'machine');
         }
+    });
+});
+
+suite('agent processing', () => {
+    const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'vext-process-'));
+    const diskIo = (root) => {
+        const fsp = fs.promises;
+        return {
+            root,
+            async readFile(abs) {
+                try {
+                    return await fsp.readFile(abs);
+                } catch (error) {
+                    if (error?.code === 'ENOENT') {
+                        return null;
+                    }
+                    throw error;
+                }
+            },
+            async writeFile(abs, text) {
+                await fsp.mkdir(path.dirname(abs), { recursive: true });
+                await fsp.writeFile(abs, text, 'utf8');
+            },
+            async deleteFile(abs) {
+                await fsp.unlink(abs);
+            },
+            async stat(abs) {
+                try {
+                    const info = await fsp.stat(abs);
+                    return { isFile: info.isFile(), isDirectory: info.isDirectory(), isSymbolicLink: false, size: info.size };
+                } catch (error) {
+                    if (error?.code === 'ENOENT') {
+                        return null;
+                    }
+                    throw error;
+                }
+            },
+            async readdir(abs) {
+                const entries = await fsp.readdir(abs, { withFileTypes: true });
+                return entries.map((entry) => ({
+                    name: entry.name,
+                    isFile: entry.isFile(),
+                    isDirectory: entry.isDirectory(),
+                    isSymbolicLink: entry.isSymbolicLink(),
+                }));
+            },
+            spawn() {
+                throw new Error('Терминал редактора недоступен.');
+            },
+        };
+    };
+
+    test('processing host does not import node fs or child_process', () => {
+        const source = fs.readFileSync(new URL('../src/agent/processing.mjs', import.meta.url), 'utf8');
+        assert.doesNotMatch(source, /node:fs|node:child_process|node:path/);
+        const launch = fs.readFileSync(new URL('../src/agent/index.mjs', import.meta.url), 'utf8');
+        assert.doesNotMatch(launch, /node:fs|node:child_process|node:path/);
+        const endpoint = fs.readFileSync(new URL('../src/agent/endpoint.mjs', import.meta.url), 'utf8');
+        assert.doesNotMatch(endpoint, /node:fs|node:os|node:path/);
+    });
+
+    test('reads, edits, and deletes inside the work directory', async () => {
+        const dir = temp();
+        try {
+            fs.writeFileSync(path.join(dir, 'a.txt'), 'hello');
+            fs.mkdirSync(path.join(dir, 'sub'));
+            fs.writeFileSync(path.join(dir, 'sub', 'b.txt'), 'needle');
+            const io = diskIo(dir);
+            const read = await executeProcessing({ name: 'read_file', args: { path: 'a.txt' } }, io);
+            assert.match(read.output, /# a\.txt — строки 1-1 из 1/);
+            assert.match(read.output, /1\| hello/);
+            assert.strictEqual(read.summary, 'a.txt: строки 1-1/1');
+            const replaced = await executeProcessing({
+                name: 'replace_text', args: { path: 'a.txt', search: 'hello', replacement: 'hi', all: false },
+            }, io);
+            assert.deepStrictEqual(replaced.changes, [{ op: 'edit', path: 'a.txt' }]);
+            assert.strictEqual(fs.readFileSync(path.join(dir, 'a.txt'), 'utf8'), 'hi');
+            const created = await executeProcessing({
+                name: 'write_file', args: { path: 'sub/c.txt', content: 'new', overwrite: false },
+            }, io);
+            assert.deepStrictEqual(created.changes, [{ op: 'create', path: 'sub/c.txt' }]);
+            const blocked = await executeProcessing({
+                name: 'write_file', args: { path: 'a.txt', content: 'no', overwrite: false },
+            }, io);
+            assert.match(blocked.error, /overwrite=false/);
+            const found = await executeProcessing({ name: 'search_files', args: { query: 'needle', path: null, regex: false, scope: 'all' } }, io);
+            assert.match(found.output, /sub\/b\.txt:1: needle/);
+            const listed = await executeProcessing({ name: 'list_files', args: { path: '.', depth: 2, include_hidden: false } }, io);
+            assert.match(listed.output, /sub\//);
+            assert.match(listed.output, /a\.txt/);
+            const removed = await executeProcessing({ name: 'delete_file', args: { path: 'a.txt' } }, io);
+            assert.deepStrictEqual(removed.changes, [{ op: 'delete', path: 'a.txt' }]);
+            assert.strictEqual(fs.existsSync(path.join(dir, 'a.txt')), false);
+            const outside = await executeProcessing({ name: 'read_file', args: { path: '../secret' } }, io);
+            assert.match(outside.error, /вне рабочего каталога/);
+            const secret = await executeProcessing({ name: 'read_file', args: { path: '.env' } }, io);
+            assert.match(secret.error, /секретами/);
+            const crlf = path.join(dir, 'win.txt');
+            fs.writeFileSync(crlf, 'one\r\ntwo');
+            const mismatch = await executeProcessing({
+                name: 'replace_text', args: { path: 'win.txt', search: 'one\ntwo', replacement: 'x', all: false },
+            }, io);
+            assert.match(mismatch.error, /CRLF\/LF/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('uses an open editor buffer for read and replace', async () => {
+        const dir = temp();
+        try {
+            const abs = path.join(dir, 'a.txt');
+            fs.writeFileSync(abs, 'disk');
+            let saved = 0;
+            let applied = null;
+            const doc = {
+                uri: { scheme: 'file', fsPath: abs },
+                isDirty: true,
+                getText: () => 'alpha beta',
+                positionAt: (offset) => ({ line: 0, character: offset }),
+                save: async () => {
+                    saved += 1;
+                    return true;
+                },
+            };
+            const vscode = {
+                Uri: { file: (file) => ({ fsPath: file, scheme: 'file' }) },
+                Position: class { constructor(line, character) { this.line = line; this.character = character; } },
+                Range: class { constructor(start, end) { this.start = start; this.end = end; } },
+                WorkspaceEdit: class { replace(uri, range, text) { this.uri = uri; this.range = range; this.text = text; } },
+                workspace: {
+                    workspaceFolders: [{ uri: { scheme: 'file', fsPath: dir } }],
+                    textDocuments: [doc],
+                    applyEdit: async (edit) => {
+                        applied = edit;
+                        return true;
+                    },
+                    fs: {
+                        stat: async () => ({ type: 1, size: 4 }),
+                        readFile: async () => {
+                            throw new Error('workspace.fs.readFile');
+                        },
+                        writeFile: async () => {
+                            throw new Error('workspace.fs.writeFile');
+                        },
+                        createDirectory: async () => {},
+                        delete: async () => {
+                            throw new Error('workspace.fs.delete');
+                        },
+                        readDirectory: async () => [],
+                    },
+                },
+                window: {},
+            };
+            const io = createWorkspaceIo(vscode, dir);
+            const read = await executeProcessing({ name: 'read_file', args: { path: 'a.txt' } }, io);
+            assert.match(read.output, /alpha beta/);
+            assert.doesNotMatch(read.output, /disk/);
+            const replaced = await executeProcessing({
+                name: 'replace_text', args: { path: 'a.txt', search: 'alpha', replacement: 'gamma', all: false },
+            }, io);
+            assert.strictEqual(applied.text, 'gamma beta');
+            assert.strictEqual(saved, 1);
+            assert.deepStrictEqual(replaced.changes, [{ op: 'edit', path: 'a.txt' }]);
+            assert.strictEqual(fs.readFileSync(abs, 'utf8'), 'disk');
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('reports a command from the editor terminal', async () => {
+        const dir = temp();
+        try {
+            const io = diskIo(dir);
+            let launched = null;
+            io.spawn = async (spec) => {
+                launched = spec;
+                return { exitCode: 0, timedOut: false, cancelled: false, durationMs: 4, truncated: false, stdout: 'hi\n', stderr: '', error: null };
+            };
+            const result = await executeProcessing({
+                name: 'run_command', args: { command: 'echo hi', shell: '', cwd: null, timeout_seconds: 5, reason: 'test' },
+            }, io);
+            assert.match(launched.commandLine, /echo hi/);
+            assert.match(result.output, /exit code 0/);
+            assert.match(result.output, /hi/);
+            assert.strictEqual(result.summary, 'exit code 0');
+            fs.writeFileSync(path.join(dir, 'hi.cmd'), '@echo off\r\n');
+            const script = await executeProcessing({
+                name: 'run_script', args: { path: 'hi.cmd', args: ['--x'], shell: '', cwd: null, timeout_seconds: null, reason: 'test' },
+            }, io);
+            assert.strictEqual(script.summary, 'exit code 0');
+            assert.match(launched.commandLine, /hi\.cmd/);
+            assert.match(launched.commandLine, /--x/);
+        } finally {
+            fs.rmSync(dir, { recursive: true, force: true });
+        }
+    });
+
+    test('writes through workspace.fs and runs in the integrated terminal', async () => {
+        const written = [];
+        let execution = null;
+        let endListener = null;
+        const vscode = {
+            Uri: {
+                file: (file) => ({ fsPath: file, scheme: 'file' }),
+                joinPath: (base, ...parts) => ({ fsPath: [base.fsPath, ...parts].join('/'), scheme: base.scheme }),
+            },
+            workspace: {
+                workspaceFolders: [{ uri: { scheme: 'file', fsPath: 'C:\\work' } }],
+                textDocuments: [],
+                fs: {
+                    stat: async (uri) => {
+                        if (uri.fsPath.replace(/\\/g, '/').toLowerCase().endsWith('/a.txt')) {
+                            const error = new Error('missing');
+                            error.code = 'FileNotFound';
+                            throw error;
+                        }
+                        return { type: 2, size: 0 };
+                    },
+                    readDirectory: async () => [['a.txt', 1]],
+                    createDirectory: async () => {},
+                    writeFile: async (uri, bytes) => {
+                        written.push({ uri, text: new TextDecoder().decode(bytes) });
+                    },
+                    readFile: async () => new TextEncoder().encode('a'),
+                    delete: async () => {},
+                },
+            },
+            window: {
+                createTerminal() {
+                    return {
+                        shellIntegration: {
+                            executeCommand(line) {
+                                execution = {
+                                    line,
+                                    read: async function* read() {
+                                        yield 'hi\n';
+                                    },
+                                };
+                                queueMicrotask(() => endListener?.({ execution, exitCode: 0 }));
+                                return execution;
+                            },
+                        },
+                        dispose() {},
+                    };
+                },
+                onDidEndTerminalShellExecution(listener) {
+                    endListener = listener;
+                    return { dispose() {} };
+                },
+            },
+        };
+        const io = createWorkspaceIo(vscode, 'C:\\work');
+        const created = await executeProcessing({
+            name: 'write_file', args: { path: 'a.txt', content: 'hi', overwrite: true },
+        }, io);
+        assert.deepStrictEqual(created.changes, [{ op: 'create', path: 'a.txt' }]);
+        assert.strictEqual(written[0].text, 'hi');
+        const ran = await executeProcessing({
+            name: 'run_command', args: { command: 'echo hi', shell: 'cmd', cwd: null, timeout_seconds: 5, reason: 'test' },
+        }, io);
+        assert.match(execution.line, /echo hi/);
+        assert.match(ran.output, /hi/);
+        assert.strictEqual(ran.summary, 'exit code 0');
     });
 });

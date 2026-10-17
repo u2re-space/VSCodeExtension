@@ -1,97 +1,177 @@
-import { execFileSync, spawn } from 'node:child_process';
-import fs from 'node:fs/promises';
-import path from 'node:path';
-
 import vscodeAPI from '../imports/api.ts';
 import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
+import { createWorkspaceIo, executeProcessing } from './processing.mjs';
 import { agentHome, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
 import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from './settings.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const STDERR_CAP = 4096;
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
 
 const positivePid = (pid) => (Number.isInteger(pid) && pid > 0 ? pid : null);
 
-const killPid = (pid) => {
-    try {
-        process.kill(pid);
-    } catch (error) {
-        if (error?.code !== 'ESRCH') {
-            throw error;
-        }
-    }
+const missingFile = (error) => error?.code === 'FileNotFound' || error?.code === 'EntryNotFound';
+
+const isWindows = (vscode) => {
+    const shell = String(vscode.env?.shell ?? '');
+    return shell.includes('\\') || /\.exe$/i.test(shell);
 };
 
-const killChild = (proc) => {
-    if (!proc) {
-        return;
+const lockUri = (vscode) => vscode.Uri.joinPath(vscode.Uri.file(agentHome()), 'launch.lock');
+
+const readLock = async (vscode, uri) => {
+    const bytes = await vscode.workspace.fs.readFile(uri);
+    return decoder.decode(bytes).trim();
+};
+
+const taskPresentation = (vscode) => ({
+    reveal: vscode.TaskRevealKind.Never,
+    echo: false,
+    focus: false,
+    panel: vscode.TaskPanelKind.Dedicated,
+    showReuseMessage: false,
+    close: true,
+});
+
+const runTask = async (vscode, name, execution, onStart, onEnd) => {
+    const task = new vscode.Task({ type: execution instanceof vscode.ProcessExecution ? 'process' : 'shell' }, vscode.TaskScope.Global, name, 'U2RE Agent', execution);
+    task.presentationOptions = taskPresentation(vscode);
+    const started = [];
+    const ended = [];
+    let executionHandle = null;
+    const handle = {
+        execution: null,
+        pid: null,
+        kill() {
+            try {
+                executionHandle?.terminate();
+            } catch {
+                /* already gone */
+            }
+        },
+        dispose() {},
+    };
+    const remember = (bucket, event) => {
+        if (!executionHandle || event.execution === executionHandle) {
+            bucket.push(event);
+        }
+    };
+    const startSub = vscode.tasks.onDidStartTaskProcess((event) => {
+        if (!executionHandle) {
+            remember(started, event);
+            return;
+        }
+        if (event.execution === executionHandle && positivePid(event.processId)) {
+            handle.pid = event.processId;
+            onStart?.(event.processId);
+        }
+    });
+    const endSub = vscode.tasks.onDidEndTaskProcess((event) => {
+        if (!executionHandle) {
+            remember(ended, event);
+            return;
+        }
+        if (event.execution === executionHandle) {
+            onEnd?.(event.exitCode);
+        }
+    });
+    try {
+        executionHandle = await vscode.tasks.executeTask(task);
+    } catch (error) {
+        startSub.dispose();
+        endSub.dispose();
+        throw error;
     }
-    const pid = proc.pid;
-    if (process.platform === 'win32' && Number.isInteger(pid) && pid > 0) {
-        try {
-            execFileSync('taskkill', ['/T', '/F', '/PID', String(pid)], {
-                windowsHide: true,
-                stdio: 'ignore',
-                timeout: 5000,
-            });
-        } catch {
-            /* already gone */
+    handle.execution = executionHandle;
+    handle.dispose = () => {
+        startSub.dispose();
+        endSub.dispose();
+    };
+    for (const event of started) {
+        if (event.execution === executionHandle && positivePid(event.processId)) {
+            handle.pid = event.processId;
+            onStart?.(event.processId);
         }
     }
+    for (const event of ended) {
+        if (event.execution === executionHandle) {
+            onEnd?.(event.exitCode);
+        }
+    }
+    return handle;
+};
+
+const endPid = async (vscode, pid) => {
+    if (!positivePid(pid)) {
+        return;
+    }
+    const execution = isWindows(vscode)
+        ? new vscode.ProcessExecution('taskkill', ['/T', '/F', '/PID', String(pid)])
+        : new vscode.ProcessExecution('kill', ['-KILL', String(pid)]);
     try {
-        proc.kill();
+        const handle = await runTask(vscode, 'stop', execution);
+        handle.dispose();
     } catch {
         /* already gone */
     }
 };
 
-const launchLockFile = () => path.join(agentHome(), 'launch.lock');
+const killHandle = (proc) => {
+    if (!proc) {
+        return;
+    }
+    proc.kill?.();
+    proc.dispose?.();
+};
 
-const takeLaunchLock = async () => {
-    const file = launchLockFile();
-    await fs.mkdir(path.dirname(file), { recursive: true });
-    const write = async () => {
-        await fs.writeFile(file, String(process.pid), { flag: 'wx' });
-        return { file };
+const takeLaunchLock = async (vscode) => {
+    const uri = lockUri(vscode);
+    await vscode.workspace.fs.createDirectory(vscode.Uri.file(agentHome()));
+    const marker = String(process.pid);
+    const claim = async () => {
+        await vscode.workspace.fs.writeFile(uri, encoder.encode(marker));
+        const current = await readLock(vscode, uri);
+        if (current !== marker) {
+            return null;
+        }
+        return { uri, marker };
     };
+    let existing = null;
     try {
-        return await write();
+        existing = await readLock(vscode, uri);
     } catch (error) {
-        if (error?.code !== 'EEXIST') {
+        if (!missingFile(error)) {
             throw error;
         }
     }
-    let holder = 0;
-    try {
-        holder = Number(await fs.readFile(file, 'utf8'));
-    } catch {
-        return null;
-    }
-    if (Number.isInteger(holder) && pidAlive(holder)) {
-        return null;
-    }
-    try {
-        await fs.unlink(file);
-    } catch {
-        return null;
+    if (existing !== null) {
+        const holder = Number(existing);
+        if (Number.isInteger(holder) && pidAlive(holder)) {
+            return null;
+        }
+        try {
+            await vscode.workspace.fs.delete(uri);
+        } catch {
+            return null;
+        }
     }
     try {
-        return await write();
+        return await claim();
     } catch {
         return null;
     }
 };
 
-const releaseLaunchLock = async (lock) => {
+const releaseLaunchLock = async (vscode, lock) => {
     if (!lock) {
         return;
     }
     try {
-        const current = Number(await fs.readFile(lock.file, 'utf8'));
-        if (current === process.pid) {
-            await fs.unlink(lock.file);
+        const current = await readLock(vscode, lock.uri);
+        if (current === lock.marker) {
+            await vscode.workspace.fs.delete(lock.uri);
         }
     } catch {
         /* already gone */
@@ -139,6 +219,14 @@ export async function agent(context) {
 
     const bus = createBus({
         WebSocketImpl: globalThis.WebSocket,
+        onToolRequest: (frame, cwd, signal) => {
+            const folder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '';
+            const root = typeof cwd === 'string' && cwd.trim() ? cwd : folder;
+            if (!root) {
+                return executeProcessing(frame, { root: '' }, signal);
+            }
+            return executeProcessing(frame, createWorkspaceIo(vscode, root), signal);
+        },
         onMessage: (message) => post(message),
         onStatus: (message) => {
             const detail = message.detail || (message.state === 'ready' ? endpoint?.url : message.state);
@@ -159,7 +247,7 @@ export async function agent(context) {
 
     const currentEndpoint = async () => {
         const settings = settingsOf();
-        const record = await loadServeRecord(agentHome());
+        const record = await loadServeRecord(vscode, agentHome());
         const alive = record ? pidAlive(record.pid) : false;
         return resolveEndpoint({
             record,
@@ -174,7 +262,7 @@ export async function agent(context) {
             spawnWatch.on = false;
         }
         if (proc) {
-            killChild(proc);
+            killHandle(proc);
             if (child === proc) {
                 child = null;
             }
@@ -182,13 +270,13 @@ export async function agent(context) {
         if (!killFilePid) {
             return;
         }
-        const record = await loadServeRecord(agentHome());
+        const record = await loadServeRecord(vscode, agentHome());
         const spawnedPid = positivePid(proc?.pid);
         if (record && pidAlive(record.pid) && shouldKillSpawnedPid({
             ownPid: spawnedPid,
             livePid: record.pid,
         })) {
-            killPid(record.pid);
+            await endPid(vscode, record.pid);
         }
     };
 
@@ -209,56 +297,47 @@ export async function agent(context) {
         try {
             if (!cancelled()) {
                 try {
-                    lock = await takeLaunchLock();
+                    lock = await takeLaunchLock(vscode);
                 } catch (error) {
                     spawnError = error;
                 }
             }
             if (lock && !spawnError && !cancelled()) {
-                let stderrText = '';
-                proc = spawn(settings.command, spawnArgs(settings), {
-                    shell: process.platform === 'win32',
-                    windowsHide: true,
-                    env: spawnEnv(process.env, settings),
-                    stdio: ['ignore', 'ignore', 'pipe'],
-                });
-                child = proc;
-                const spawnedNow = positivePid(proc?.pid);
-                if (spawnedNow !== null) {
-                    ownPid = spawnedNow;
-                }
-                proc.stderr?.on('data', (chunk) => {
-                    if (stderrText.length >= STDERR_CAP) {
-                        return;
-                    }
-                    stderrText += chunk.toString();
-                    if (stderrText.length > STDERR_CAP) {
-                        stderrText = stderrText.slice(0, STDERR_CAP);
-                    }
-                });
-                proc.on('error', (error) => {
-                    if (!watch.on || spawnError) {
-                        return;
-                    }
+                const env = spawnEnv({}, settings);
+                const options = Object.keys(env).length > 0 ? { env } : undefined;
+                try {
+                    proc = await runTask(
+                        vscode,
+                        'serve',
+                        new vscode.ShellExecution(settings.command, spawnArgs(settings), options),
+                        (pid) => {
+                            if (ownPid === null && watch.on) {
+                                ownPid = pid;
+                                showStop();
+                            }
+                        },
+                        (code) => {
+                            if (!watch.on || spawnError || code === 0 || code === undefined || code === null) {
+                                return;
+                            }
+                            spawnError = new Error(`${settings.command} exited with code ${code}`);
+                            wakeWait();
+                        },
+                    );
+                } catch (error) {
                     spawnError = error;
                     wakeWait();
-                });
-                proc.on('exit', (code) => {
-                    if (!watch.on || spawnError || code === 0 || code === null) {
-                        return;
-                    }
-                    const detail = stderrText.trim();
-                    const message = detail
-                        ? `${settings.command} exited with code ${code}: ${detail}`
-                        : `${settings.command} exited with code ${code}`;
-                    spawnError = new Error(message);
-                    wakeWait();
-                });
+                }
+                child = proc;
+                const spawnedNow = positivePid(proc?.pid);
+                if (spawnedNow !== null && ownPid === null) {
+                    ownPid = spawnedNow;
+                }
             }
             const deadline = Date.now() + 10000;
             let found = null;
             while (Date.now() < deadline && !cancelled() && !spawnError) {
-                const record = await loadServeRecord(agentHome());
+                const record = await loadServeRecord(vscode, agentHome());
                 if (cancelled() || spawnError) {
                     break;
                 }
@@ -301,7 +380,7 @@ export async function agent(context) {
             vscode.window.showErrorMessage(message);
             post({ type: 'status', state: 'error', detail: message });
         } finally {
-            await releaseLaunchLock(lock);
+            await releaseLaunchLock(vscode, lock);
             if (wakeLaunch === wakeWait) {
                 wakeLaunch = null;
             }
@@ -432,16 +511,16 @@ export async function agent(context) {
                 const proc = child;
                 child = null;
                 try {
-                    const record = await loadServeRecord(agentHome());
+                    const record = await loadServeRecord(vscode, agentHome());
                     const livePid = record && pidAlive(record.pid) ? record.pid : null;
                     if (shouldKillSpawnedPid({ ownPid: ownedPid, livePid })) {
-                        killPid(livePid);
+                        await endPid(vscode, livePid);
                     }
                     if (proc) {
                         const childPid = positivePid(proc.pid);
                         const killingLive = childPid !== null && childPid === livePid;
                         if (!killingLive || shouldKillSpawnedPid({ ownPid: ownedPid, livePid })) {
-                            killChild(proc);
+                            killHandle(proc);
                         }
                     }
                 } finally {

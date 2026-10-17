@@ -11,3 +11,4 @@ Read only when the task needs prior decisions. Append a line only if a later cha
 - Known symlink pairs: `vext.symlink.knownLinks` on `globalState`.
 - GPT webview is offline-first (host CSP / X-Frame-Options).
 - Convert prefixes: `htd` HTML→MD, `dth` MD→HTML, `ltm` LaTeX→MathML, `mtl` MathML→LaTeX.
+- Universal-AI processing: on bus `ready`, claim running client runs; every `start` sends `processing` for the eight tools. `tool.request` uses `vscode.workspace.fs`, open editors, and the integrated terminal.

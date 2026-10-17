@@ -1,13 +1,34 @@
-import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
+const decoder = new TextDecoder();
 
-export function agentHome(env = process.env, homedir = os.homedir()) {
-    const custom = typeof env.AI_AGENT_HOME === 'string' ? env.AI_AGENT_HOME.trim() : '';
+export function homeDirectory(env = process.env) {
+    const profile = typeof env?.USERPROFILE === 'string' ? env.USERPROFILE.trim() : '';
+    if (profile) {
+        return profile;
+    }
+    const drive = typeof env?.HOMEDRIVE === 'string' ? env.HOMEDRIVE : '';
+    const homePath = typeof env?.HOMEPATH === 'string' ? env.HOMEPATH : '';
+    if (drive && homePath) {
+        const sep = homePath.startsWith('\\') || homePath.startsWith('/') ? '' : '\\';
+        return `${drive}${sep}${homePath}`;
+    }
+    return typeof env?.HOME === 'string' ? env.HOME.trim() : '';
+}
+
+function joinPath(root, name) {
+    const windows = root.includes('\\') || /^[A-Za-z]:/.test(root);
+    const sep = windows ? '\\' : '/';
+    return `${String(root).replace(/[\\/]+$/, '')}${sep}${name}`;
+}
+
+export function agentHome(env = process.env, homedir = homeDirectory(env)) {
+    const custom = typeof env?.AI_AGENT_HOME === 'string' ? env.AI_AGENT_HOME.trim() : '';
     if (custom) {
         return custom;
     }
-    return path.join(homedir, '.ai-agent');
+    if (typeof homedir !== 'string' || !homedir.trim()) {
+        return '';
+    }
+    return joinPath(homedir.trim(), '.ai-agent');
 }
 
 export function parseServeRecord(text) {
@@ -47,10 +68,17 @@ export function pidAlive(pid) {
     }
 }
 
-export async function loadServeRecord(dir) {
+function serveUri(vscode, dir) {
+    return vscode.Uri.joinPath(vscode.Uri.file(dir), 'serve.json');
+}
+
+export async function loadServeRecord(vscode, dir) {
+    if (!vscode?.workspace?.fs || typeof dir !== 'string' || !dir.trim() || typeof vscode.Uri?.file !== 'function') {
+        return null;
+    }
     try {
-        const text = await fs.readFile(path.join(dir, 'serve.json'), 'utf8');
-        return parseServeRecord(text);
+        const bytes = await vscode.workspace.fs.readFile(serveUri(vscode, dir));
+        return parseServeRecord(decoder.decode(bytes));
     } catch {
         return null;
     }
@@ -83,4 +111,4 @@ export function resolveEndpoint({ record, settings, ownPid = null, alive = false
     return null;
 }
 
-export const __agentTest = { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint };
+export const __agentTest = { homeDirectory, agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint };
