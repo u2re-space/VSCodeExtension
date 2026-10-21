@@ -46,14 +46,14 @@ function renderInitialModuleRows(modules: string[] | undefined): string {
 }
 
 /** Shown when getWebviewContent fails — keeps the view usable over SSH */
-export function getMinimalManagerFallbackHtml(theme = "dark"): string {
+export function getMinimalManagerFallbackHtml(theme = "dark", initialModules?: string[]): string {
     return `<!doctype html>
 <html data-theme="${theme}">
 <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /></head>
 <body data-theme="${theme}">
   <div class="toolbar"><span class="toolbar-label">Bulk actions:</span></div>
   <table id="modulesTable" aria-label="Modules"><tbody id="modulesTbody">
-    <tr tabindex="0" data-module="./"><td class="name">./</td><td class="actions"></td></tr>
+    ${renderInitialModuleRows(initialModules)}
   </tbody></table>
   <p style="opacity:0.7;font-size:12px;padding:8px;">Manager UI loading…</p>
 </body></html>`;

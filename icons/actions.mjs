@@ -188,7 +188,7 @@ function renderModules(modules = []) {
     for (const raw of ["./", ...(modules || [])]) {
         if (raw == null || raw === "") { continue; }
         const view = asModuleView(raw);
-        const key = view.path.replace(/\\/g, "/").toLowerCase();
+        const key = view.path.replace(/\\/g, "/");
         if (seen.has(key)) { continue; }
         seen.add(key);
         list.push(view);

@@ -8,6 +8,7 @@ Read only when the task needs prior decisions. Append a line only if a later cha
 - New command / menu / setting: `package.json` `contributes` **and** a registrar in `src/`.
 - Manager cache key `vext.managerModulesCacheV2`. `vext.managerView.fileWatch` defaults off (broad watchers fight agents).
 - Scan order: manifests → quick probe (`modules/projects`, `modules`, `apps`, `packages`, `externals`) → `package.json` find. Extra paths: `vext.managerView.extraModules`.
+- Manager cache is per workspace URI; scanning/filtering must use `workspace.fs` and URI-relative paths (no Node `fs`/`asRelativePath`) to work on Linux and `vscode-remote:`.
 - Known symlink pairs: `vext.symlink.knownLinks` on `globalState`.
 - GPT webview is offline-first (host CSP / X-Frame-Options).
 - Convert prefixes: `htd` HTML→MD, `dth` MD→HTML, `ltm` LaTeX→MathML, `mtl` MathML→LaTeX.
