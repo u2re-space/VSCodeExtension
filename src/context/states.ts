@@ -59,27 +59,29 @@ async function proxyUndo() {
     const vscode = await vscodePromise;
     const unflag = () => { // run cursor command!
         changeFlags.undo = false;
-        clearTimeout(timer);
+        //clearTimeout(timer);
     };
     await vscode?.commands?.executeCommand?.('undo')?.catch?.(unflag);
-    const timer = setTimeout(()=>{
+    // @ts-ignore
+    const timer = queueMicrotask?.(()=>{
         if (!changeFlags.undo) { unflag?.(); }
         changeFlags.undo = false;
-    }, 10);
+    });
 }
 
 //
 async function proxyRedo() {
     const vscode = await vscodePromise;
     const unflag = () => { // run cursor command!
-        changeFlags.redo = false; clearTimeout(timer);
+        changeFlags.redo = false; //clearTimeout(timer);
         return vscode?.commands?.executeCommand?.("editor.action.acceptCursorTabSuggestion");
     };
     await vscode?.commands?.executeCommand?.('redo')?.catch?.(unflag);
-    const timer = setTimeout(()=>{
+    // @ts-ignore
+    const timer = queueMicrotask?.(()=>{
         if (!changeFlags.redo) { unflag?.(); }
         changeFlags.redo = false;
-    }, 10);
+    });
 }
 
 //

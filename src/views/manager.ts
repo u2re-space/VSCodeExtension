@@ -845,7 +845,7 @@ async function runModuleScan(
 
     const scanPromise = scanWork();
     let timedOut = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    //let timer: ReturnType<typeof setTimeout> | undefined;
     // Do not discard a slow remote scan: publish its final result after the timeout.
     scanPromise.then((modules) => {
         if (timedOut) { onFinal?.(modules); }
@@ -853,15 +853,15 @@ async function runModuleScan(
 
     const result = await Promise.race([
         scanPromise,
-        new Promise<string[]>((resolve) => {
-            timer = setTimeout(() => {
+        new Promise<string[]>((resolve) => { // @ts-ignore
+            return queueMicrotask?.(() => {
                 timedOut = true;
                 // Do not await fs checks here: a disconnected remote can hang them forever.
                 resolve(mergeModuleLists(stale, extra));
-            }, hardTimeoutMs);
+            });
         }),
     ]);
-    if (timer) { clearTimeout(timer); }
+    //if (timer) { clearTimeout(timer); }
     return result;
 }
 
@@ -894,11 +894,11 @@ async function scanWorkspaceModules(
         try {
             const mods = await Promise.race([
                 cache.inflight,
-                new Promise<string[]>((resolve) => {
-                    setTimeout(() => {
+                new Promise<string[]>((resolve) => { // @ts-ignore
+                    return queueMicrotask?.(() => {
                         // Same reason as in runModuleScan: never block the refresh on hung fs calls.
                         resolve(mergeModuleLists(cache.modules, extra));
-                    }, hardTimeoutMs);
+                    });
                 }),
             ]);
             return await filterLiveModules(vscodeAPI, wsdUri, mods, extra);
@@ -1401,8 +1401,8 @@ export class ManagerViewProvider {
             }).catch(console.warn);
         };
 
-        acquireManagerFileWatch(vscodeAPI);
-        setTimeout(startBackgroundWork, 100);
+        acquireManagerFileWatch(vscodeAPI); // @ts-ignore
+        queueMicrotask?.(startBackgroundWork);
 
         const watchCb = (force = false) => scheduleRefresh(force);
         inWatch?.add?.(watchCb);
@@ -1530,9 +1530,9 @@ export async function manager(context: vscode.ExtensionContext) {
             inWatch.delete(watchCb);
             releaseManagerFileWatch();
             if (refreshTimer) { clearTimeout(refreshTimer); }
-        });
-        setTimeout(() => {
-            getWorkspaceFolder(vscodeAPI?.workspace).then((wsdUri) => {
+        }); // @ts-ignore
+        queueMicrotask?.(() => {
+            return getWorkspaceFolder(vscodeAPI?.workspace).then((wsdUri) => {
                 if (!wsdUri) {
                     refreshModules(false).catch(console.warn);
                     return;
@@ -1541,7 +1541,7 @@ export async function manager(context: vscode.ExtensionContext) {
                     .then(() => refreshModules(false))
                     .catch(() => refreshModules(false).catch(console.warn));
             }).catch(console.warn);
-        }, 100);
+        });
         context.subscriptions.push(
             vscodeAPI.workspace.onDidChangeConfiguration((event: vscode.ConfigurationChangeEvent) => {
                 if (event.affectsConfiguration("vext.managerView")) {

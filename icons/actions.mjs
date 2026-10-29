@@ -402,6 +402,6 @@ window.addEventListener("DOMContentLoaded", () => {
         const ro = new ResizeObserver(() => updateNarrowClass());
         ro.observe(document.documentElement);
     }
-    setTimeout(updateNarrowClass, 300);
+    queueMicrotask?.(updateNarrowClass);
     send("ready", "");
 });

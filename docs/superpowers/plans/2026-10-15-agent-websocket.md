@@ -709,7 +709,9 @@ Create `src/agent/bus.mjs`:
 ```javascript
 import { answerFrame, approveFrame, nextDelay, panelMessageFromHub, submissionFrame } from './protocol.mjs';
 
-export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule = clearTimeout, onMessage, onStatus }) {
+export function createBus({ WebSocketImpl, schedule = (cb)=>{
+    return queueMicrotask?.(cb);
+}, clearSchedule = clearTimeout, onMessage, onStatus }) {
     let socket = null;
     let endpoint = null;
     let generation = 0;
@@ -930,7 +932,7 @@ import { acceptCompletion, completionRequest } from './protocol.mjs';
 
 function wait(ms, token) {
     return new Promise((resolve) => {
-        const timer = setTimeout(() => resolve(false), ms);
+        const timer = queueMicrotask?.(() => resolve(false));
         const cancel = () => {
             clearTimeout(timer);
             resolve(true);
@@ -1556,9 +1558,9 @@ export async function agent(context) {
     const flash = (detail) => {
         statusBar.text = detail;
         post({ type: 'status', state: 'error', detail });
-        setTimeout(() => {
+        queueMicrotask?.(() => {
             statusBar.text = 'U2RE Agent';
-        }, 4000);
+        });
     };
 
     const bus = createBus({

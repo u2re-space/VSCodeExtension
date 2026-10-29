@@ -212,9 +212,9 @@ export async function agent(context) {
     const flash = (detail) => {
         statusBar.text = detail;
         post({ type: 'status', state: 'error', detail });
-        setTimeout(() => {
+        queueMicrotask?.()?.then?.(() => {
             statusBar.text = 'U2RE Agent';
-        }, 4000);
+        });
     };
 
     const bus = createBus({

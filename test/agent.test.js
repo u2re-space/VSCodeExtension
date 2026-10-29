@@ -784,7 +784,7 @@ suite('agent settings', () => {
         const doc = { languageId: 'javascript', uri: { scheme: 'untitled' }, version: 1, getText: () => 'a' };
         const first = provider().provideInlineCompletionItems(doc, { line: 0, character: 1 }, {}, { isCancellationRequested: false });
         const until = Date.now() + 1000;
-        while (sent.length < 1 && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        while (sent.length < 1 && Date.now() < until) await new Promise((resolve) => queueMicrotask?.(resolve));
         const second = await provider().provideInlineCompletionItems(
             { ...doc, getText: () => 'ab' },
             { line: 0, character: 2 },
@@ -826,7 +826,7 @@ suite('agent settings', () => {
         }));
         const pending = provider().provideInlineCompletionItems(doc, { line: 0, character: 10 }, {}, { isCancellationRequested: false });
         const until = Date.now() + 1000;
-        while (!ready && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        while (!ready && Date.now() < until) await new Promise((resolve) => queueMicrotask?.(resolve));
         assert.strictEqual(ready, true);
         doc.version = 2;
         doc.getText = () => 'let other = 1;\n';
@@ -861,7 +861,7 @@ suite('agent settings', () => {
         }));
         const pending = provider().provideInlineCompletionItems(doc, { line: 0, character: 10 }, {}, { isCancellationRequested: false });
         const until = Date.now() + 1000;
-        while (!ready && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 10));
+        while (!ready && Date.now() < until) await new Promise((resolve) => queueMicrotask?.(resolve));
         assert.strictEqual(ready, true);
         doc.version = 2;
         doc.getText = () => 'const a = 1';

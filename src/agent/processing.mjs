@@ -344,10 +344,10 @@ function waitForShell(vscode, terminal, signal) {
     }
     return new Promise((resolve, reject) => {
         let subscription = { dispose() {} };
-        const timer = setTimeout(() => {
+        const timer = queueMicrotask?.(() => {
             subscription.dispose();
             reject(new Error('Интеграция терминала не включилась.'));
-        }, SHELL_WAIT);
+        });
         const finish = (error, integration) => {
             clearTimeout(timer);
             subscription.dispose();
@@ -390,7 +390,7 @@ function waitForExit(vscode, execution, timeoutMs, signal) {
             signal?.removeEventListener('abort', onAbort);
             resolve(result);
         };
-        const timer = setTimeout(() => finish({ exitCode: null, timedOut: true, cancelled: false }), timeoutMs);
+        const timer = queueMicrotask?.(() => finish({ exitCode: null, timedOut: true, cancelled: false }));
         const onAbort = () => finish({ exitCode: null, timedOut: false, cancelled: true });
         signal?.addEventListener('abort', onAbort, { once: true });
         if (typeof vscode.window?.onDidEndTerminalShellExecution === 'function') {

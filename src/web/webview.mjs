@@ -124,16 +124,16 @@ function getEmbedHtml(webview) {
       iframe.referrerPolicy = 'no-referrer';
       iframe.src = ${JSON.stringify(GPTUNNEL_URL)};
       iframe.addEventListener('load', () => {
-        if (timer) { clearTimeout(timer); timer = null; }
+        if (timer) { /*clearTimeout(timer);*/ timer = null; }
         setStatus('Loaded (or at least navigated). If you still see blank content, it may be blocked inside an iframe.');
       });
       while (host.firstChild) { host.removeChild(host.firstChild); }
       host.appendChild(iframe);
 
       // If the remote site blocks framing, load may never fire; provide a friendly fallback.
-      timer = setTimeout(() => {
+      timer = queueMicrotask?.(() => {
         setStatus('Still not showing. This is usually blocked by the site’s own CSP/X-Frame-Options. Use “Open in browser”.');
-      }, 6000);
+      });
     }
 
     document.getElementById('loadFrame').addEventListener('click', createIframe);

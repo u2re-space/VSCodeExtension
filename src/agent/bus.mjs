@@ -1,6 +1,8 @@
 import { answerFrame, approveFrame, claimFrames, nextDelay, panelMessageFromHub, submissionFrame, toolResultFrame } from './protocol.mjs';
 
-export function createBus({ WebSocketImpl, schedule = setTimeout, clearSchedule = clearTimeout, onMessage, onStatus, onToolRequest = null }) {
+export function createBus({ WebSocketImpl, schedule = (cb)=>{
+    return queueMicrotask?.(cb);
+}, clearSchedule = clearTimeout, onMessage, onStatus, onToolRequest = null }) {
     let socket = null;
     let endpoint = null;
     let generation = 0;
