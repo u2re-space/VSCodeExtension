@@ -9,6 +9,7 @@ import { createCompleteClient, registerAgentCompletion } from '../src/agent/comp
 import { createMcpClient } from '../src/agent/mcpclient.mjs';
 import { createMcpServer, startStdioServer } from '../src/agent/mcp.mjs';
 import { createEditorToolProvider } from '../src/agent/mcpproxy.mjs';
+import { mcpServerConfiguration } from '../src/agent/mcpconfig.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { createWorkspaceIo, executeProcessing, toolNames } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
@@ -1100,6 +1101,30 @@ suite('agent mcp server', () => {
             assert.ok(tool.description.length > 0);
             assert.strictEqual(tool.parameters?.type, 'object');
         }
+    });
+
+    test('names a binary that runs the program of the server', () => {
+        const electron = mcpServerConfiguration({
+            execPath: 'C:\\Program Files\\Microsoft VS Code\\Code.exe',
+            serverPath: 'C:\\ext\\dist\\agent-mcp.mjs',
+            env: { AI_SERVE_HOME: 'C:\\home' },
+        });
+        assert.strictEqual(electron.mcpServers.vscode.command, 'C:\\Program Files\\Microsoft VS Code\\Code.exe');
+        assert.strictEqual(electron.mcpServers.vscode.env.ELECTRON_RUN_AS_NODE, '1');
+        assert.strictEqual(electron.mcpServers.vscode.env.AI_SERVE_HOME, 'C:\\home');
+        assert.deepStrictEqual(electron.mcpServers.vscode.args, ['C:\\ext\\dist\\agent-mcp.mjs']);
+
+        const node = mcpServerConfiguration({
+            execPath: 'C:\\Program Files\\nodejs\\node.exe',
+            serverPath: 'C:\\ext\\dist\\agent-mcp.mjs',
+            env: { AI_AGENT_HOME: 'C:\\old' },
+        });
+        assert.strictEqual(node.mcpServers.vscode.env.ELECTRON_RUN_AS_NODE, undefined);
+        assert.strictEqual(node.mcpServers.vscode.env.AI_AGENT_HOME, 'C:\\old');
+
+        const plain = mcpServerConfiguration({ serverPath: '/ext/agent-mcp.mjs', env: {} });
+        assert.strictEqual(plain.mcpServers.vscode.command, 'node');
+        assert.deepStrictEqual(plain.mcpServers.vscode.env, {});
     });
 });
 
