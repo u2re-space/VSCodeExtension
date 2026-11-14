@@ -11,7 +11,10 @@ import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mj
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
-const { agentHome, parseServeRecord, pidAlive, loadServeRecord, resolveEndpoint } = __agentTest;
+const {
+    agentHome, serveHome, homeDirectories, parseServeRecord, pidAlive, loadServeRecord,
+    loadFirstServeRecord, resolveEndpoint, httpOf,
+} = __agentTest;
 
 const {
     nextDelay, submissionFrame, approveFrame, completionRequest, acceptCompletion,
@@ -25,6 +28,38 @@ suite('agent endpoint', () => {
     test('uses AI_AGENT_HOME when it is set', () => {
         assert.strictEqual(agentHome({ AI_AGENT_HOME: ' D:\\ai ' }, 'C:\\Users\\me'), 'D:\\ai');
         assert.strictEqual(agentHome({}, 'C:\\Users\\me'), path.join('C:\\Users\\me', '.ai-agent'));
+    });
+
+    test('knows both homes and puts the package first', () => {
+        assert.strictEqual(serveHome({ AI_SERVE_HOME: ' D:\\srv ' }, 'C:\\Users\\me'), 'D:\\srv');
+        assert.strictEqual(serveHome({}, 'C:\\Users\\me'), path.join('C:\\Users\\me', '.ai-serve'));
+        assert.deepStrictEqual(homeDirectories({}, 'C:\\Users\\me'), [
+            path.join('C:\\Users\\me', '.ai-serve'),
+            path.join('C:\\Users\\me', '.ai-agent'),
+        ]);
+        assert.deepStrictEqual(homeDirectories({ AI_SERVE_HOME: 'D:\\srv', AI_AGENT_HOME: 'D:\\old' }), ['D:\\srv', 'D:\\old']);
+        assert.deepStrictEqual(homeDirectories({ AI_AGENT_HOME: 'D:\\old' }), ['D:\\old']);
+    });
+
+    test('keeps the new fields of the record and drops the broken ones', () => {
+        const rich = {
+            pid: 42,
+            url: 'ws://127.0.0.1:1111/',
+            token: 'tok',
+            httpURL: 'http://127.0.0.1:1111',
+            complete: 'http://127.0.0.1:1111/v1/complete',
+            structure: 'http://127.0.0.1:1111/v1/structure',
+            completeWs: 'ws://127.0.0.1:1111/v1/complete',
+            mcp: 'http://127.0.0.1:1111/mcp',
+            protocol: '0.4',
+        };
+        const parsed = parseServeRecord(JSON.stringify(rich));
+        assert.strictEqual(parsed.url, 'ws://127.0.0.1:1111');
+        assert.strictEqual(parsed.httpURL, 'http://127.0.0.1:1111');
+        assert.strictEqual(parsed.mcp, 'http://127.0.0.1:1111/mcp');
+        assert.strictEqual(parsed.protocol, '0.4');
+        const bare = parseServeRecord(JSON.stringify({ pid: 42, url: 'ws://127.0.0.1:1111', token: 'tok', mcp: 5 }));
+        assert.deepStrictEqual(bare, { pid: 42, url: 'ws://127.0.0.1:1111', token: 'tok' });
     });
 
     test('parses a serve record and rejects broken json', () => {
@@ -101,6 +136,83 @@ suite('agent endpoint', () => {
         const got = resolveEndpoint({ record: live, settings: { port: 9000, token: 'set' }, ownPid: null, alive: false });
         assert.strictEqual(got.url, 'ws://127.0.0.1:9000');
         assert.strictEqual(got.token, 'set');
+    });
+
+    test('names the parts of the server from the record', () => {
+        const got = resolveEndpoint({
+            record: {
+                pid: 42,
+                url: 'ws://127.0.0.1:1111',
+                token: 'file-token',
+                httpURL: 'http://127.0.0.1:1111',
+                complete: 'http://127.0.0.1:1111/v1/complete',
+                structure: 'http://127.0.0.1:1111/v1/structure',
+                mcp: 'http://127.0.0.1:1111/mcp',
+                protocol: '0.4',
+            },
+            settings: { port: 0, token: '' },
+            ownPid: null,
+            alive: true,
+        });
+        assert.strictEqual(got.httpURL, 'http://127.0.0.1:1111');
+        assert.strictEqual(got.complete, 'http://127.0.0.1:1111/v1/complete');
+        assert.strictEqual(got.structure, 'http://127.0.0.1:1111/v1/structure');
+        assert.strictEqual(got.mcp, 'http://127.0.0.1:1111/mcp');
+        assert.strictEqual(got.protocol, '0.4');
+    });
+
+    test('derives the parts of the server when the record is old', () => {
+        const got = resolveEndpoint({ record: live, settings: { port: 0, token: '' }, ownPid: null, alive: true });
+        assert.strictEqual(got.httpURL, 'http://127.0.0.1:1111');
+        assert.strictEqual(got.complete, 'http://127.0.0.1:1111/v1/complete');
+        assert.strictEqual(got.structure, 'http://127.0.0.1:1111/v1/structure');
+        assert.strictEqual(got.mcp, 'http://127.0.0.1:1111/mcp');
+        assert.strictEqual(got.protocol, null);
+        assert.strictEqual(httpOf('ws://127.0.0.1:1'), 'http://127.0.0.1:1');
+    });
+
+    test('moves the port of the parts of the server together', () => {
+        const got = resolveEndpoint({
+            record: {
+                pid: 42,
+                url: 'ws://127.0.0.1:1111',
+                token: 'file-token',
+                httpURL: 'http://127.0.0.1:1111',
+                complete: 'http://127.0.0.1:1111/v1/complete',
+                mcp: 'http://127.0.0.1:1111/mcp',
+            },
+            settings: { port: 2222, token: '' },
+            ownPid: null,
+            alive: true,
+        });
+        assert.strictEqual(got.httpURL, 'http://127.0.0.1:2222');
+        assert.strictEqual(got.complete, 'http://127.0.0.1:2222/v1/complete');
+        assert.strictEqual(got.mcp, 'http://127.0.0.1:2222/mcp');
+    });
+
+    test('reads the record of the first home that has one', async () => {
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vext-homes-'));
+        const pkg = path.join(root, 'pkg');
+        const old = path.join(root, 'old');
+        fs.mkdirSync(pkg);
+        fs.mkdirSync(old);
+        const vscode = {
+            Uri: {
+                file: (file) => ({ fsPath: file, scheme: 'file' }),
+                joinPath: (base, ...parts) => ({ fsPath: path.join(base.fsPath, ...parts), scheme: 'file' }),
+            },
+            workspace: {
+                fs: {
+                    readFile: async (uri) => fs.readFileSync(uri.fsPath),
+                },
+            },
+        };
+        assert.strictEqual(await loadFirstServeRecord(vscode, [pkg, old]), null);
+        fs.writeFileSync(path.join(old, 'serve.json'), JSON.stringify({ pid: 1, url: 'ws://127.0.0.1:1', token: 't' }));
+        assert.strictEqual((await loadFirstServeRecord(vscode, [pkg, old])).token, 't');
+        fs.writeFileSync(path.join(pkg, 'serve.json'), JSON.stringify({ pid: 2, url: 'ws://127.0.0.1:2', token: 'p' }));
+        assert.strictEqual((await loadFirstServeRecord(vscode, [pkg, old])).token, 'p');
+        fs.rmSync(root, { recursive: true, force: true });
     });
 });
 

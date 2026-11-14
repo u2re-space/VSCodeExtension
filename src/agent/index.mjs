@@ -2,7 +2,7 @@ import vscodeAPI from '../imports/api.ts';
 import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
 import { createWorkspaceIo, executeProcessing } from './processing.mjs';
-import { agentHome, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
+import { agentHome, homeDirectories, loadFirstServeRecord, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
 import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from './settings.mjs';
 
@@ -247,7 +247,7 @@ export async function agent(context) {
 
     const currentEndpoint = async () => {
         const settings = settingsOf();
-        const record = await loadServeRecord(vscode, agentHome());
+        const record = await loadFirstServeRecord(vscode, homeDirectories());
         const alive = record ? pidAlive(record.pid) : false;
         return resolveEndpoint({
             record,
@@ -270,7 +270,7 @@ export async function agent(context) {
         if (!killFilePid) {
             return;
         }
-        const record = await loadServeRecord(vscode, agentHome());
+        const record = await loadFirstServeRecord(vscode, homeDirectories());
         const spawnedPid = positivePid(proc?.pid);
         if (record && pidAlive(record.pid) && shouldKillSpawnedPid({
             ownPid: spawnedPid,
@@ -337,7 +337,7 @@ export async function agent(context) {
             const deadline = Date.now() + 10000;
             let found = null;
             while (Date.now() < deadline && !cancelled() && !spawnError) {
-                const record = await loadServeRecord(vscode, agentHome());
+                const record = await loadFirstServeRecord(vscode, homeDirectories());
                 if (cancelled() || spawnError) {
                     break;
                 }
@@ -511,7 +511,7 @@ export async function agent(context) {
                 const proc = child;
                 child = null;
                 try {
-                    const record = await loadServeRecord(vscode, agentHome());
+                    const record = await loadFirstServeRecord(vscode, homeDirectories());
                     const livePid = record && pidAlive(record.pid) ? record.pid : null;
                     if (shouldKillSpawnedPid({ ownPid: ownedPid, livePid })) {
                         await endPid(vscode, livePid);
