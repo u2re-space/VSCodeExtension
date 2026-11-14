@@ -765,6 +765,10 @@
                 "command": "vext.agent.reconnect",
                 "title": "Universal AI: Reconnect agent",
                 "icon": "$(refresh)"
+            },
+            {
+                "command": "vext.agent.tools",
+                "title": "Universal AI: Tools of the agent server"
             }
         ]
     },

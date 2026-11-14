@@ -6,6 +6,7 @@ import path from 'path';
 import { agentHtml } from '../src/agent/html.mjs';
 import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from '../src/agent/complete.mjs';
+import { createMcpClient } from '../src/agent/mcpclient.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
@@ -913,6 +914,78 @@ suite('agent complete', () => {
     });
 });
 
+suite('agent mcp client', () => {
+    test('lists the tools of the server and calls one of them', async () => {
+        const calls = [];
+        const client = createMcpClient({
+            fetchImpl: async (url, options) => {
+                const body = JSON.parse(options.body);
+                calls.push({ url, body, options });
+                if (body.method === 'tools/list') {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            jsonrpc: '2.0',
+                            id: body.id,
+                            result: {
+                                tools: [
+                                    { name: 'read_file', description: 'Read a file.', inputSchema: { type: 'object' } },
+                                    { name: 'vscode__list_files', description: 'The files of the editor.', inputSchema: { type: 'object' } },
+                                ],
+                            },
+                        }),
+                    };
+                }
+                return {
+                    ok: true,
+                    json: async () => ({
+                        jsonrpc: '2.0',
+                        id: body.id,
+                        result: { content: [{ type: 'text', text: 'the body of the file' }], isError: false },
+                    }),
+                };
+            },
+        });
+        client.connect({ url: 'http://127.0.0.1:8765/mcp', token: 'tok' });
+        const tools = await client.listTools();
+        assert.deepStrictEqual(tools.map((tool) => tool.name), ['read_file', 'vscode__list_files']);
+        assert.strictEqual(calls[0].url, 'http://127.0.0.1:8765/mcp');
+        assert.strictEqual(calls[0].body.method, 'tools/list');
+        assert.strictEqual(calls[0].options.headers.Authorization, 'Bearer tok');
+        const answer = await client.callTool('read_file', { path: 'a.js' });
+        assert.strictEqual(answer.text, 'the body of the file');
+        assert.strictEqual(answer.isError, false);
+        assert.strictEqual(calls[1].body.method, 'tools/call');
+        assert.deepStrictEqual(calls[1].body.params, { name: 'read_file', arguments: { path: 'a.js' } });
+        client.close();
+    });
+
+    test('says nothing when the server is not there', async () => {
+        const client = createMcpClient({ fetchImpl: async () => { throw new Error('no server'); } });
+        client.close();
+        assert.deepStrictEqual(await client.listTools(), []);
+        const answer = await client.callTool('read_file', {});
+        assert.strictEqual(answer.text, '');
+        assert.strictEqual(answer.isError, false);
+    });
+
+    test('reports a refusal of the server', async () => {
+        const statuses = [];
+        const client = createMcpClient({
+            onStatus: (detail) => statuses.push(detail),
+            fetchImpl: async () => ({
+                ok: true,
+                json: async () => ({ jsonrpc: '2.0', id: 1, error: { code: -32602, message: 'There is no tool named x.' } }),
+            }),
+        });
+        client.connect({ url: 'http://127.0.0.1:8765/mcp', token: 'tok' });
+        assert.deepStrictEqual(await client.listTools(), []);
+        assert.strictEqual(statuses.length, 1);
+        assert.match(statuses[0], /There is no tool named x/);
+        client.close();
+    });
+});
+
 suite('agent panel', () => {
     test('renders the command buttons and a locked down csp', () => {
         const html = agentHtml({
@@ -1238,6 +1311,7 @@ suite('agent settings', () => {
         assert.ok(ids.includes('vext.agent.start'));
         assert.ok(ids.includes('vext.agent.stop'));
         assert.ok(ids.includes('vext.agent.reconnect'));
+        assert.ok(ids.includes('vext.agent.tools'));
         assert.ok(pkg.contributes.views.agentView.some((view) => view.id === 'vext.agentView'));
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);

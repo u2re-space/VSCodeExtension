@@ -1,6 +1,7 @@
 import vscodeAPI from '../imports/api.ts';
 import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
+import { createMcpClient } from './mcpclient.mjs';
 import { createWorkspaceIo, executeProcessing } from './processing.mjs';
 import { agentHome, homeDirectories, loadFirstServeRecord, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
@@ -245,6 +246,11 @@ export async function agent(context) {
         onStatus: (detail) => flash(detail),
     });
 
+    // The client of MCP: the editor asks the server of the bus over the route `/mcp`.
+    const mcp = createMcpClient({
+        onStatus: (detail) => flash(detail),
+    });
+
     const currentEndpoint = async () => {
         const settings = settingsOf();
         const record = await loadFirstServeRecord(vscode, homeDirectories());
@@ -255,6 +261,60 @@ export async function agent(context) {
             ownPid,
             alive,
         });
+    };
+
+    const output = vscode.window.createOutputChannel('U2RE Agent');
+    context.subscriptions.push(output);
+
+    /**
+     * Show the tools of the server and call one of them.
+     *
+     * The list comes from the MCP server of the package: it holds the tools of the
+     * package and the tools of the clients of the bus.
+     *
+     * @returns {Promise<void>}
+     */
+    const showServerTools = async () => {
+        const next = endpoint ?? await currentEndpoint();
+        if (!next?.mcp) {
+            vscode.window.showWarningMessage('Сервер агента не запущен.');
+            return;
+        }
+        mcp.connect({ url: next.mcp, token: next.token });
+        const tools = await mcp.listTools();
+        if (!tools.length) {
+            vscode.window.showInformationMessage('У сервера нет инструментов.');
+            return;
+        }
+        const picked = await vscode.window.showQuickPick(tools.map((tool) => ({
+            label: tool.name,
+            description: typeof tool.description === 'string' ? tool.description : '',
+            tool,
+        })), { placeHolder: 'Инструменты сервера' });
+        if (!picked) {
+            return;
+        }
+        const required = Array.isArray(picked.tool?.inputSchema?.required) ? picked.tool.inputSchema.required : [];
+        let args = {};
+        if (required.length) {
+            const text = await vscode.window.showInputBox({
+                prompt: `Аргументы ${picked.label} (JSON)`,
+                value: '{}',
+            });
+            if (text === undefined) {
+                return;
+            }
+            try {
+                args = JSON.parse(text || '{}');
+            } catch {
+                vscode.window.showErrorMessage('Аргументы должны быть JSON.');
+                return;
+            }
+        }
+        const answer = await mcp.callTool(picked.label, args);
+        output.appendLine(`\n## ${picked.label}`);
+        output.appendLine(answer.text || '(пусто)');
+        output.show(true);
     };
 
     const releaseLaunch = async (proc, killFilePid) => {
@@ -456,6 +516,7 @@ export async function agent(context) {
             post({ type: 'status', state: 'disconnected', detail: 'агент не запущен' });
             return;
         }
+        mcp.connect({ url: next.mcp, token: next.token });
         bus.connect(next);
     };
 
@@ -514,6 +575,7 @@ export async function agent(context) {
             if (message.type === 'reconnect') {
                 bus.close();
                 complete.close();
+                mcp.close();
                 endpoint = null;
                 completeUrl = '';
                 await ensureBus(false);
@@ -551,6 +613,7 @@ export async function agent(context) {
                     bus.resetPhase();
                     bus.close();
                     complete.close();
+                    mcp.close();
                     endpoint = null;
                     completeUrl = '';
                     showStop();
@@ -601,12 +664,14 @@ export async function agent(context) {
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.start', () => ensureBus(true)));
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.stop', () => session.onWebview({ type: 'stop' })));
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.reconnect', () => session.onWebview({ type: 'reconnect' })));
+    context.subscriptions.push(vscode.commands.registerCommand('vext.agent.tools', () => showServerTools()));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (!shouldReconnectAgent((section) => event.affectsConfiguration(section))) {
             return;
         }
         bus.close();
         complete.close();
+        mcp.close();
         endpoint = null;
         completeUrl = '';
         const launch = settingsOf().launch;
@@ -621,5 +686,5 @@ export async function agent(context) {
             }
         });
     }
-    context.subscriptions.push({ dispose: () => { bus.close(); complete.close(); } });
+    context.subscriptions.push({ dispose: () => { bus.close(); complete.close(); mcp.close(); } });
 }
