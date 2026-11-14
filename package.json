@@ -540,13 +540,20 @@
                     "type": "boolean",
                     "scope": "machine",
                     "default": false,
-                    "description": "Start ai serve when no live serve.json is found."
+                    "description": "Start the agent server when no live serve.json is found."
+                },
+                "vext.agent.server": {
+                    "type": "string",
+                    "scope": "machine",
+                    "enum": ["auto", "ai-serve", "ai"],
+                    "default": "auto",
+                    "description": "The server to start: auto tries ai-serve (the package @u2ai/server) and then ai (the monolith)."
                 },
                 "vext.agent.command": {
                     "type": "string",
                     "scope": "machine",
-                    "default": "ai",
-                    "description": "Command used to start ai serve."
+                    "default": "",
+                    "description": "Program used to start the agent server. Empty takes the program of vext.agent.server."
                 },
                 "vext.agent.approve": {
                     "type": "string",
@@ -569,6 +576,9 @@
                 "vext.agent.completion.model": {
                     "type": "string",
                     "enum": [
+                        "minimax/minimax-m3.1-flash",
+                        "moonshotai/kimi-k3",
+                        "openai/gpt-5.1",
                         "gpt-6-luna",
                         "anthropic/claude-haiku-5-5",
                         "qwen/qwen3.8-omni-flash",
@@ -578,8 +588,8 @@
                         "gemini-3.8-flash",
                         "deepseek/deepseek-v4.1-flash"
                     ],
-                    "default": "gpt-6-luna",
-                    "description": "Model for ghost-text completion. gemini-3.8-flash may be expensive. deepseek/deepseek-v4.1-flash is expensive."
+                    "default": "minimax/minimax-m3.1-flash",
+                    "description": "Model for ghost-text completion. The first three are the models of @u2ai/server. gemini-3.8-flash may be expensive. deepseek/deepseek-v4.1-flash is expensive."
                 }
             }
         },

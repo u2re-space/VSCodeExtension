@@ -7,13 +7,37 @@ const RECONNECT_SECTIONS = [
     'vext.agent.openaiApiKey',
     'vext.agent.launch',
     'vext.agent.command',
+    'vext.agent.server',
 ];
 
 export function shouldReconnectAgent(affectsConfiguration) {
     return RECONNECT_SECTIONS.some((section) => affectsConfiguration(section));
 }
 
+/**
+ * The servers the extension knows.
+ *
+ * `ai-serve` is the package `@u2ai/server`, `ai` is the monolith. Both take the same
+ * subcommand `serve`, so the difference is the name of the program.
+ */
+const SERVERS = new Set(['ai-serve', 'ai']);
+
+/** The program of every server. */
+const SERVER_PROGRAMS = Object.freeze({
+    'ai-serve': 'ai-serve',
+    ai: 'ai',
+});
+
+/**
+ * The models of the servers.
+ *
+ * The first three are the models of the package `@u2ai/server`: the default one and the
+ * chain of the fallback. The other ones belong to the monolith.
+ */
 const COMPLETION_MODELS = new Set([
+    'minimax/minimax-m3.1-flash',
+    'moonshotai/kimi-k3',
+    'openai/gpt-5.1',
     'gpt-6-luna',
     'anthropic/claude-haiku-5-5',
     'qwen/qwen3.8-omni-flash',
@@ -24,6 +48,9 @@ const COMPLETION_MODELS = new Set([
     'deepseek/deepseek-v4.1-flash',
 ]);
 
+/** The model of the server by default. */
+export const DEFAULT_COMPLETION_MODEL = 'minimax/minimax-m3.1-flash';
+
 export function readAgentSettings(get) {
     const portValue = get('vext.agent.port');
     const port = Number.isInteger(portValue) && portValue >= 0 && portValue <= 65535 ? portValue : 0;
@@ -32,19 +59,49 @@ export function readAgentSettings(get) {
     const debounceMs = Math.max(50, parsedDebounce);
     const approveValue = get('vext.agent.approve');
     const modelValue = get('vext.agent.completion.model');
-    const completionModel = COMPLETION_MODELS.has(modelValue) ? modelValue : 'gpt-6-luna';
+    const completionModel = COMPLETION_MODELS.has(modelValue) ? modelValue : DEFAULT_COMPLETION_MODEL;
+    const serverValue = get('vext.agent.server');
+    const commandValue = typeof get('vext.agent.command') === 'string' ? get('vext.agent.command').trim() : '';
     return {
         port,
         token: typeof get('vext.agent.token') === 'string' ? get('vext.agent.token') : '',
         openaiBaseUrl: typeof get('vext.agent.openaiBaseUrl') === 'string' ? get('vext.agent.openaiBaseUrl') : '',
         openaiApiKey: typeof get('vext.agent.openaiApiKey') === 'string' ? get('vext.agent.openaiApiKey') : '',
         launch: get('vext.agent.launch') === true,
-        command: typeof get('vext.agent.command') === 'string' && get('vext.agent.command').trim() ? get('vext.agent.command').trim() : 'ai',
+        // The program of the server. Empty means the program of the setting `server`.
+        command: commandValue,
+        // The server to start: the package, the monolith, or the first one that answers.
+        server: SERVERS.has(serverValue) ? serverValue : 'auto',
         approve: APPROVE.has(approveValue) ? approveValue : 'ask',
         completionEnabled: get('vext.agent.completion.enabled') !== false,
         debounceMs,
         completionModel,
     };
+}
+
+/**
+ * The programs to try, in the order of the attempt.
+ *
+ * The command of the settings wins: a user with a build of their own points the
+ * extension at it. Without a command the server decides: the package first, the
+ * monolith after.
+ *
+ * @param {{ server?: string, command?: string }} settings
+ * @returns {string[]}
+ */
+export function serverCommands(settings) {
+    const custom = typeof settings?.command === 'string' ? settings.command.trim() : '';
+    if (custom) {
+        return [custom];
+    }
+    const server = SERVERS.has(settings?.server) ? settings.server : 'auto';
+    if (server === 'ai-serve') {
+        return [SERVER_PROGRAMS['ai-serve']];
+    }
+    if (server === 'ai') {
+        return [SERVER_PROGRAMS.ai];
+    }
+    return [SERVER_PROGRAMS['ai-serve'], SERVER_PROGRAMS.ai];
 }
 
 export function spawnArgs(settings) {

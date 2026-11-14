@@ -4,7 +4,7 @@ import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
 import { createWorkspaceIo, executeProcessing } from './processing.mjs';
 import { agentHome, homeDirectories, loadFirstServeRecord, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
-import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from './settings.mjs';
+import { launchOutcome, readAgentSettings, serverCommands, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from './settings.mjs';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const encoder = new TextEncoder();
@@ -292,8 +292,11 @@ export async function agent(context) {
         const watch = { on: true };
         spawnWatch = watch;
         const settings = settingsOf();
+        // The programs to try: the package first, the monolith after.
+        const candidates = serverCommands(settings);
         let lock = null;
         let proc = null;
+        let found = null;
         try {
             if (!cancelled()) {
                 try {
@@ -305,47 +308,65 @@ export async function agent(context) {
             if (lock && !spawnError && !cancelled()) {
                 const env = spawnEnv({}, settings);
                 const options = Object.keys(env).length > 0 ? { env } : undefined;
-                try {
-                    proc = await runTask(
-                        vscode,
-                        'serve',
-                        new vscode.ShellExecution(settings.command, spawnArgs(settings), options),
-                        (pid) => {
-                            if (ownPid === null && watch.on) {
-                                ownPid = pid;
-                                showStop();
-                            }
-                        },
-                        (code) => {
-                            if (!watch.on || spawnError || code === 0 || code === undefined || code === null) {
-                                return;
-                            }
-                            spawnError = new Error(`${settings.command} exited with code ${code}`);
-                            wakeWait();
-                        },
-                    );
-                } catch (error) {
-                    spawnError = error;
-                    wakeWait();
+                for (const command of candidates) {
+                    if (cancelled()) {
+                        break;
+                    }
+                    const attempt = { error: null, done: false };
+                    let attemptProc = null;
+                    try {
+                        attemptProc = await runTask(
+                            vscode,
+                            'serve',
+                            new vscode.ShellExecution(command, spawnArgs(settings), options),
+                            (pid) => {
+                                if (ownPid === null && watch.on) {
+                                    ownPid = pid;
+                                    showStop();
+                                }
+                            },
+                            (code) => {
+                                if (attempt.done || !watch.on || attempt.error || code === 0 || code === undefined || code === null) {
+                                    return;
+                                }
+                                attempt.error = new Error(`${command} exited with code ${code}`);
+                                wakeWait();
+                            },
+                        );
+                    } catch (error) {
+                        attempt.error = error;
+                        wakeWait();
+                    }
+                    attempt.done = true;
+                    child = attemptProc;
+                    const spawnedNow = positivePid(attemptProc?.pid);
+                    if (spawnedNow !== null && ownPid === null) {
+                        ownPid = spawnedNow;
+                    }
+                    const deadline = Date.now() + 10000;
+                    while (Date.now() < deadline && !cancelled() && !attempt.error) {
+                        const record = await loadFirstServeRecord(vscode, homeDirectories());
+                        if (cancelled() || attempt.error) {
+                            break;
+                        }
+                        if (record && pidAlive(record.pid)) {
+                            found = record;
+                            break;
+                        }
+                        await Promise.race([sleep(200), woken]);
+                    }
+                    if (found) {
+                        proc = attemptProc;
+                        break;
+                    }
+                    // The program did not answer: the next one gets a turn.
+                    await releaseLaunch(attemptProc, attemptProc !== null);
+                    child = null;
+                    ownPid = null;
+                    if (attempt.error) {
+                        spawnError = attempt.error;
+                    }
                 }
-                child = proc;
-                const spawnedNow = positivePid(proc?.pid);
-                if (spawnedNow !== null && ownPid === null) {
-                    ownPid = spawnedNow;
-                }
-            }
-            const deadline = Date.now() + 10000;
-            let found = null;
-            while (Date.now() < deadline && !cancelled() && !spawnError) {
-                const record = await loadFirstServeRecord(vscode, homeDirectories());
-                if (cancelled() || spawnError) {
-                    break;
-                }
-                if (record && pidAlive(record.pid)) {
-                    found = record;
-                    break;
-                }
-                await Promise.race([sleep(200), woken]);
             }
             const pending = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (pending === 'adopt') {
@@ -368,7 +389,8 @@ export async function agent(context) {
             showStop();
             const outcome = launchOutcome({ cancelled: cancelled(), spawnError, found });
             if (outcome === 'spawn-error') {
-                const message = spawnError.message || String(spawnError);
+                const tried = candidates.length > 1 ? ` (пробовали: ${candidates.join(', ')})` : '';
+                const message = `${spawnError.message || String(spawnError)}${tried}`;
                 vscode.window.showErrorMessage(message);
                 post({ type: 'status', state: 'error', detail: message });
                 return;

@@ -9,7 +9,7 @@ import { createCompleteClient, registerAgentCompletion } from '../src/agent/comp
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
-import { launchOutcome, readAgentSettings, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
+import { launchOutcome, readAgentSettings, serverCommands, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
 const {
     agentHome, serveHome, homeDirectories, parseServeRecord, pidAlive, loadServeRecord,
@@ -900,6 +900,7 @@ suite('agent settings', () => {
             ['vext.agent.openaiApiKey', ''],
             ['vext.agent.launch', false],
             ['vext.agent.command', 'ai'],
+            ['vext.agent.server', 'auto'],
             ['vext.agent.approve', 'nope'],
             ['vext.agent.completion.enabled', true],
             ['vext.agent.completion.debounceMs', 350],
@@ -907,7 +908,9 @@ suite('agent settings', () => {
         const settings = readAgentSettings((key) => values.get(key));
         assert.strictEqual(settings.port, 8765);
         assert.strictEqual(settings.debounceMs, 350);
-        assert.strictEqual(settings.completionModel, 'gpt-6-luna');
+        assert.strictEqual(settings.completionModel, 'minimax/minimax-m3.1-flash');
+        assert.strictEqual(settings.command, 'ai');
+        assert.strictEqual(settings.server, 'auto');
         assert.deepStrictEqual(spawnArgs(settings), ['serve', '--port', '8765']);
         assert.deepStrictEqual(spawnArgs({ ...settings, port: 0 }), ['serve']);
         const env = spawnEnv({ PATH: 'C:\\bin' }, { ...settings, openaiApiKey: 'secret' });
@@ -918,9 +921,17 @@ suite('agent settings', () => {
         assert.strictEqual(untouched.OPENAI_API_KEY, undefined);
     });
 
-    test('an unrecognized completion model setting falls back to gpt-6-luna', () => {
+    test('an unrecognized completion model setting falls back to the model of the server', () => {
         const settings = readAgentSettings((key) => (key === 'vext.agent.completion.model' ? 'nope' : undefined));
-        assert.strictEqual(settings.completionModel, 'gpt-6-luna');
+        assert.strictEqual(settings.completionModel, 'minimax/minimax-m3.1-flash');
+    });
+
+    test('tries the package first and the monolith after', () => {
+        assert.deepStrictEqual(serverCommands({ server: 'auto', command: '' }), ['ai-serve', 'ai']);
+        assert.deepStrictEqual(serverCommands({ server: 'ai-serve', command: '' }), ['ai-serve']);
+        assert.deepStrictEqual(serverCommands({ server: 'ai', command: '' }), ['ai']);
+        assert.deepStrictEqual(serverCommands({ server: 'auto', command: 'D:\\bin\\ai.exe' }), ['D:\\bin\\ai.exe']);
+        assert.deepStrictEqual(serverCommands({}), ['ai-serve', 'ai']);
     });
 
     test('every completion model enum id round-trips through readAgentSettings', () => {
@@ -942,6 +953,8 @@ suite('agent settings', () => {
         assert.strictEqual(reconnects(['vext.agent.token']), true);
         assert.strictEqual(reconnects(['vext.agent.openaiBaseUrl']), true);
         assert.strictEqual(reconnects(['vext.agent.openaiApiKey']), true);
+        assert.strictEqual(reconnects(['vext.agent.server']), true);
+        assert.strictEqual(reconnects(['vext.agent.command']), true);
         assert.strictEqual(reconnects(['vext.agent.launch']), true);
         assert.strictEqual(reconnects(['vext.agent.command']), true);
     });
@@ -1181,8 +1194,11 @@ suite('agent settings', () => {
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.completion.debounceMs'].default, 350);
         const completionModel = pkg.contributes.configuration.properties['vext.agent.completion.model'];
-        assert.strictEqual(completionModel.default, 'gpt-6-luna');
+        assert.strictEqual(completionModel.default, 'minimax/minimax-m3.1-flash');
         assert.deepStrictEqual(completionModel.enum, [
+            'minimax/minimax-m3.1-flash',
+            'moonshotai/kimi-k3',
+            'openai/gpt-5.1',
             'gpt-6-luna',
             'anthropic/claude-haiku-5-5',
             'qwen/qwen3.8-omni-flash',
@@ -1194,7 +1210,11 @@ suite('agent settings', () => {
         ]);
         assert.match(completionModel.description, /gemini-3\.8-flash may be expensive/);
         assert.match(completionModel.description, /deepseek\/deepseek-v4\.1-flash is expensive/);
-        for (const key of ['vext.agent.command', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
+        const server = pkg.contributes.configuration.properties['vext.agent.server'];
+        assert.deepStrictEqual(server.enum, ['auto', 'ai-serve', 'ai']);
+        assert.strictEqual(server.default, 'auto');
+        assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.command'].default, '');
+        for (const key of ['vext.agent.command', 'vext.agent.server', 'vext.agent.launch', 'vext.agent.openaiBaseUrl', 'vext.agent.openaiApiKey', 'vext.agent.approve']) {
             assert.strictEqual(pkg.contributes.configuration.properties[key].scope, 'machine');
         }
     });
