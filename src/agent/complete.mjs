@@ -15,13 +15,15 @@ function wait(ms, token) {
     });
 }
 
-export function createCompleteClient({ WebSocketImpl, onStatus }) {
+export function createCompleteClient({ WebSocketImpl, onStatus, fetchImpl = globalThis.fetch }) {
     let socket = null;
     let endpoint = null;
     let generation = 0;
     let resolveOpened = () => {};
     let opened = Promise.resolve();
     const waiters = new Map();
+    // The ids of the requests the server refused: the HTTP way must not repeat them.
+    const refused = new Set();
 
     const failAll = () => {
         for (const [id, waiter] of waiters) {
@@ -66,6 +68,7 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
                 onStatus?.(String(message.message ?? 'Ошибка дополнения.'));
                 const waiter = waiters.get(message.id);
                 if (waiter) {
+                    refused.add(message.id);
                     waiter(null);
                     waiters.delete(message.id);
                 }
@@ -99,10 +102,58 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
         } catch { /* already closed */ }
     };
 
+    /**
+     * The way of the HTTP: the route `/v1/complete` of the server.
+     *
+     * The WebSocket is the fast way, but a server may have no bridge of the completion
+     * on it: the HTTP route is the way back. The token of the server goes in the header.
+     *
+     * @param {object} body
+     * @param {{ isCancellationRequested?: boolean, onCancellationRequested?: Function }|undefined} signal
+     * @param {number} gen
+     * @returns {Promise<string|null>}
+     */
+    const askHttp = async (body, signal, gen) => {
+        const url = typeof endpoint?.complete === 'string' ? endpoint.complete : '';
+        if (!url || typeof fetchImpl !== 'function') {
+            return null;
+        }
+        if (signal?.isCancellationRequested || gen !== generation) {
+            return null;
+        }
+        const controller = new AbortController();
+        const cancel = () => controller.abort();
+        signal?.onCancellationRequested?.(cancel);
+        try {
+            const response = await fetchImpl(url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${typeof endpoint.token === 'string' ? endpoint.token : ''}`,
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+            if (!response?.ok) {
+                onStatus?.(`Дополнение по HTTP: ${response?.status ?? 'ошибка'}.`);
+                return null;
+            }
+            const answer = await response.json();
+            const text = typeof answer?.text === 'string' ? answer.text : '';
+            return text ? text : null;
+        } catch (error) {
+            if (error?.name !== 'AbortError') {
+                onStatus?.(error?.message || String(error));
+            }
+            return null;
+        }
+    };
+
     return {
         connect(next) {
             dropSocket();
             endpoint = next;
+            refused.clear();
             open();
         },
         close() {
@@ -131,13 +182,26 @@ export function createCompleteClient({ WebSocketImpl, onStatus }) {
                 signal?.onCancellationRequested?.(cancel);
                 socket.send(JSON.stringify(body));
             });
+            const ask = async () => {
+                const text = await sendNow();
+                if (text !== null) {
+                    return text;
+                }
+                // The server refused the request: the HTTP way would only repeat it.
+                const wasRefused = refused.has(body.id);
+                refused.delete(body.id);
+                if (wasRefused || gen !== generation) {
+                    return null;
+                }
+                return askHttp(body, signal, gen);
+            };
             if (socket && socket.readyState === 1) {
-                return sendNow();
+                return ask();
             }
             if (signal?.isCancellationRequested) {
                 return Promise.resolve(null);
             }
-            return opened.then(sendNow);
+            return opened.then(ask);
         },
         isOpen() {
             return Boolean(socket && socket.readyState === 1);

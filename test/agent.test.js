@@ -835,6 +835,55 @@ suite('agent complete', () => {
         client.close();
     });
 
+    test('asks the server over HTTP when the socket is not open', async () => {
+        const calls = [];
+        const client = createCompleteClient({
+            WebSocketImpl: FakeSocket,
+            onStatus: () => {},
+            fetchImpl: async (url, options) => {
+                calls.push({ url, options });
+                return { ok: true, json: async () => ({ id: '11', text: 'from http' }) };
+            },
+        });
+        client.connect({
+            completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok',
+            complete: 'http://127.0.0.1:8765/v1/complete',
+            token: 'tok',
+        });
+        const pending = client.request({ type: 'complete', id: '11', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: false, onCancellationRequested: () => {} });
+        FakeSocket.latest.close();
+        assert.strictEqual(await pending, 'from http');
+        assert.strictEqual(calls.length, 1);
+        assert.strictEqual(calls[0].url, 'http://127.0.0.1:8765/v1/complete');
+        assert.strictEqual(calls[0].options.method, 'POST');
+        assert.strictEqual(calls[0].options.headers.Authorization, 'Bearer tok');
+        assert.strictEqual(JSON.parse(calls[0].options.body).id, '11');
+        client.close();
+    });
+
+    test('does not ask the server over HTTP when the socket refused the request', async () => {
+        let calls = 0;
+        const client = createCompleteClient({
+            WebSocketImpl: FakeSocket,
+            onStatus: () => {},
+            fetchImpl: async () => {
+                calls += 1;
+                return { ok: true, json: async () => ({ text: 'from http' }) };
+            },
+        });
+        client.connect({
+            completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok',
+            complete: 'http://127.0.0.1:8765/v1/complete',
+            token: 'tok',
+        });
+        FakeSocket.latest.open();
+        const pending = client.request({ type: 'complete', id: '12', content: 'a', cursor: { line: 0, character: 1 } }, { isCancellationRequested: false, onCancellationRequested: () => {} });
+        FakeSocket.latest.receive({ type: 'error', id: '12', message: 'The completion failed.' });
+        assert.strictEqual(await pending, null);
+        assert.strictEqual(calls, 0);
+        client.close();
+    });
+
     test('returns null for an empty completion', async () => {
         const client = createCompleteClient({ WebSocketImpl: FakeSocket, onStatus: () => {} });
         client.connect({ completeWs: 'ws://127.0.0.1:8765/v1/complete?token=tok' });
