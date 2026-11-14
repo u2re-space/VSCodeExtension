@@ -7,6 +7,8 @@ import { agentHtml } from '../src/agent/html.mjs';
 import { createBus } from '../src/agent/bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from '../src/agent/complete.mjs';
 import { createMcpClient } from '../src/agent/mcpclient.mjs';
+import { createMcpServer, startStdioServer } from '../src/agent/mcp.mjs';
+import { createEditorToolProvider } from '../src/agent/mcpproxy.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
 import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
@@ -986,6 +988,111 @@ suite('agent mcp client', () => {
     });
 });
 
+suite('agent mcp server', () => {
+    test('says hello and gives the tools of the editor', async () => {
+        const server = createMcpServer({
+            listTools: async () => [{ name: 'read_file', description: 'Read a file.', inputSchema: { type: 'object' } }],
+        });
+        const hello = await server.handle({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26' } });
+        assert.strictEqual(hello.result.protocolVersion, '2025-03-26');
+        assert.strictEqual(hello.result.serverInfo.name, 'vext-vscode');
+        assert.ok(hello.result.capabilities.tools);
+        const ping = await server.handle({ jsonrpc: '2.0', id: 2, method: 'ping' });
+        assert.deepStrictEqual(ping.result, {});
+        const list = await server.handle({ jsonrpc: '2.0', id: 3, method: 'tools/list' });
+        assert.deepStrictEqual(list.result.tools.map((tool) => tool.name), ['read_file']);
+        const unknown = await server.handle({ jsonrpc: '2.0', id: 4, method: 'tools/nope' });
+        assert.strictEqual(unknown.error.code, -32601);
+    });
+
+    test('calls a tool and refuses an unknown one', async () => {
+        const calls = [];
+        const server = createMcpServer({
+            listTools: async () => [{ name: 'read_file', inputSchema: { type: 'object' } }],
+            callTool: async (name, args) => {
+                calls.push({ name, args });
+                return { text: 'body of a.js', isError: false };
+            },
+        });
+        const answer = await server.handle({
+            jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'read_file', arguments: { path: 'a.js' } },
+        });
+        assert.deepStrictEqual(answer.result, { content: [{ type: 'text', text: 'body of a.js' }], isError: false });
+        assert.deepStrictEqual(calls, [{ name: 'read_file', args: { path: 'a.js' } }]);
+        const missing = await server.handle({ jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'nope' } });
+        assert.strictEqual(missing.error.code, -32602);
+        assert.match(missing.error.message, /There is no tool named nope/);
+        const noName = await server.handle({ jsonrpc: '2.0', id: 7, method: 'tools/call', params: {} });
+        assert.strictEqual(noName.error.code, -32602);
+    });
+
+    test('answers a failure of the tool as a text of the answer', async () => {
+        const server = createMcpServer({
+            listTools: async () => [{ name: 'read_file', inputSchema: { type: 'object' } }],
+            callTool: async () => {
+                throw new Error('Файл не найден.');
+            },
+        });
+        const answer = await server.handle({ jsonrpc: '2.0', id: 8, method: 'tools/call', params: { name: 'read_file' } });
+        assert.strictEqual(answer.result.isError, true);
+        assert.strictEqual(answer.result.content[0].text, 'Файл не найден.');
+    });
+
+    test('reads the resources and the prompts of the server', async () => {
+        const server = createMcpServer({ listTools: async () => [] });
+        const resources = await server.handle({ jsonrpc: '2.0', id: 9, method: 'resources/list' });
+        assert.deepStrictEqual(resources.result.resources.map((item) => item.uri), ['vscode://tools']);
+        const read = await server.handle({ jsonrpc: '2.0', id: 10, method: 'resources/read', params: { uri: 'vscode://tools' } });
+        assert.strictEqual(read.result.contents[0].mimeType, 'application/json');
+        const missing = await server.handle({ jsonrpc: '2.0', id: 11, method: 'resources/read', params: { uri: 'other://x' } });
+        assert.strictEqual(missing.error.code, -32602);
+        const prompts = await server.handle({ jsonrpc: '2.0', id: 12, method: 'prompts/list' });
+        assert.deepStrictEqual(prompts.result.prompts, []);
+    });
+
+    test('says nothing to a notification and answers a broken line', async () => {
+        const server = createMcpServer({ listTools: async () => [] });
+        assert.strictEqual(await server.handle({ jsonrpc: '2.0', method: 'notifications/initialized' }), null);
+        const lines = [];
+        const output = { write: (text) => lines.push(text) };
+        const handlers = {};
+        const input = {
+            setEncoding() {},
+            on(event, handler) { handlers[event] = handler; },
+            off() {},
+            resume() {},
+        };
+        const stdio = startStdioServer({ server, input, output });
+        await handlers.data('{ not json\n');
+        await handlers.data('{"jsonrpc":"2.0","id":13,"method":"ping"}\n');
+        const answers = lines.map((line) => JSON.parse(line.trim()));
+        assert.strictEqual(answers[0].error.code, -32700);
+        assert.deepStrictEqual(answers[1].result, {});
+        stdio.close();
+    });
+
+    test('keeps the tools of the editor and drops the tools of the server', async () => {
+        const client = {
+            listTools: async () => [
+                { name: 'read_file', description: 'The tool of the package.', inputSchema: { type: 'object' } },
+                { name: 'vscode__read_file', description: 'A file of the editor.', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } },
+                { name: 'vscode__write_file', description: 'A file of the editor.', inputSchema: { type: 'object' } },
+            ],
+            callTool: async (name, args) => {
+                client.called = { name, args };
+                return { text: 'ok', isError: false };
+            },
+        };
+        const provider = createEditorToolProvider({ client });
+        const tools = await provider.listTools();
+        assert.deepStrictEqual(tools.map((tool) => tool.name), ['read_file', 'write_file']);
+        assert.strictEqual(tools[0].description, 'A file of the editor.');
+        const answer = await provider.callTool('read_file', { path: 'a.js' });
+        assert.deepStrictEqual(client.called, { name: 'vscode__read_file', args: { path: 'a.js' } });
+        assert.deepStrictEqual(answer, { text: 'ok', isError: false });
+    });
+});
+
 suite('agent panel', () => {
     test('renders the command buttons and a locked down csp', () => {
         const html = agentHtml({
@@ -1312,6 +1419,7 @@ suite('agent settings', () => {
         assert.ok(ids.includes('vext.agent.stop'));
         assert.ok(ids.includes('vext.agent.reconnect'));
         assert.ok(ids.includes('vext.agent.tools'));
+        assert.ok(ids.includes('vext.agent.mcp'));
         assert.ok(pkg.contributes.views.agentView.some((view) => view.id === 'vext.agentView'));
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.port'].default, 0);
         assert.strictEqual(pkg.contributes.configuration.properties['vext.agent.launch'].default, false);

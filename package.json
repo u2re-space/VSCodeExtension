@@ -32,6 +32,7 @@
     "type": "module",
     "files": [
         "dist/extension.mjs",
+        "dist/agent-mcp.mjs",
         "icons/**",
         "assets/**",
         "modules/**",
@@ -769,6 +770,10 @@
             {
                 "command": "vext.agent.tools",
                 "title": "Universal AI: Tools of the agent server"
+            },
+            {
+                "command": "vext.agent.mcp",
+                "title": "Universal AI: Copy the MCP configuration of the editor"
             }
         ]
     },

@@ -317,6 +317,57 @@ export async function agent(context) {
         output.show(true);
     };
 
+    /**
+     * The configuration of the stdio server of MCP of the editor.
+     *
+     * Another AI system takes the tools of the editor through this server: the program
+     * of it speaks the protocol over the standard input and the standard output. The
+     * snippet names the program of the bundle and the home of the agent server, so the
+     * client of MCP finds the server of the bus.
+     *
+     * @returns {object}
+     */
+    const mcpConfiguration = () => {
+        const serverPath = vscode.Uri.joinPath(context.extensionUri, 'dist', 'agent-mcp.mjs').fsPath;
+        const env = {};
+        const serveHome = process.env.AI_SERVE_HOME;
+        const agentHome = process.env.AI_AGENT_HOME;
+        if (serveHome) {
+            env.AI_SERVE_HOME = serveHome;
+        }
+        if (agentHome) {
+            env.AI_AGENT_HOME = agentHome;
+        }
+        return {
+            mcpServers: {
+                vscode: {
+                    command: process.execPath,
+                    args: [serverPath],
+                    env,
+                },
+            },
+        };
+    };
+
+    /**
+     * Show the configuration of the stdio server of MCP and put it into the clipboard.
+     *
+     * @returns {Promise<void>}
+     */
+    const showMcpConfiguration = async () => {
+        const config = mcpConfiguration();
+        const text = JSON.stringify(config, null, 2);
+        output.appendLine('\n## MCP configuration');
+        output.appendLine(text);
+        output.show(true);
+        try {
+            await vscode.env.clipboard.writeText(text);
+            vscode.window.showInformationMessage('Конфигурация MCP скопирована в буфер обмена.');
+        } catch {
+            vscode.window.showWarningMessage('Конфигурация MCP показана в канале вывода.');
+        }
+    };
+
     const releaseLaunch = async (proc, killFilePid) => {
         if (spawnWatch) {
             spawnWatch.on = false;
@@ -665,6 +716,7 @@ export async function agent(context) {
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.stop', () => session.onWebview({ type: 'stop' })));
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.reconnect', () => session.onWebview({ type: 'reconnect' })));
     context.subscriptions.push(vscode.commands.registerCommand('vext.agent.tools', () => showServerTools()));
+    context.subscriptions.push(vscode.commands.registerCommand('vext.agent.mcp', () => showMcpConfiguration()));
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (!shouldReconnectAgent((section) => event.affectsConfiguration(section))) {
             return;
