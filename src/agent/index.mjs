@@ -2,6 +2,7 @@ import vscodeAPI from '../imports/api.ts';
 import { createBus } from './bus.mjs';
 import { createCompleteClient, registerAgentCompletion } from './complete.mjs';
 import { createMcpClient } from './mcpclient.mjs';
+import { mcpServerConfiguration } from './mcpconfig.mjs';
 import { createWorkspaceIo, executeProcessing } from './processing.mjs';
 import { agentHome, homeDirectories, loadFirstServeRecord, loadServeRecord, pidAlive, resolveEndpoint } from './endpoint.mjs';
 import { AgentViewProvider } from './panel.mjs';
@@ -327,27 +328,11 @@ export async function agent(context) {
      *
      * @returns {object}
      */
-    const mcpConfiguration = () => {
-        const serverPath = vscode.Uri.joinPath(context.extensionUri, 'dist', 'agent-mcp.mjs').fsPath;
-        const env = {};
-        const serveHome = process.env.AI_SERVE_HOME;
-        const agentHome = process.env.AI_AGENT_HOME;
-        if (serveHome) {
-            env.AI_SERVE_HOME = serveHome;
-        }
-        if (agentHome) {
-            env.AI_AGENT_HOME = agentHome;
-        }
-        return {
-            mcpServers: {
-                vscode: {
-                    command: process.execPath,
-                    args: [serverPath],
-                    env,
-                },
-            },
-        };
-    };
+    const mcpConfiguration = () => mcpServerConfiguration({
+        execPath: process.execPath,
+        serverPath: vscode.Uri.joinPath(context.extensionUri, 'dist', 'agent-mcp.mjs').fsPath,
+        env: process.env,
+    });
 
     /**
      * Show the configuration of the stdio server of MCP and put it into the clipboard.
