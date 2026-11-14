@@ -1,4 +1,17 @@
-import { answerFrame, approveFrame, claimFrames, nextDelay, panelMessageFromHub, submissionFrame, toolResultFrame } from './protocol.mjs';
+import {
+    answerFrame,
+    approveFrame,
+    claimFrames,
+    helloFrame,
+    isOwnRun,
+    nextDelay,
+    panelMessageFromHub,
+    PROCESSABLE,
+    submissionFrame,
+    toolCallRequest,
+    toolResultFrame,
+    toolsRegisterFrame,
+} from './protocol.mjs';
 
 export function createBus({ WebSocketImpl, schedule = (cb)=>{
     return queueMicrotask?.(cb);
@@ -13,8 +26,11 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
     let phase = 'idle';
     let hubReady = false;
     let pending = null;
+    let submitted = null;
+    let toolsRefused = false;
     const runDirs = new Map();
     const inflight = new Set();
+    const claimed = new Set();
 
     const abortInflight = (runId) => {
         for (const controller of inflight) {
@@ -53,6 +69,36 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
                 return;
             }
             send(toolResultFrame(frame.requestId, { error: error?.message || String(error) }));
+        } finally {
+            inflight.delete(controller);
+        }
+    };
+
+    const answerToolCall = async (frame) => {
+        const request = toolCallRequest(frame);
+        if (!request) {
+            return;
+        }
+        const gen = generation;
+        const controller = new AbortController();
+        controller.runId = '';
+        inflight.add(controller);
+        onMessage?.({ type: 'log', level: 'info', text: `инструмент редактора: ${request.name}` });
+        try {
+            // The call of a tool of the editor may come outside a run: the work folder
+            // is the folder of the workspace.
+            const result = onToolRequest
+                ? await onToolRequest({ name: request.name, args: request.args }, '', controller.signal)
+                : { error: 'Обработка инструмента недоступна.' };
+            if (controller.signal.aborted || gen !== generation) {
+                return;
+            }
+            send(toolResultFrame(request.requestId, result ?? { error: 'Ошибка инструмента.' }));
+        } catch (error) {
+            if (controller.signal.aborted || gen !== generation || error?.name === 'AbortError') {
+                return;
+            }
+            send(toolResultFrame(request.requestId, { error: error?.message || String(error) }));
         } finally {
             inflight.delete(controller);
         }
@@ -104,11 +150,35 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
     const dispatch = (result) => {
         for (const frame of result.frames) {
             send(frame);
+            if (frame.type === 'start') {
+                submitted = {
+                    command: typeof frame.command === 'string' ? frame.command : '',
+                    prompt: typeof frame.prompt === 'string' ? frame.prompt : '',
+                    cwd: typeof frame.cwd === 'string' ? frame.cwd : '',
+                };
+            }
         }
         if (result.frames.some((frame) => frame.type === 'start')) {
             phase = 'starting';
         }
         return result;
+    };
+
+    /**
+     * Hold the tools of a run for the editor.
+     *
+     * The server asks the holder of a tool to run it. Every run of this client is
+     * claimed once: the claim of the same run again is a mistake.
+     *
+     * @param {string} runId
+     * @returns {boolean}
+     */
+    const sendClaim = (runId) => {
+        if (typeof runId !== 'string' || runId === '' || claimed.has(runId)) {
+            return false;
+        }
+        claimed.add(runId);
+        return send({ type: 'processing.claim', runId, tools: PROCESSABLE.slice() });
     };
 
     const flushPending = () => {
@@ -140,6 +210,7 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
         const present = list.some((run) => run && run.id === phase.runId);
         if (!present) {
             phase = 'idle';
+            submitted = null;
         }
     };
 
@@ -149,6 +220,7 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
         }
         const gen = ++generation;
         hubReady = false;
+        toolsRefused = false;
         status('connecting', endpoint.url);
         const ws = new WebSocketImpl(endpoint.url);
         socket = ws;
@@ -156,7 +228,7 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
             if (gen !== generation) {
                 return;
             }
-            ws.send(JSON.stringify({ type: 'hello', role: 'client', token: endpoint.token }));
+            ws.send(JSON.stringify(helloFrame(endpoint.token)));
         };
         ws.onmessage = (event) => {
             if (gen !== generation) {
@@ -179,12 +251,24 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
                     }
                 }
                 for (const claim of claimFrames(frame.runs)) {
+                    claimed.add(claim.runId);
                     send(claim);
+                }
+                // The tools of the editor go to the server: another system may call them
+                // through the MCP server of the package.
+                if (!toolsRefused) {
+                    send(toolsRegisterFrame());
                 }
                 flushPending();
             }
             if (frame.type === 'error' && frame.code === 'unauthorized') {
                 unauthorized = true;
+            }
+            if (frame.type === 'error' && frame.code === 'unknown_type' && !toolsRefused) {
+                // The server does not know the frame of the tools: it is an old server.
+                // The editor keeps working, it only has no tools in the MCP server.
+                toolsRefused = true;
+                return;
             }
             if (frame.type === 'error' && phase === 'starting') {
                 phase = 'idle';
@@ -192,6 +276,11 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
             if (frame.type === 'run.started') {
                 rememberRun(frame.run);
                 if (frame.run && phase === 'starting') {
+                    // The server of the package does not take the claim of the frame
+                    // `start`, so the editor claims the run of its own here.
+                    if (isOwnRun(frame.run, submitted)) {
+                        sendClaim(frame.run.id);
+                    }
                     phase = { runId: frame.run.id, command: frame.run.command };
                 }
             }
@@ -202,10 +291,14 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
                 }
                 if (phase && phase.runId === frame.runId) {
                     phase = 'idle';
+                    submitted = null;
                 }
             }
             if (frame.type === 'tool.request') {
                 void answerTool(frame);
+            }
+            if (frame.type === 'tool.call') {
+                void answerToolCall(frame);
             }
             deliver(frame);
         };
@@ -240,6 +333,8 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
             failPending();
             abortInflight();
             runDirs.clear();
+            claimed.clear();
+            submitted = null;
             hubReady = false;
             stopped = false;
             unauthorized = false;
@@ -261,6 +356,8 @@ export function createBus({ WebSocketImpl, schedule = (cb)=>{
             failPending();
             abortInflight();
             runDirs.clear();
+            claimed.clear();
+            submitted = null;
             hubReady = false;
             stopped = true;
             generation += 1;

@@ -20,6 +20,7 @@ const {
     nextDelay, submissionFrame, approveFrame, completionRequest, acceptCompletion,
     panelMessageFromEvent, panelMessageFromHub, FULL_BYTES,
     PROCESSABLE, claimFrames, toolResultFrame,
+    CLIENT_NAME, CLIENT_TOOLS, helloFrame, toolsRegisterFrame, toolCallRequest, runTitle, isOwnRun,
 } = protocolTest;
 
 suite('agent endpoint', () => {
@@ -264,6 +265,52 @@ suite('agent protocol', () => {
         assert.deepStrictEqual(toolResultFrame('q2', { error: ' Файл не найден ' }), { type: 'tool.result', requestId: 'q2', error: 'Файл не найден' });
     });
 
+    test('says hello with the name of the editor', () => {
+        assert.deepStrictEqual(helloFrame('tok'), { type: 'hello', role: 'client', token: 'tok', name: 'vscode' });
+        assert.strictEqual(CLIENT_NAME, 'vscode');
+    });
+
+    test('publishes the tools of the editor without the prefix of the client', () => {
+        const frame = toolsRegisterFrame();
+        assert.strictEqual(frame.type, 'tools.register');
+        const names = frame.tools.map((tool) => tool.name);
+        assert.deepStrictEqual(names.slice().sort(), PROCESSABLE.slice().sort());
+        assert.strictEqual(names.some((name) => name.includes('__')), false);
+        for (const tool of frame.tools) {
+            assert.strictEqual(typeof tool.description, 'string');
+            assert.strictEqual(tool.parameters.type, 'object');
+        }
+        assert.strictEqual(CLIENT_TOOLS.length, PROCESSABLE.length);
+        const broken = toolsRegisterFrame([{ name: ' ' }, { name: 'x' }]);
+        assert.deepStrictEqual(broken.tools, [{ name: 'x', description: '', parameters: { type: 'object', properties: {} } }]);
+    });
+
+    test('reads the request of a tool of the editor', () => {
+        assert.deepStrictEqual(toolCallRequest({ type: 'tool.call', requestId: 'q1', name: 'read_file', arguments: { path: 'a.js' } }), {
+            requestId: 'q1',
+            name: 'read_file',
+            args: { path: 'a.js' },
+        });
+        assert.deepStrictEqual(toolCallRequest({ type: 'tool.call', requestId: 'q2', name: 'list_files' }), {
+            requestId: 'q2',
+            name: 'list_files',
+            args: {},
+        });
+        assert.strictEqual(toolCallRequest({ type: 'tool.call', requestId: '', name: 'read_file' }), null);
+        assert.strictEqual(toolCallRequest({ type: 'tool.call', requestId: 'q3', name: '' }), null);
+        assert.strictEqual(toolCallRequest({ type: 'tool.request', requestId: 'q4', name: 'read_file' }), null);
+    });
+
+    test('knows the run of its own by the title and the folder', () => {
+        const submitted = { command: 'run', prompt: 'fix tests', cwd: 'C:\\work' };
+        assert.strictEqual(runTitle('run', 'fix tests'), 'run fix tests');
+        assert.strictEqual(isOwnRun({ title: 'run fix tests', cwd: 'C:\\work' }, submitted), true);
+        assert.strictEqual(isOwnRun({ title: 'run other', cwd: 'C:\\work' }, submitted), false);
+        assert.strictEqual(isOwnRun({ title: 'run fix tests', cwd: 'D:\\other' }, submitted), false);
+        assert.strictEqual(isOwnRun({ title: 'run fix tests' }, submitted), true);
+        assert.strictEqual(isOwnRun({ title: 'run fix tests', cwd: 'C:\\work' }, null), false);
+    });
+
     test('rejects an empty prompt, a missing folder, and a start that has not been acknowledged', () => {
         assert.strictEqual(submissionFrame({ command: 'run', prompt: '  ', cwd: 'C:\\work', approve: 'ask', phase: 'idle' }).error, 'empty');
         assert.strictEqual(submissionFrame({ command: 'run', prompt: 'x', cwd: '', approve: 'ask', phase: 'idle' }).error, 'no-workspace');
@@ -382,7 +429,7 @@ suite('agent bus', () => {
         });
         bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
         FakeSocket.latest.open();
-        assert.deepStrictEqual(FakeSocket.latest.sent[0], { type: 'hello', role: 'client', token: 'tok' });
+        assert.deepStrictEqual(FakeSocket.latest.sent[0], { type: 'hello', role: 'client', token: 'tok', name: 'vscode' });
         FakeSocket.latest.receive({ type: 'ready', runs: [] });
         assert.strictEqual(statuses.at(-1).state, 'ready');
         const result = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
@@ -489,7 +536,7 @@ suite('agent bus', () => {
         const pending = bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
         assert.strictEqual(FakeSocket.latest.sent.some((frame) => frame.type === 'start'), false);
         FakeSocket.latest.open();
-        assert.deepStrictEqual(FakeSocket.latest.sent, [{ type: 'hello', role: 'client', token: 'tok' }]);
+        assert.deepStrictEqual(FakeSocket.latest.sent, [{ type: 'hello', role: 'client', token: 'tok', name: 'vscode' }]);
         FakeSocket.latest.receive({ type: 'ready', runs: [] });
         const result = await pending;
         assert.strictEqual(result.frames[0].type, 'start');
@@ -671,6 +718,107 @@ suite('agent bus', () => {
         release();
         await new Promise((resolve) => setImmediate(resolve));
         assert.strictEqual(socket.sent.some((frame) => frame.type === 'tool.result'), false);
+    });
+
+    test('publishes the tools of the editor on ready', () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        FakeSocket.latest.open();
+        FakeSocket.latest.receive({ type: 'ready', runs: [] });
+        const register = FakeSocket.latest.sent.find((frame) => frame.type === 'tools.register');
+        assert.ok(register);
+        assert.deepStrictEqual(register.tools.map((tool) => tool.name).sort(), PROCESSABLE.slice().sort());
+        bus.close();
+    });
+
+    test('claims the run of its own when it starts', () => {
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: () => {},
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const socket = FakeSocket.latest;
+        socket.open();
+        socket.receive({ type: 'ready', runs: [] });
+        bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        socket.receive({
+            type: 'run.started',
+            run: { id: 'r1', source: 'client', status: 'running', command: 'run', title: 'run fix tests', cwd: 'C:\\work' },
+        });
+        const claim = socket.sent.find((frame) => frame.type === 'processing.claim');
+        assert.ok(claim);
+        assert.strictEqual(claim.runId, 'r1');
+        assert.deepStrictEqual(claim.tools, PROCESSABLE);
+        // The run of another client keeps its tools.
+        bus.submit({ command: 'ask', prompt: 'again', cwd: 'C:\\work', approve: 'ask' });
+        socket.receive({
+            type: 'run.started',
+            run: { id: 'r2', source: 'client', status: 'running', command: 'ask', title: 'ask something else', cwd: 'C:\\work' },
+        });
+        assert.strictEqual(socket.sent.filter((frame) => frame.type === 'processing.claim').length, 1);
+        bus.close();
+    });
+
+    test('answers a call of a tool of the editor outside a run', async () => {
+        let seen;
+        const messages = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: (message) => messages.push(message),
+            onStatus: () => {},
+            onToolRequest: async (frame, cwd) => {
+                seen = { name: frame.name, args: frame.args, cwd };
+                return { output: 'body', summary: 'sum', changes: [] };
+            },
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const socket = FakeSocket.latest;
+        socket.open();
+        socket.receive({ type: 'ready', runs: [] });
+        socket.receive({ type: 'tool.call', requestId: 'q7', name: 'read_file', arguments: { path: 'a.js' } });
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.deepStrictEqual(seen, { name: 'read_file', args: { path: 'a.js' }, cwd: '' });
+        assert.deepStrictEqual(socket.sent.find((frame) => frame.type === 'tool.result'), {
+            type: 'tool.result', requestId: 'q7', output: 'body', summary: 'sum',
+        });
+        assert.strictEqual(messages.some((message) => message.type === 'log'), true);
+        bus.close();
+    });
+
+    test('survives a server that does not know the tools of the editor', () => {
+        const messages = [];
+        const bus = createBus({
+            WebSocketImpl: FakeSocket,
+            schedule: () => 0,
+            clearSchedule: () => {},
+            onMessage: (message) => messages.push(message),
+            onStatus: () => {},
+        });
+        bus.connect({ url: 'ws://127.0.0.1:8765', token: 'tok' });
+        const socket = FakeSocket.latest;
+        socket.open();
+        socket.receive({ type: 'ready', runs: [] });
+        socket.receive({ type: 'error', code: 'unknown_type', message: 'Неизвестный тип кадра: tools.register.' });
+        assert.strictEqual(messages.some((message) => message.state === 'error'), false);
+        // The editor keeps working: the run of its own is claimed as before.
+        bus.submit({ command: 'run', prompt: 'fix tests', cwd: 'C:\\work', approve: 'ask' });
+        socket.receive({
+            type: 'run.started',
+            run: { id: 'r1', source: 'client', status: 'running', command: 'run', title: 'run fix tests', cwd: 'C:\\work' },
+        });
+        assert.strictEqual(socket.sent.some((frame) => frame.type === 'processing.claim'), true);
+        bus.close();
     });
 });
 

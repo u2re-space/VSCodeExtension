@@ -21,6 +21,231 @@ export function answerFrame(requestId, text) {
 
 export const PROCESSABLE = ['delete_file', 'list_files', 'read_file', 'replace_text', 'run_command', 'run_script', 'search_files', 'write_file'];
 
+/**
+ * The name of the editor on the bus.
+ *
+ * The server puts the name of the client in front of the name of every tool of it, so
+ * two clients may have a tool with the same name: the tool `read_file` of the editor
+ * `vscode` is `vscode__read_file`.
+ */
+export const CLIENT_NAME = 'vscode';
+
+/**
+ * The tools the editor publishes to the bus.
+ *
+ * The list is the catalog of the editor: the file system of the workspace and the
+ * terminal of the editor. The server shows the list in the MCP server, so another
+ * system may use the editor as the source of its own tools.
+ *
+ * The names are the names of the tools of the editor itself: the server adds the name
+ * of the client, and the server asks the editor to run a tool with the name it
+ * published.
+ */
+export const CLIENT_TOOLS = Object.freeze([
+    {
+        name: 'list_files',
+        description: 'The files and the directories of a path of the workspace of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+                depth: { type: 'integer', description: 'How deep the listing goes, from 1 to 6.' },
+                include_hidden: { type: 'boolean', description: 'The hidden files are in the list too.' },
+            },
+        },
+    },
+    {
+        name: 'read_file',
+        description: 'A text file of the workspace of the editor, with the numbered lines.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+                start_line: { type: 'integer', description: 'The first line of the range.' },
+                end_line: { type: 'integer', description: 'The last line of the range.' },
+            },
+            required: ['path'],
+        },
+    },
+    {
+        name: 'search_files',
+        description: 'The files of the workspace of the editor that hold a string or a regular expression.',
+        parameters: {
+            type: 'object',
+            properties: {
+                query: { type: 'string', description: 'The text or the regular expression to find.' },
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+                regex: { type: 'boolean', description: 'The query is a regular expression.' },
+                scope: { type: 'string', description: 'One of path, symbol, content, all.' },
+            },
+            required: ['query'],
+        },
+    },
+    {
+        name: 'write_file',
+        description: 'Create or overwrite a file of the workspace of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+                content: { type: 'string', description: 'The text of the file.' },
+                overwrite: { type: 'boolean', description: 'The file may be overwritten.' },
+            },
+            required: ['path', 'content'],
+        },
+    },
+    {
+        name: 'replace_text',
+        description: 'Replace a fragment of a file of the workspace of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+                search: { type: 'string', description: 'The text to replace.' },
+                replacement: { type: 'string', description: 'The text to put instead.' },
+                all: { type: 'boolean', description: 'Every occurrence is replaced, not the first one.' },
+            },
+            required: ['path', 'search', 'replacement'],
+        },
+    },
+    {
+        name: 'delete_file',
+        description: 'Delete a file of the workspace of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path, relative to the root of the workspace.' },
+            },
+            required: ['path'],
+        },
+    },
+    {
+        name: 'run_command',
+        description: 'Run a command in the terminal of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                command: { type: 'string', description: 'The line of the command.' },
+                cwd: { type: 'string', description: 'The working directory, relative to the root of the workspace.' },
+                timeout_seconds: { type: 'number', description: 'How long the command may run.' },
+            },
+            required: ['command'],
+        },
+    },
+    {
+        name: 'run_script',
+        description: 'Run a script of the workspace of the editor in the terminal of the editor.',
+        parameters: {
+            type: 'object',
+            properties: {
+                path: { type: 'string', description: 'The path of the script, relative to the root of the workspace.' },
+                args: { type: 'array', items: { type: 'string' }, description: 'The arguments of the script.' },
+                cwd: { type: 'string', description: 'The working directory, relative to the root of the workspace.' },
+                timeout_seconds: { type: 'number', description: 'How long the script may run.' },
+            },
+            required: ['path'],
+        },
+    },
+]);
+
+/**
+ * The frame that opens the talk with the server.
+ *
+ * The name of the client is in the frame: the server puts it in front of the names of
+ * the tools of the client.
+ *
+ * @param {string} token
+ * @returns {object}
+ */
+export function helloFrame(token) {
+    return { type: 'hello', role: 'client', token: String(token ?? ''), name: CLIENT_NAME };
+}
+
+/**
+ * The frame that publishes the tools of the editor.
+ *
+ * The list replaces the list the server had: a client that changes its catalog
+ * publishes it again.
+ *
+ * @param {Array<{ name: string, description?: string, parameters?: object }>} [tools]
+ * @returns {object}
+ */
+export function toolsRegisterFrame(tools = CLIENT_TOOLS) {
+    const list = [];
+    for (const tool of Array.isArray(tools) ? tools : []) {
+        const name = typeof tool?.name === 'string' ? tool.name.trim() : '';
+        if (!name) {
+            continue;
+        }
+        list.push({
+            name,
+            description: typeof tool.description === 'string' ? tool.description : '',
+            parameters: tool.parameters && typeof tool.parameters === 'object' && !Array.isArray(tool.parameters)
+                ? tool.parameters
+                : { type: 'object', properties: {} },
+        });
+    }
+    return { type: 'tools.register', tools: list };
+}
+
+/**
+ * The request of the server to run a tool of the editor.
+ *
+ * The server sends it when another system calls a tool of the editor through the MCP
+ * server of the package. The editor answers with `tool.result`.
+ *
+ * @param {object} frame
+ * @returns {{ requestId: string, name: string, args: object }|null}
+ */
+export function toolCallRequest(frame) {
+    if (!frame || frame.type !== 'tool.call') {
+        return null;
+    }
+    const requestId = typeof frame.requestId === 'string' ? frame.requestId : '';
+    const name = typeof frame.name === 'string' ? frame.name.trim() : '';
+    if (!requestId || !name) {
+        return null;
+    }
+    const args = frame.arguments && typeof frame.arguments === 'object' && !Array.isArray(frame.arguments)
+        ? frame.arguments
+        : {};
+    return { requestId, name, args };
+}
+
+/**
+ * The title of a run: the server builds it from the command and the prompt.
+ *
+ * @param {string} command
+ * @param {string} prompt
+ * @returns {string}
+ */
+export function runTitle(command, prompt) {
+    return `${command} ${prompt}`.trim().slice(0, 200);
+}
+
+/**
+ * Is the run the one this client has started?
+ *
+ * A run of another client belongs to another client: the tools of it stay with it. The
+ * title and the folder tell the runs apart.
+ *
+ * @param {object} run
+ * @param {{ command: string, prompt: string, cwd: string }|null} submitted
+ * @returns {boolean}
+ */
+export function isOwnRun(run, submitted) {
+    if (!run || !submitted) {
+        return false;
+    }
+    if (typeof run.title === 'string' && run.title !== runTitle(submitted.command, submitted.prompt)) {
+        return false;
+    }
+    if (typeof run.cwd === 'string' && run.cwd !== submitted.cwd) {
+        return false;
+    }
+    return true;
+}
+
 const CHANGE_OPS = new Set(['create', 'overwrite', 'edit', 'delete']);
 
 export function claimFrames(runs) {
@@ -363,11 +588,18 @@ export const __agentTest = {
     JSON_BYTES,
     nextDelay,
     PROCESSABLE,
+    CLIENT_NAME,
+    CLIENT_TOOLS,
     claimFrames,
     toolResultFrame,
     submissionFrame,
     approveFrame,
     answerFrame,
+    helloFrame,
+    toolsRegisterFrame,
+    toolCallRequest,
+    runTitle,
+    isOwnRun,
     completionHeader,
     completionRequest,
     acceptCompletion,
