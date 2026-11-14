@@ -10,7 +10,7 @@ import { createMcpClient } from '../src/agent/mcpclient.mjs';
 import { createMcpServer, startStdioServer } from '../src/agent/mcp.mjs';
 import { createEditorToolProvider } from '../src/agent/mcpproxy.mjs';
 import { __agentTest } from '../src/agent/endpoint.mjs';
-import { createWorkspaceIo, executeProcessing } from '../src/agent/processing.mjs';
+import { createWorkspaceIo, executeProcessing, toolNames } from '../src/agent/processing.mjs';
 import { __agentTest as protocolTest } from '../src/agent/protocol.mjs';
 import { launchOutcome, readAgentSettings, serverCommands, shouldKillSpawnedPid, shouldReconnectAgent, spawnArgs, spawnEnv } from '../src/agent/settings.mjs';
 
@@ -1071,8 +1071,7 @@ suite('agent mcp server', () => {
         stdio.close();
     });
 
-    test('keeps the tools of the editor and drops the tools of the server', async () => {
-        const client = {
+    test('keeps the tools of the editor and drops the tools of the server', async () => {        const client = {
             listTools: async () => [
                 { name: 'read_file', description: 'The tool of the package.', inputSchema: { type: 'object' } },
                 { name: 'vscode__read_file', description: 'A file of the editor.', inputSchema: { type: 'object', properties: { path: { type: 'string' } } } },
@@ -1090,6 +1089,17 @@ suite('agent mcp server', () => {
         const answer = await provider.callTool('read_file', { path: 'a.js' });
         assert.deepStrictEqual(client.called, { name: 'vscode__read_file', args: { path: 'a.js' } });
         assert.deepStrictEqual(answer, { text: 'ok', isError: false });
+    });
+
+    test('publishes exactly the tools the editor can run', () => {
+        const published = protocolTest.CLIENT_TOOLS.map((tool) => tool.name).sort();
+        assert.deepStrictEqual(published, toolNames().sort());
+        assert.deepStrictEqual(published, [...PROCESSABLE].sort());
+        for (const tool of protocolTest.CLIENT_TOOLS) {
+            assert.strictEqual(typeof tool.description, 'string');
+            assert.ok(tool.description.length > 0);
+            assert.strictEqual(tool.parameters?.type, 'object');
+        }
     });
 });
 

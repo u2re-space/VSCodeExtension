@@ -883,6 +883,19 @@ const TOOLS = {
     run_script: runScriptTool,
 };
 
+/**
+ * The names of the tools the editor can run.
+ *
+ * The catalog of the editor (`CLIENT_TOOLS`) and this list must be the same: the server
+ * of the bus publishes the catalog, and the server calls the tools of it.
+ *
+ * @returns {string[]}
+ * @exports
+ */
+export function toolNames() {
+    return Object.keys(TOOLS);
+}
+
 export async function executeProcessing(frame, io, signal) {
     ensure(signal);
     if (!io?.root || typeof io.root !== 'string' || !io.root.trim()) {
